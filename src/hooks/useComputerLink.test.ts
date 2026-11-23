@@ -36,10 +36,13 @@ const makePort = (status: ComputerLinkStatus) => {
       calls.push({ method: 'status' });
       return status;
     },
-    pair: async (options) => {
-      calls.push({ method: 'pair', options });
-      return status;
+    pairSearch: async (options) => {
+      calls.push({ method: 'pairSearch', options });
+      return { status, generation: 1, candidates: [] };
     },
+    pairOffer: async () => ({ status, failure: 'network' }),
+    pairConfirm: async () => ({ status, failure: 'network' }),
+    pairFinish: async () => status,
     connect: async (options) => {
       calls.push({ method: 'connect', options });
       return status;

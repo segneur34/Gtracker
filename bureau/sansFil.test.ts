@@ -6,10 +6,15 @@ import net from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import tls from 'node:tls'
+import { p256 } from '@noble/curves/nist.js'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { enHex } from './appairage'
-import { fabriquerCertificat } from './certificat'
+import { pairWithComputer } from '../src/library/computerPairing'
+import type { ComputerLinkStatus, PairConfirmResult, PairFinishOptions, PairOfferResult, PairSearchResult, PairStepFailure } from '../src/platform/computerLink'
+import { readComputerLinkStatus } from '../src/platform/computerLink'
+import { TAILLE_NONCE, enHex } from './appairage'
+import { empreinteCertificat, fabriquerCertificat } from './certificat'
 import { estTemporaire } from './disque'
+import type { MemoireFaux } from './fauxTelephone'
 import { FauxTelephone, RefusPc, sonder } from './fauxTelephone'
 import type { ContexteEcoute, JugementPareFeu, ResultatAutorisation } from './pareFeu'
 import type { Reponse } from './pont'
@@ -29,11 +34,12 @@ import {
   pareFeuFactice,
   stockageDossier,
 } from './sansFil'
-import type { ReponseSonde } from './sonde'
-import { TAILLE_NONCE_SONDE, decoderReponse, encoderQuestion } from './sonde'
+import type { ReponseSonde, VersionSonde } from './sonde'
+import { TAILLE_NONCE_SONDE, VERSION_SONDE, VERSION_SONDE_V2, decoderReponse, encoderQuestion } from './sonde'
+import { M_P256, commencerAppairage, conclure, scalaireDuCode } from './spake2'
 import { dossierLocal, gestionnairesTelephone } from './telephone'
-import type { Commande, Message } from './trames'
-import { TAILLE_BLOC, encoderMessage, encoderTrame } from './trames'
+import type { Commande, Message, MessageAppaire, RaisonRefus } from './trames'
+import { CAPACITE_ECRITURE, CAPACITE_SPAKE2, PROTOCOLE_SANS_FIL, TAILLE_BLOC, encoderMessage, encoderTrame } from './trames'
 
 let tmp: string
 /** Secrets du sans-fil, dans le profil du PC d'essai. */
@@ -109,7 +115,7 @@ function coupeeDans(port: number, adresseLocale: string, ms: number): Promise<bo
 }
 
 /** Envoie `n` questions de découverte depuis `adresseLocale`, et rend les réponses reçues dans la demi-seconde qui suit. */
-async function questionner(portSonde: number, adresseLocale: string, n: number): Promise<ReponseSonde[]> {
+async function questionner(portSonde: number, adresseLocale: string, n: number, version: VersionSonde = VERSION_SONDE): Promise<ReponseSonde[]> {
   const socket = dgram.createSocket('udp4')
   const recues: ReponseSonde[] = []
   socket.on('message', (paquet) => {
@@ -117,7 +123,7 @@ async function questionner(portSonde: number, adresseLocale: string, n: number):
     if (reponse) recues.push(reponse)
   })
   await new Promise<void>((fin) => socket.bind(0, adresseLocale, () => fin()))
-  for (let k = 0; k < n; k++) socket.send(encoderQuestion(randomBytes(TAILLE_NONCE_SONDE)), portSonde, '127.0.0.1')
+  for (let k = 0; k < n; k++) socket.send(encoderQuestion(randomBytes(TAILLE_NONCE_SONDE), version), portSonde, '127.0.0.1')
   await attendre(500)
   socket.close()
   return recues
@@ -395,6 +401,11 @@ describe('serveur sans fil', () => {
     expect(trouve?.identifiantPc).toBe(f.memoire?.identifiantPc)
     // Le nom du PC ne part qu'au téléphone reconnu.
     expect(f.memoire?.nomPc).toBe('PC de test')
+    // Version 2 : l'identifiant ne part que sous HMAC du nonce, que seul le téléphone appairé sait vérifier.
+    const v2 = await sonder('127.0.0.1', portSonde, 2_000, randomBytes, VERSION_SONDE_V2, f.memoire?.identifiantPc)
+    expect(v2).toMatchObject({ adresse: '127.0.0.1', port: (await s.etat()).port, nom: '', version: VERSION_SONDE_V2 })
+    expect(v2?.identifiantPc).not.toBe(f.memoire?.identifiantPc)
+    expect(await sonder('127.0.0.1', portSonde, 500, randomBytes, VERSION_SONDE_V2, '00'.repeat(16))).toBeNull()
   })
 
   it('répond trois fois par seconde au plus à une même adresse, sans priver les autres', async () => {
@@ -405,6 +416,10 @@ describe('serveur sans fil', () => {
     expect(await questionner(portSonde, '127.0.0.1', 6)).toHaveLength(3)
     expect(await questionner(portSonde, '127.0.0.2', 2)).toHaveLength(2)
     expect(await questionner(portSonde, '127.0.0.1', 1)).toHaveLength(0)
+    // Les deux versions partagent le plafond de l'adresse ; un hôte bavard ne prive pas le téléphone d'une autre.
+    expect(await questionner(portSonde, '127.0.0.1', 3, VERSION_SONDE_V2)).toHaveLength(0)
+    const v2 = await questionner(portSonde, '127.0.0.3', 2, VERSION_SONDE_V2)
+    expect(v2.map((r) => r.version)).toEqual([VERSION_SONDE_V2, VERSION_SONDE_V2])
   })
 })
 
@@ -817,6 +832,417 @@ describe('le faux téléphone, comme le greffon', () => {
     await cote.fermee
     expect(await provisoires()).toEqual([])
     expect(existsSync(path.join(telephone, 'sessions', 'neuf.gpx'))).toBe(false)
+  })
+})
+
+/**
+ * Un faux PC tenu par un intrus du réseau : un serveur TLS à son propre certificat, qui joue l'appairage à sa façon
+ * avec chaque téléphone qui s'y connecte.
+ */
+async function fauxPc(jouer: (liaison: Liaison, empreinte: Uint8Array) => Promise<void>) {
+  const c = fabriquerCertificat()
+  const serveurTls = tls.createServer({ cert: c.certificat, key: c.cle, minVersion: 'TLSv1.2' }, (socket) => {
+    const liaison = new Liaison(socket)
+    void jouer(liaison, c.empreinte).catch(() => liaison.fermer())
+  })
+  await new Promise<void>((fin) => serveurTls.listen(0, '127.0.0.1', () => fin()))
+  return { port: (serveurTls.address() as net.AddressInfo).port, empreinte: c.empreinte, fermer: () => serveurTls.close() }
+}
+
+/** Le premier message d'un téléphone, qui doit être `appairer`. */
+async function appairerRecu(liaison: Liaison) {
+  const m = await liaison.prochain(5_000)
+  if (m.type !== 'appairer') throw new Error(`appairer attendu, « ${m.type} » reçu`)
+  return m
+}
+
+/** Un code de 6 chiffres différent de `code`. */
+const autreCode = (code: string) => (code === '000000' ? '000001' : '000000')
+
+describe('appairage face à un intrus du réseau', () => {
+  it('le faux PC de la relecture n’obtient rien : ni le code, ni le jeton, ni l’empreinte fixée', async () => {
+    // Le vrai PC ouvre une fenêtre : l'utilisateur lit le code et le tape sur son téléphone.
+    const vrai = serveur()
+    await vrai.activer(true)
+    const ouvert = await vrai.ouvrirAppairage()
+    // L'intrus ne connaît pas le code : il bâtit sa part sur un code deviné, puis essaie hors ligne une liste de codes
+    // qui contient le bon (le meilleur cas pour lui), avec son scalaire y et sa part déjà envoyée.
+    const devine = autreCode(ouvert.code)
+    const candidats = [ouvert.code, devine, ...Array.from({ length: 20 }, (_, k) => String(100_000 + k * 37_123).padStart(6, '0'))]
+    let issue: { trouves: string[]; preuveRecue: boolean } | null = null
+    const intrus = await fauxPc(async (liaison, empreinte) => {
+      const m = await appairerRecu(liaison)
+      const partA = Buffer.from(m.partA ?? '', 'hex')
+      const etat = commencerAppairage('B', devine, empreinte, randomBytes)
+      liaison.envoyer({ type: 'defi', noncePc: enHex(randomBytes(32)), partB: enHex(etat.part) })
+      const preuve = await liaison.prochain(5_000)
+      if (preuve.type !== 'preuve') throw new Error('preuve attendue')
+      const recue = Buffer.from(preuve.preuve, 'hex')
+      const trouves = candidats.filter((c) => Buffer.from(conclure({ ...etat, w: scalaireDuCode(c) }, partA).confirmationA).equals(recue))
+      issue = { trouves, preuveRecue: true }
+      // Il répond au mieux : la confirmation de son code deviné, et un jeton à lui.
+      liaison.envoyer({ type: 'appaire', preuve: enHex(conclure(etat, partA).confirmationB), jeton: enHex(randomBytes(32)), identifiantPc: enHex(randomBytes(16)), nomPc: 'PC de test' })
+    })
+    try {
+      // Le téléphone de l'utilisateur joint le faux PC (première réponse à sa découverte) avec le bon code.
+      const victime = faux({ nom: 'Pixel 8' })
+      await expect(victime.appairer('127.0.0.1', intrus.port, ouvert.code)).rejects.toThrow(/Confirmation du PC fausse/)
+      expect(victime.memoire).toBeNull()
+      expect(issue).toEqual({ trouves: [], preuveRecue: true })
+      // Le code n'a jamais servi chez le vrai PC : sa fenêtre est intacte et le téléphone s'y appaire.
+      expect(await vrai.etat()).toMatchObject({ appairage: { code: ouvert.code }, codesFaux: null })
+      const liaison = await victime.appairer(ouvert.adresse, ouvert.port, ouvert.code)
+      expect(victime.memoire?.empreinte).not.toBe(enHex(intrus.empreinte))
+      expect((await vrai.telephones()).map((t) => t.nom)).toEqual(['Pixel 8'])
+      liaison.fermer()
+    } finally {
+      intrus.fermer()
+    }
+  })
+
+  it('un intrus qui relaie le téléphone vers le vrai PC échoue : le vrai PC compte un code faux et montre son origine', async () => {
+    const vrai = serveur({ essaiPareFeu: false })
+    await vrai.activer(true)
+    const ouvert = await vrai.ouvrirAppairage()
+    const relais = await fauxPc(async (cote) => {
+      const socket = tls.connect({ host: '127.0.0.1', port: ouvert.port, rejectUnauthorized: false })
+      await new Promise<void>((fin, echec) => socket.once('secureConnect', () => fin()).once('error', echec))
+      const versPc = new Liaison(socket)
+      versPc.envoyer(await appairerRecu(cote))
+      cote.envoyer(await versPc.prochain(5_000))
+      versPc.envoyer(await cote.prochain(5_000))
+      cote.envoyer(await versPc.prochain(5_000))
+    })
+    try {
+      const f = faux()
+      await expect(f.appairer('127.0.0.1', relais.port, ouvert.code)).rejects.toMatchObject({ raison: 'code' })
+      expect(f.memoire).toBeNull()
+      await quand(async () => (await vrai.etat()).codesFaux !== null)
+      expect((await vrai.etat()).codesFaux).toEqual({ nombre: 1, adresse: '127.0.0.1' })
+      expect(await vrai.telephones()).toEqual([])
+    } finally {
+      relais.fermer()
+    }
+  })
+
+  it('refuse l’ancien échange avec la raison « version », sans toucher à la fenêtre', async () => {
+    const s = serveur()
+    await s.activer(true)
+    const ouvert = await s.ouvrirAppairage()
+    await expect(faux({ ancienEchange: true }).appairer(ouvert.adresse, ouvert.port, ouvert.code)).rejects.toMatchObject({ raison: 'version' })
+    expect(await s.etat()).toMatchObject({ appairage: { code: ouvert.code }, codesFaux: null })
+    // Un téléphone sans capacité d'écriture, à l'échange à jour, s'appaire.
+    const { liaison } = await appairer(s, faux({ ancien: true }))
+    liaison.fermer()
+  })
+
+  it('le téléphone s’arrête sur un PC d’avant l’échange (défi sans part) sans rien prouver', async () => {
+    let apresDefi = ''
+    const ancienPc = await fauxPc(async (liaison) => {
+      await appairerRecu(liaison)
+      liaison.envoyer({ type: 'defi', noncePc: enHex(randomBytes(32)) })
+      apresDefi = await liaison.prochain(3_000).then(
+        (m) => m.type,
+        () => 'fermée',
+      )
+    })
+    try {
+      const f = faux()
+      await expect(f.appairer('127.0.0.1', ancienPc.port, '123456')).rejects.toMatchObject({ raison: 'version' })
+      await quand(() => apresDefi !== '')
+      expect(apresDefi).toBe('fermée')
+      expect(f.memoire).toBeNull()
+    } finally {
+      ancienPc.fermer()
+    }
+  })
+
+  it('une part fabriquée sur le bon code, ou hors courbe, compte comme un code faux avant toute réponse, sous le même échange et le même refus', async () => {
+    const s = serveur({ essaiPareFeu: false })
+    await s.activer(true)
+    const ouvert = await s.ouvrirAppairage()
+    /**
+     * Un `appairer` brut à la part donnée, sur une connexion neuve : la réponse du PC, les codes faux qu'il montre
+     * avant toute preuve, puis sa réponse à une confirmation quelconque.
+     */
+    const appairerBrut = async (partA: Uint8Array) => {
+      const liaison = new Liaison(await connexionBrute(ouvert.port))
+      liaison.envoyer({ type: 'appairer', version: 1, nom: 'Intrus', nonceTelephone: enHex(randomBytes(32)), partA: enHex(partA) })
+      const defi = await liaison.prochain(5_000)
+      const codesFaux = (await s.etat()).codesFaux
+      liaison.envoyer({ type: 'preuve', preuve: enHex(new Uint8Array(32)) })
+      const refus = await liaison.prochain(5_000)
+      liaison.fermer()
+      return { defi, codesFaux, refus }
+    }
+    const reponseAttendue = (nombre: number) => ({
+      defi: { type: 'defi', noncePc: expect.stringMatching(/^[0-9a-f]{64}$/), partB: expect.stringMatching(/^04[0-9a-f]{128}$/) },
+      codesFaux: { nombre, adresse: '127.0.0.1' },
+      refus: { type: 'refus', raison: 'code' },
+    })
+    // w·M au bon code : la clé du PC serait neutre. Compté dès `appairer`, puis le même échange qu'un code faux.
+    const wM = p256.Point.fromHex(M_P256).multiply(scalaireDuCode(ouvert.code)).toBytes(false)
+    expect(await appairerBrut(wM)).toEqual(reponseAttendue(1))
+    const horsCourbe = Uint8Array.from({ length: 65 }, (_, i) => (i === 0 ? 4 : 1))
+    expect(await appairerBrut(horsCourbe)).toEqual(reponseAttendue(2))
+    expect((await s.etat()).codesFaux).toEqual({ nombre: 2, adresse: '127.0.0.1' })
+    // Le compteur est celui de la fenêtre, toutes connexions comprises : une confirmation fausse de plus la ferme.
+    await expect(faux().appairer(ouvert.adresse, ouvert.port, autreCode(ouvert.code))).rejects.toMatchObject({ raison: 'code' })
+    expect(await s.etat()).toMatchObject({ appairage: null, codesFaux: { nombre: 3, adresse: '127.0.0.1' } })
+  })
+
+  it('n’accepte aucune suite TLS anonyme : l’empreinte prise pour l’échange est toujours celle d’un certificat servi', async () => {
+    const s = serveur({ essaiPareFeu: false })
+    await s.activer(true)
+    const ouvert = await s.ouvrirAppairage()
+    const anonyme = new Promise<string>((resoudre) => {
+      const socket = tls.connect({ host: '127.0.0.1', port: ouvert.port, rejectUnauthorized: false, maxVersion: 'TLSv1.2', ciphers: 'aNULL:@SECLEVEL=0' })
+      socket.once('secureConnect', () => {
+        socket.destroy()
+        resoudre('liée')
+      })
+      socket.once('error', (e) => resoudre(`refusée : ${e.message}`))
+    })
+    // Refusée par le serveur pendant la poignée (alerte reçue), pas faute d'avoir pu la commencer.
+    expect(await anonyme).toMatch(/^refusée : .*alert handshake failure/)
+  })
+
+  it('trois confirmations fausses ferment la fenêtre, avec l’origine de la dernière', async () => {
+    const s = serveur()
+    await s.activer(true)
+    const ouvert = await s.ouvrirAppairage()
+    for (let i = 1; i <= 3; i++) {
+      await expect(faux().appairer(ouvert.adresse, ouvert.port, autreCode(ouvert.code))).rejects.toMatchObject({ raison: 'code' })
+    }
+    expect(await s.etat()).toMatchObject({ appairage: null, codesFaux: { nombre: 3, adresse: '127.0.0.1' } })
+    await expect(faux().appairer(ouvert.adresse, ouvert.port, ouvert.code)).rejects.toMatchObject({ raison: 'fenetre' })
+  })
+
+  it('chaque refus d’appairage laisse une ligne au journal, l’adresse seulement dans le texte du mode d’essai', async () => {
+    const lignes: { message: string; essai?: string }[] = []
+    const s = serveur({ journal: (message, essai) => lignes.push({ message, essai }) })
+    const port = (await s.activer(true)).port as number
+    // Aucune fenêtre ouverte.
+    await expect(faux().appairer('127.0.0.1', port, '123456')).rejects.toMatchObject({ raison: 'fenetre' })
+    const ouvert = await s.ouvrirAppairage()
+    await expect(faux().appairer(ouvert.adresse, ouvert.port, autreCode(ouvert.code))).rejects.toMatchObject({ raison: 'code' })
+    const refus = lignes.filter((l) => l.message.startsWith('appairage refusé'))
+    expect(refus).toEqual([
+      { message: 'appairage refusé : fenetre', essai: 'appairage refusé (127.0.0.1) : fenetre' },
+      { message: 'appairage refusé : code', essai: 'appairage refusé (127.0.0.1) : code' },
+    ])
+  })
+})
+
+/** La génération ouverte par la recherche du faux greffon. */
+const GENERATION_ESSAI = 1
+
+/** Raison d'un refus du PC telle que le greffon la rend à la page (`pairRefusal` de `ComputerLinkPlugin.java`). */
+const ECHEC_DU_REFUS: Record<RaisonRefus, PairStepFailure> = { code: 'code', fenetre: 'window', nonce: 'nonce', jeton: 'proof', version: 'version' }
+
+/**
+ * Le greffon Java du téléphone (`ComputerLinkPlugin.java`), rejoué en Node pour l'appairage : il ne fait que
+ * transporter, le calcul est celui de la page (`src/library/computerPairing.ts`). Comme lui : liaison TLS sans
+ * empreinte fixée, empreinte du certificat vu rendue à la page, une seule confirmation par candidat, et ce que le PC
+ * rend dans `appaire` (jeton, identifiant, nom) n'en sort pas ; il n'est gardé (`garde`) qu'à l'ordre de garder.
+ * Les candidats de la recherche sont donnés tels quels (« 127.0.0.1:port »).
+ */
+function greffonEssai(candidats: string[]) {
+  type EnCours = { liaison: Liaison; empreinte: Uint8Array; port: number; offert: boolean; appaire: MessageAppaire | null }
+  let enCours: EnCours | null = null
+  const statut = readComputerLinkStatus({ state: 'pairing' })
+  const lacher = () => {
+    enCours?.liaison.fermer('appairage abandonné par le téléphone.')
+    enCours = null
+  }
+  const echec = (failure: PairStepFailure) => {
+    lacher()
+    return { status: statut, failure }
+  }
+  const greffon = {
+    /** Fins demandées par la page, dans l'ordre. */
+    fins: [] as PairFinishOptions[],
+    /** Candidats joints par `pairOffer`, dans l'ordre. */
+    offres: [] as string[],
+    /** Confirmations du téléphone parties vers un PC. */
+    confirmations: 0,
+    /** L'appairage gardé (ce que le greffon écrirait dans ses préférences), `null` tant que la page n'a rien gardé. */
+    garde: null as MemoireFaux | null,
+    pairSearch: async (): Promise<PairSearchResult> => ({ status: statut, generation: GENERATION_ESSAI, candidates: candidats }),
+    pairOffer: async ({ generation, endpoint, partA }: { generation: number; endpoint: string; partA: string }): Promise<PairOfferResult> => {
+      lacher()
+      greffon.offres.push(endpoint)
+      if (generation !== GENERATION_ESSAI) return echec('network')
+      const port = Number(endpoint.split(':')[1])
+      let liaison: Liaison
+      try {
+        liaison = new Liaison(await connexionBrute(port))
+      } catch {
+        return echec('unreachable')
+      }
+      const der = liaison.certificatDistant()
+      if (!der) {
+        liaison.fermer()
+        return echec('protocol')
+      }
+      const c: EnCours = { liaison, empreinte: empreinteCertificat(der), port, offert: false, appaire: null }
+      enCours = c
+      try {
+        liaison.envoyer({
+          type: 'appairer', version: PROTOCOLE_SANS_FIL, nom: 'Pixel 8', nonceTelephone: enHex(randomBytes(TAILLE_NONCE)), partA,
+          capacites: [CAPACITE_ECRITURE, CAPACITE_SPAKE2],
+        })
+        const defi = await liaison.prochain(5_000)
+        if (defi.type === 'refus') return echec(ECHEC_DU_REFUS[defi.raison])
+        if (defi.type !== 'defi') return echec('protocol')
+        const fingerprint = enHex(c.empreinte)
+        // PC resté à l'ancien échange : la liaison est fermée, aucune confirmation ne partira vers lui.
+        if (defi.partB === undefined) {
+          lacher()
+          return { status: statut, failure: null, fingerprint, partB: null }
+        }
+        c.offert = true
+        return { status: statut, failure: null, fingerprint, partB: defi.partB }
+      } catch {
+        return echec('network')
+      }
+    },
+    pairConfirm: async ({ generation, cA }: { generation: number; cA: string }): Promise<PairConfirmResult> => {
+      const c = enCours
+      if (generation !== GENERATION_ESSAI || c === null) return echec('network')
+      if (!c.offert) return echec('protocol')
+      c.offert = false
+      greffon.confirmations++
+      try {
+        c.liaison.envoyer({ type: 'preuve', preuve: cA })
+        const r = await c.liaison.prochain(5_000)
+        if (r.type === 'refus') return echec(ECHEC_DU_REFUS[r.raison])
+        if (r.type !== 'appaire') return echec('protocol')
+        c.appaire = r
+        return { status: statut, failure: null, cB: r.preuve }
+      } catch {
+        return echec('network')
+      }
+    },
+    pairFinish: async (options: PairFinishOptions): Promise<ComputerLinkStatus> => {
+      greffon.fins.push(options)
+      const c = enCours
+      if (options.keep && c?.appaire) {
+        const { jeton, identifiantPc, nomPc } = c.appaire
+        greffon.garde = { jeton, empreinte: enHex(c.empreinte), identifiantPc, nomPc, adresse: '127.0.0.1', port: c.port }
+      }
+      lacher()
+      const garde = greffon.garde
+      if (garde) return readComputerLinkStatus({ state: 'linked', paired: true, computerName: garde.nomPc })
+      return readComputerLinkStatus({ state: 'unpaired', error: options.keep ? 'network' : options.error })
+    },
+  }
+  return greffon
+}
+
+describe('appairage de bout en bout : le vrai PC face au calcul de la page, par un greffon rejoué en Node', () => {
+  it('bon code : la page garde le PC, le jeton reste au greffon et ouvre ensuite la liaison', async () => {
+    const s = serveur()
+    await s.activer(true)
+    const ouvert = await s.ouvrirAppairage()
+    const greffon = greffonEssai([`127.0.0.1:${ouvert.port}`])
+    // Tapé avec une espace au milieu, comme sur le téléphone.
+    const tape = `${ouvert.code.slice(0, 3)} ${ouvert.code.slice(3)}`
+    const etat = await pairWithComputer(greffon, { code: tape, folder: 'content://dossier' })
+    expect(etat).toMatchObject({ state: 'linked', paired: true, computerName: 'PC de test' })
+    expect(greffon.fins).toEqual([{ generation: GENERATION_ESSAI, keep: true, folder: 'content://dossier' }])
+    expect(greffon.confirmations).toBe(1)
+    expect(greffon.garde?.jeton).toMatch(/^[0-9a-f]{64}$/)
+    expect(await s.etat()).toMatchObject({ codesFaux: null })
+    expect((await s.telephones()).map((t) => t.nom)).toEqual(['Pixel 8'])
+    // Le jeton gardé est bien celui que le PC a inscrit : le téléphone se présente par lui, sans code.
+    const liaison = await faux({ memoire: greffon.garde as MemoireFaux }).connecter()
+    liaison.fermer()
+  })
+
+  it('code faux : rien n’est gardé, et le PC compte un code faux', async () => {
+    const s = serveur()
+    await s.activer(true)
+    const ouvert = await s.ouvrirAppairage()
+    const greffon = greffonEssai([`127.0.0.1:${ouvert.port}`])
+    const etat = await pairWithComputer(greffon, { code: autreCode(ouvert.code), folder: null })
+    expect(etat).toMatchObject({ paired: false, error: 'code' })
+    expect(greffon.fins).toEqual([{ generation: GENERATION_ESSAI, keep: false, error: 'code', notFound: false }])
+    expect(greffon.garde).toBeNull()
+    expect(await s.etat()).toMatchObject({ appairage: { code: ouvert.code }, codesFaux: { nombre: 1, adresse: '127.0.0.1' } })
+    expect(await s.telephones()).toEqual([])
+  })
+
+  it('PC d’avant l’échange SPAKE2 (défi sans part) : « version », sans qu’aucune confirmation ne parte', async () => {
+    let apresDefi = ''
+    const ancienPc = await fauxPc(async (liaison) => {
+      await appairerRecu(liaison)
+      liaison.envoyer({ type: 'defi', noncePc: enHex(randomBytes(32)) })
+      apresDefi = await liaison.prochain(3_000).then(
+        (m) => m.type,
+        () => 'fermée',
+      )
+    })
+    try {
+      const greffon = greffonEssai([`127.0.0.1:${ancienPc.port}`])
+      expect(await pairWithComputer(greffon, { code: '123456', folder: null })).toMatchObject({ paired: false, error: 'version' })
+      expect(greffon.fins).toEqual([{ generation: GENERATION_ESSAI, keep: false, error: 'version', notFound: false }])
+      expect(greffon.confirmations).toBe(0)
+      expect(greffon.garde).toBeNull()
+      await quand(() => apresDefi !== '')
+      expect(apresDefi).toBe('fermée')
+    } finally {
+      ancienPc.fermer()
+    }
+  })
+
+  it('un relais entre deux certificats échoue : jamais gardé, et le vrai PC compte un code faux', async () => {
+    const vrai = serveur({ essaiPareFeu: false })
+    await vrai.activer(true)
+    const ouvert = await vrai.ouvrirAppairage()
+    const relais = await fauxPc(async (cote) => {
+      const versPc = new Liaison(await connexionBrute(ouvert.port))
+      versPc.envoyer(await appairerRecu(cote))
+      cote.envoyer(await versPc.prochain(5_000))
+      versPc.envoyer(await cote.prochain(5_000))
+      cote.envoyer(await versPc.prochain(5_000))
+    })
+    try {
+      const greffon = greffonEssai([`127.0.0.1:${relais.port}`])
+      expect(await pairWithComputer(greffon, { code: ouvert.code, folder: null })).toMatchObject({ paired: false, error: 'code' })
+      expect(greffon.fins).toEqual([{ generation: GENERATION_ESSAI, keep: false, error: 'code', notFound: false }])
+      expect(greffon.garde).toBeNull()
+      expect((await vrai.etat()).codesFaux).toEqual({ nombre: 1, adresse: '127.0.0.1' })
+      expect(await vrai.telephones()).toEqual([])
+    } finally {
+      relais.fermer()
+    }
+  })
+
+  it('un faux PC qui répond le premier n’empêche pas l’appairage : il est écarté sur sa confirmation, le vrai est gardé', async () => {
+    const vrai = serveur()
+    await vrai.activer(true)
+    const ouvert = await vrai.ouvrirAppairage()
+    const intrus = await fauxPc(async (liaison, empreinte) => {
+      const m = await appairerRecu(liaison)
+      const etat = commencerAppairage('B', autreCode(ouvert.code), empreinte, randomBytes)
+      liaison.envoyer({ type: 'defi', noncePc: enHex(randomBytes(32)), partB: enHex(etat.part) })
+      await liaison.prochain(5_000)
+      const cles = conclure(etat, Buffer.from(m.partA ?? '', 'hex'))
+      liaison.envoyer({ type: 'appaire', preuve: enHex(cles.confirmationB), jeton: enHex(randomBytes(32)), identifiantPc: enHex(randomBytes(16)), nomPc: 'PC de test' })
+    })
+    try {
+      const greffon = greffonEssai([`127.0.0.1:${intrus.port}`, `127.0.0.1:${ouvert.port}`])
+      expect(await pairWithComputer(greffon, { code: ouvert.code, folder: null })).toMatchObject({ state: 'linked', paired: true })
+      expect(greffon.offres).toHaveLength(2)
+      expect(greffon.confirmations).toBe(2)
+      expect(greffon.fins).toEqual([{ generation: GENERATION_ESSAI, keep: true, folder: null }])
+      expect(greffon.garde?.empreinte).not.toBe(enHex(intrus.empreinte))
+      expect(greffon.garde?.port).toBe(ouvert.port)
+      expect(await vrai.etat()).toMatchObject({ codesFaux: null })
+    } finally {
+      intrus.fermer()
+    }
   })
 })
 

@@ -494,6 +494,50 @@ function modulesDe(depart) {
   }
 }
 
+/**
+ * Regroupe le calcul de l'appairage, `bureau/spake2.ts`, et les paquets dont il se sert (`@noble/curves` et
+ * `@noble/hashes`, publiés en modules ES seulement) en un seul fichier CommonJS, `<sortie>/spake2.js`, qui remplace
+ * celui de tsc : la coquille le charge par `require('./spake2')`, sans `node_modules` dans l'archive ni chargement
+ * d'un module ES à l'exécution, et l'emballage le prend comme ses autres fichiers. Regroupeur : rolldown, celui de
+ * Vite, pris là où Vite le trouve. Un `require` resté dans le fichier arrête la construction.
+ */
+function regrouperSpake2(modules, sortie) {
+  const rolldown = dirname(createRequire(join(modules, 'vite', 'package.json')).resolve('rolldown/package.json'))
+  const fichier = join(sortie, 'spake2.js')
+  rmSync(fichier, { force: true })
+  etape("regroupement du calcul de l'appairage (rolldown)", join(rolldown, 'bin', 'cli.mjs'), [
+    join(BUREAU, 'spake2.ts'),
+    '--format',
+    'cjs',
+    '--platform',
+    'node',
+    '--file',
+    fichier,
+    '--logLevel',
+    'warn',
+  ])
+  if (!existsSync(fichier)) throw new Error(`calcul de l'appairage absent après le regroupement : ${fichier}`)
+  const restes = readFileSync(fichier, 'utf8').match(/\brequire\s*\(\s*["'][^"']+["']\s*\)/g)
+  if (restes) throw new Error(`calcul de l'appairage regroupé : ${[...new Set(restes)].join(', ')} resté dans ${fichier}`)
+  // Ces paquets se résolvent depuis `bureau/` dans le regroupement, depuis la racine dans la page (donc l'APK) : une
+  // autre version dans `bureau/node_modules` (dépendance d'un outil d'emballage, ou installation pas à jour) ferait
+  // calculer l'appairage par deux bibliothèques différentes. `bureau/package.json` pose la même version que la racine.
+  const versionDe = (paquet, depuis) => {
+    for (let d = depuis; ; d = dirname(d)) {
+      const fiche = join(d, 'node_modules', paquet, 'package.json')
+      if (existsSync(fiche)) return JSON.parse(readFileSync(fiche, 'utf8')).version
+      if (dirname(d) === d) return null
+    }
+  }
+  for (const paquet of ['@noble/curves', '@noble/hashes']) {
+    const bureau = versionDe(paquet, BUREAU)
+    const racine = versionDe(paquet, RACINE)
+    if (bureau === null || bureau !== racine) {
+      throw new Error(`${paquet} : version ${bureau ?? 'absente'} prise depuis bureau/, ${racine ?? 'absente'} à la racine ; relancer « npm install » dans le dossier bureau/`)
+    }
+  }
+}
+
 /** Compile l'application et la coquille dans `sortie` ; `essai` pose le marqueur du programme d'essai (défaut : oui). */
 function compiler({ vite, sortie = COMPILE, essai = true }) {
   if (!existsSync(join(BUREAU, 'node_modules', 'electron'))) {
@@ -507,6 +551,7 @@ function compiler({ vite, sortie = COMPILE, essai = true }) {
   if (!existsSync(join(DIST, 'index.html'))) throw new Error("dist/index.html absent : construire l'application d'abord")
   rmSync(sortie, { recursive: true, force: true })
   etape('compilation de la coquille (tsc -p bureau)', join(modules, 'typescript', 'bin', 'tsc'), ['-p', BUREAU, '--outDir', sortie])
+  regrouperSpake2(modules, sortie)
   const version = lireVersion()
   writeFileSync(join(sortie, 'package.json'), JSON.stringify(paquetDeLaCoquille(version, { essai }), null, 2) + '\n', 'utf8')
   return version

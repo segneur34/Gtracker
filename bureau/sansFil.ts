@@ -66,7 +66,7 @@ import type { ContexteEcoute, IssueAutorisation, JugementPareFeu, LecturePareFeu
 import { ESSAIS_PORT, releveRate } from './pareFeu'
 import type { Gestionnaire } from './pont'
 import { enReponse } from './pont'
-import { decoderQuestion, encoderReponse, adressesPrivees, memeReseau, nomPcPourSonde, PORT_SONDE } from './sonde'
+import { decoderQuestion, encoderReponse, adressesPrivees, identifiantDeSonde, memeReseau, nomPcPourSonde, PORT_SONDE, VERSION_SONDE_V2 } from './sonde'
 import type { DossierDistant, EtatTelephone, FichierTelephone } from './telephone'
 import { cheminAdmis, cheminEcrivable, cheminRefuse, enSerie, fichiersAdmis, pasPret } from './telephone'
 import type {
@@ -94,6 +94,7 @@ import {
   PROTOCOLE_SANS_FIL,
   PORT_SANS_FIL,
   TAILLE_NONCE,
+  TAILLE_PART_SPAKE2,
   TAILLE_PREUVE,
   blocsDEcriture,
   blocsDeLecture,
@@ -327,6 +328,11 @@ export class Liaison {
   /** Le certificat présenté par l'autre bout, en DER (côté téléphone : celui du PC). */
   certificatDistant(): Uint8Array | null {
     return this.socket.getPeerX509Certificate()?.raw ?? null
+  }
+
+  /** Le certificat que ce bout présente sur cette liaison, en DER (côté PC : celui que le téléphone a vu). */
+  certificatLocal(): Uint8Array | null {
+    return this.socket.getX509Certificate()?.raw ?? null
   }
 
   /** Passe aux limites larges : l'autre bout est reconnu. */
@@ -1359,7 +1365,11 @@ export class ServeurSansFil {
     compte.parAdresse.set(source.address, deLAdresse)
     compte.nombre++
     // Nom vide : le téléphone ne s'en sert pas, et le nom de Windows n'a pas à partir chez tout hôte qui le demande.
-    const reponse = encoderReponse({ nonce: question.nonce, port: this.port, identifiant: Buffer.from(this.identifiantPc, 'hex'), nom: '' })
+    // Version 2 : l'identifiant du PC ne part que sous HMAC du nonce ; la version 1 reste servie aux applications
+    // du téléphone d'avant elle, déjà reliées.
+    const identifiantPc = Buffer.from(this.identifiantPc, 'hex')
+    const identifiant = question.version === VERSION_SONDE_V2 ? identifiantDeSonde(identifiantPc, question.nonce) : identifiantPc
+    const reponse = encoderReponse({ version: question.version, nonce: question.nonce, port: this.port, identifiant, nom: '' })
     sonde.send(reponse, source.port, source.address, () => undefined)
   }
 
@@ -1409,21 +1419,35 @@ export class ServeurSansFil {
   }
 
   private async appairer(liaison: Liaison, origine: Origine, m: MessageAppairer): Promise<void> {
-    if (m.version !== PROTOCOLE_SANS_FIL) return liaison.refuser('version')
+    if (m.version !== PROTOCOLE_SANS_FIL) return this.refuserAppairage(liaison, origine, 'version')
+    // Sans part SPAKE2, c'est l'ancien échange, dont la preuve laissait essayer le code hors ligne : jamais accepté.
+    if (m.partA === undefined) {
+      this.journal("appairage refusé : application du téléphone trop ancienne", `appairage refusé (${origine.adresse}) : application du téléphone trop ancienne`)
+      return liaison.refuser('version')
+    }
     const fenetre = this.fenetre
-    if (!fenetre) return liaison.refuser('fenetre')
-    const tentative = fenetre.commencer(depuisHex(m.nonceTelephone, TAILLE_NONCE) as Uint8Array)
-    if (!tentative.ok) return liaison.refuser(tentative.raison)
-    liaison.envoyer({ type: 'defi', noncePc: enHex(tentative.noncePc) })
+    if (!fenetre) return this.refuserAppairage(liaison, origine, 'fenetre')
+    // L'identité du PC dans l'échange est l'empreinte du certificat servi sur cette liaison même, jamais une valeur
+    // reçue : si elle n'est pas celle de la fenêtre, l'échange ne peut que rater, et rien n'est commencé.
+    const servi = liaison.certificatLocal()
+    if (servi === null || !egalATempsConstant(empreinteCertificat(servi), fenetre.empreinte)) {
+      this.journal("appairage refusé : certificat servi différent de celui de la fenêtre")
+      return liaison.refuser('fenetre')
+    }
+    // Une part refusée compte comme un code faux dès `commencer`, avant toute réponse : il est montré aussitôt, et le
+    // `defi` part quand même (la fenêtre refusera la preuve), pour ne rien dire de plus qu'un code deviné faux.
+    const echecsAvantPart = fenetre.echecs
+    const tentative = fenetre.commencer(depuisHex(m.nonceTelephone, TAILLE_NONCE) as Uint8Array, depuisHex(m.partA, TAILLE_PART_SPAKE2) as Uint8Array)
+    this.noterCodeFaux(origine, fenetre, echecsAvantPart)
+    if (!tentative.ok) return this.refuserAppairage(liaison, origine, tentative.raison)
+    liaison.envoyer({ type: 'defi', noncePc: enHex(tentative.noncePc), partB: enHex(tentative.partB) })
     const r = await liaison.prochain(this.delais.accueil)
     if (r.type !== 'preuve') return liaison.fermer(`message inattendu pendant l'appairage (« ${r.type} »).`)
+    // Compté avant l'envoi du refus, au compteur de la fenêtre, commun à toutes ses liaisons.
+    const echecsAvantPreuve = fenetre.echecs
     const conclusion = tentative.conclure(depuisHex(r.preuve, TAILLE_PREUVE) as Uint8Array)
-    if (!conclusion.ok) {
-      // L'origine d'un code faux est montrée sur le PC : l'utilisateur voit si elle vient d'un autre appareil que le sien.
-      if (conclusion.raison === 'code' && this.fenetre === fenetre) this.codesFaux = { nombre: fenetre.echecs, adresse: origine.adresse }
-      this.journal(`appairage refusé : ${conclusion.raison}`, `appairage refusé (${origine.adresse}) : ${conclusion.raison}`)
-      return liaison.refuser(conclusion.raison)
-    }
+    this.noterCodeFaux(origine, fenetre, echecsAvantPreuve)
+    if (!conclusion.ok) return this.refuserAppairage(liaison, origine, conclusion.raison)
     const maintenant = this.horloge()
     const telephone = this.registre.ajouter(m.nom, conclusion.jeton, maintenant, this.alea)
     // L'appairage est sa première liaison : vu comme à une présentation par le jeton.
@@ -1431,8 +1455,27 @@ export class ServeurSansFil {
     // Inscrit avant d'envoyer le jeton : un PC arrêté juste après ne laisse pas au téléphone un jeton inconnu.
     await this.sauverRegistre()
     if (!this.admissibleApresAttente(liaison, telephone.id)) return
-    liaison.envoyer({ type: 'appaire', preuve: enHex(conclusion.preuvePc), jeton: enHex(conclusion.jeton), identifiantPc: this.identifiantPc, nomPc: this.nomPc })
+    liaison.envoyer({ type: 'appaire', preuve: enHex(conclusion.confirmationB), jeton: enHex(conclusion.jeton), identifiantPc: this.identifiantPc, nomPc: this.nomPc })
     this.reconnaitre(liaison, origine, telephone, true, capacitesDe(m))
+  }
+
+  /**
+   * Refuse un appairage et en laisse une ligne au journal, raison et adresse d'origine seulement ; un code faux y est
+   * déjà, posé par `noterCodeFaux` au moment où la fenêtre le compte.
+   */
+  private refuserAppairage(liaison: Liaison, origine: Origine, raison: RaisonRefus): void {
+    if (raison !== 'code') this.journal(`appairage refusé : ${raison}`, `appairage refusé (${origine.adresse}) : ${raison}`)
+    liaison.refuser(raison)
+  }
+
+  /**
+   * Montre sur le PC un code faux que la fenêtre vient de compter (ses échecs ont passé `echecsAvant`), avec son
+   * origine : l'utilisateur voit s'il vient d'un autre appareil que le sien. Rien de l'échange n'y figure.
+   */
+  private noterCodeFaux(origine: Origine, fenetre: FenetreAppairage, echecsAvant: number): void {
+    if (fenetre.echecs === echecsAvant) return
+    if (this.fenetre === fenetre) this.codesFaux = { nombre: fenetre.echecs, adresse: origine.adresse }
+    this.journal('appairage refusé : code', `appairage refusé (${origine.adresse}) : code`)
   }
 
   private async bonjour(liaison: Liaison, origine: Origine, m: MessageBonjour): Promise<void> {

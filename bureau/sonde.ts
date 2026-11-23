@@ -8,27 +8,38 @@
 // dont l'identifiant est celui de son PC. Une réponse n'est pas une preuve : l'empreinte du certificat, vérifiée à
 // la liaison TLS, l'est.
 //
+// Deux versions du format, même disposition, que le PC sert toutes les deux, chacune dans sa version :
+//   1  l'identifiant du PC en clair ; gardée pour les applications du téléphone d'avant la version 2, déjà reliées ;
+//   2  l'identifiant du PC remplacé par l'identifiant de sonde, qui ne vaut que pour le nonce de la question :
+//      les 16 premiers octets de HMAC-SHA256(clé = les 16 octets de l'identifiant du PC, « gtracker-sonde » en ASCII
+//      ‖ les 16 octets du nonce) (`identifiantDeSonde`). Un hôte du réseau ne peut ni suivre un PC d'une question à
+//      l'autre, ni répondre à sa place sous l'identifiant attendu par un téléphone appairé, qui seul connaît la clé.
+// Le nom du PC part vide dans toute réponse : le téléphone ne s'en sert pas, et il n'a pas à partir chez tout hôte
+// qui le demande.
+//
 // ---------- Question (téléphone vers PC), 22 octets exactement ----------
 //
 //   octets 0 à 3     « GTRK » en ASCII : 0x47 0x54 0x52 0x4B
-//   octet 4          version du format : 1
+//   octet 4          version du format : 1 ou 2
 //   octet 5          sorte de paquet : 0x01 (question)
 //   octets 6 à 21    nonce de la question, 16 octets tirés au hasard
 //
 // ---------- Réponse (PC vers téléphone), 41 + L octets exactement ----------
 //
 //   octets 0 à 3     « GTRK »
-//   octet 4          version du format : 1
+//   octet 4          version du format : celle de la question
 //   octet 5          sorte de paquet : 0x02 (réponse)
 //   octets 6 à 21    nonce de la question, recopié
 //   octets 22 et 23  port TCP du serveur TLS du PC, entier non signé sur 16 bits, gros-boutiste, de 1 à 65 535
-//   octets 24 à 39   identifiant du PC, 16 octets (celui que le téléphone reçoit à l'appairage)
-//   octet 40         L, longueur du nom du PC en octets, de 0 à 64
+//   octets 24 à 39   version 1 : identifiant du PC, 16 octets (celui que le téléphone reçoit à l'appairage) ;
+//                    version 2 : identifiant de sonde, 16 octets
+//   octet 40         L, longueur du nom du PC en octets, de 0 à 64 (toujours 0 en version 2)
 //   L octets         nom du PC en UTF-8 valide, sans caractère de contrôle
 //
 // Tout autre paquet (autre signature, autre version, autre sorte, autre longueur, port nul, nom illisible) est
 // étranger et ignoré sans réponse.
 
+import { createHmac } from 'node:crypto'
 import { nomAdmis } from './trames'
 
 /** Port UDP où le PC attend les questions. */
@@ -37,9 +48,18 @@ export const PORT_SONDE = 48218
 /** Signature qui ouvre chaque paquet. */
 export const SIGNATURE_SONDE = Uint8Array.from([0x47, 0x54, 0x52, 0x4b])
 
+/** Version 1 du format : l'identifiant du PC en clair dans la réponse. */
 export const VERSION_SONDE = 1
+/** Version 2 du format : l'identifiant de sonde à la place de l'identifiant du PC. */
+export const VERSION_SONDE_V2 = 2
+export const VERSIONS_SONDE = [VERSION_SONDE, VERSION_SONDE_V2] as const
+export type VersionSonde = (typeof VERSIONS_SONDE)[number]
+
 export const SORTE_QUESTION = 0x01
 export const SORTE_REPONSE = 0x02
+
+/** Étiquette de l'identifiant de sonde de la version 2. */
+export const ETIQUETTE_SONDE = 'gtracker-sonde'
 
 /** Taille du nonce d'une question et de l'identifiant du PC, en octets. */
 export const TAILLE_NONCE_SONDE = 16
@@ -51,31 +71,50 @@ export const NOM_PC_MAX_OCTETS = 64
 const TAILLE_QUESTION = 6 + TAILLE_NONCE_SONDE
 const TAILLE_REPONSE_FIXE = 6 + TAILLE_NONCE_SONDE + 2 + TAILLE_IDENTIFIANT_PC + 1
 
-/** Réponse du PC. */
-export type ReponseSonde = { nonce: Uint8Array; port: number; identifiant: Uint8Array; nom: string }
+/**
+ * Réponse du PC, dans la version de la question ; `identifiant` est celui du PC en version 1, l'identifiant de sonde
+ * en version 2.
+ */
+export type ReponseSonde = { version: VersionSonde; nonce: Uint8Array; port: number; identifiant: Uint8Array; nom: string }
 
-function entete(sorte: number): Buffer {
-  return Buffer.from([...SIGNATURE_SONDE, VERSION_SONDE, sorte])
+function entete(version: VersionSonde, sorte: number): Buffer {
+  return Buffer.from([...SIGNATURE_SONDE, version, sorte])
 }
 
-function aEntete(paquet: Uint8Array, sorte: number): boolean {
-  return SIGNATURE_SONDE.every((o, i) => paquet[i] === o) && paquet[4] === VERSION_SONDE && paquet[5] === sorte
+/** La version d'un paquet de cette sorte, `null` s'il n'a pas l'en-tête d'un paquet de cette sorte. */
+function versionDe(paquet: Uint8Array, sorte: number): VersionSonde | null {
+  if (!SIGNATURE_SONDE.every((o, i) => paquet[i] === o) || paquet[5] !== sorte) return null
+  return (VERSIONS_SONDE as readonly number[]).includes(paquet[4]) ? (paquet[4] as VersionSonde) : null
 }
 
 function exigerTaille(octets: Uint8Array, taille: number, quoi: string): void {
   if (octets.length !== taille) throw new RangeError(`${quoi} : ${taille} octets attendus, ${octets.length} reçus.`)
 }
 
-/** Octets d'une question. */
-export function encoderQuestion(nonce: Uint8Array): Uint8Array {
+/**
+ * Identifiant de sonde (version 2) : les 16 premiers octets de HMAC-SHA256(clé = identifiant du PC, « gtracker-sonde »
+ * ‖ nonce de la question).
+ */
+export function identifiantDeSonde(identifiantPc: Uint8Array, nonce: Uint8Array): Uint8Array {
+  exigerTaille(identifiantPc, TAILLE_IDENTIFIANT_PC, 'Identifiant du PC')
   exigerTaille(nonce, TAILLE_NONCE_SONDE, 'Nonce de la question')
-  return Buffer.concat([entete(SORTE_QUESTION), nonce])
+  const hmac = createHmac('sha256', identifiantPc)
+  hmac.update(Buffer.from(ETIQUETTE_SONDE, 'ascii'))
+  hmac.update(nonce)
+  return Uint8Array.from(hmac.digest().subarray(0, TAILLE_IDENTIFIANT_PC))
 }
 
-/** Le nonce d'une question, `null` pour un paquet étranger. */
-export function decoderQuestion(paquet: Uint8Array): { nonce: Uint8Array } | null {
-  if (paquet.length !== TAILLE_QUESTION || !aEntete(paquet, SORTE_QUESTION)) return null
-  return { nonce: Uint8Array.from(paquet.subarray(6)) }
+/** Octets d'une question, en version 1 par défaut. */
+export function encoderQuestion(nonce: Uint8Array, version: VersionSonde = VERSION_SONDE): Uint8Array {
+  exigerTaille(nonce, TAILLE_NONCE_SONDE, 'Nonce de la question')
+  return Buffer.concat([entete(version, SORTE_QUESTION), nonce])
+}
+
+/** La version et le nonce d'une question, `null` pour un paquet étranger. */
+export function decoderQuestion(paquet: Uint8Array): { version: VersionSonde; nonce: Uint8Array } | null {
+  const version = paquet.length === TAILLE_QUESTION ? versionDe(paquet, SORTE_QUESTION) : null
+  if (version === null) return null
+  return { version, nonce: Uint8Array.from(paquet.subarray(6)) }
 }
 
 /**
@@ -93,23 +132,26 @@ export function nomPcPourSonde(nom: string): string {
   return sortie
 }
 
-/** Octets d'une réponse. Le nom doit déjà tenir (`nomPcPourSonde`). */
+/** Octets d'une réponse. Le nom doit déjà tenir (`nomPcPourSonde`), et être vide en version 2. */
 export function encoderReponse(reponse: ReponseSonde): Uint8Array {
+  if (!(VERSIONS_SONDE as readonly number[]).includes(reponse.version)) throw new RangeError(`Version de sonde inconnue : ${reponse.version}.`)
   exigerTaille(reponse.nonce, TAILLE_NONCE_SONDE, 'Nonce de la question')
   exigerTaille(reponse.identifiant, TAILLE_IDENTIFIANT_PC, 'Identifiant du PC')
   if (!Number.isInteger(reponse.port) || reponse.port < 1 || reponse.port > 65535) throw new RangeError(`Port hors bornes : ${reponse.port}.`)
   const nom = Buffer.from(reponse.nom, 'utf8')
   if (nom.length > NOM_PC_MAX_OCTETS || (nom.length > 0 && !nomAdmis(reponse.nom))) throw new RangeError('Nom du PC refusé dans une réponse.')
+  if (reponse.version === VERSION_SONDE_V2 && nom.length > 0) throw new RangeError('Nom du PC refusé dans une réponse de version 2.')
   const port = Buffer.alloc(2)
   port.writeUInt16BE(reponse.port, 0)
-  return Buffer.concat([entete(SORTE_REPONSE), reponse.nonce, port, reponse.identifiant, Buffer.from([nom.length]), nom])
+  return Buffer.concat([entete(reponse.version, SORTE_REPONSE), reponse.nonce, port, reponse.identifiant, Buffer.from([nom.length]), nom])
 }
 
 const UTF8_STRICT = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true })
 
 /** La réponse d'un PC, `null` pour un paquet étranger. */
 export function decoderReponse(paquet: Uint8Array): ReponseSonde | null {
-  if (paquet.length < TAILLE_REPONSE_FIXE || !aEntete(paquet, SORTE_REPONSE)) return null
+  const version = paquet.length >= TAILLE_REPONSE_FIXE ? versionDe(paquet, SORTE_REPONSE) : null
+  if (version === null) return null
   const octets = Buffer.from(paquet)
   const longueurNom = octets[TAILLE_REPONSE_FIXE - 1]
   if (longueurNom > NOM_PC_MAX_OCTETS || paquet.length !== TAILLE_REPONSE_FIXE + longueurNom) return null
@@ -123,6 +165,7 @@ export function decoderReponse(paquet: Uint8Array): ReponseSonde | null {
   }
   if (nom.length > 0 && !nomAdmis(nom)) return null
   return {
+    version,
     nonce: Uint8Array.from(octets.subarray(6, 6 + TAILLE_NONCE_SONDE)),
     port,
     identifiant: Uint8Array.from(octets.subarray(8 + TAILLE_NONCE_SONDE, 8 + TAILLE_NONCE_SONDE + TAILLE_IDENTIFIANT_PC)),

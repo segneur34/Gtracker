@@ -18,7 +18,10 @@ const fake = vi.hoisted(() => {
   };
   const plugin = {
     status: () => answer('status'),
-    pair: (options: unknown) => answer('pair', options),
+    pairSearch: (options: unknown) => answer('pairSearch', options),
+    pairOffer: (options: unknown) => answer('pairOffer', options),
+    pairConfirm: (options: unknown) => answer('pairConfirm', options),
+    pairFinish: (options: unknown) => answer('pairFinish', options),
     connect: (options: unknown) => answer('connect', options),
     forget: () => answer('forget'),
     addListener: async (event: string, listener: Listener) => {
@@ -100,16 +103,20 @@ describe('appels du greffon', () => {
     expect(fake.state.calls).toEqual([{ method: 'status', options: undefined }]);
   });
 
-  it('pair et connect ne passent que ce qui est donné : ni adresse vide, ni dossier absent, ni sous-dossier vide', async () => {
+  it('pairSearch, pairFinish et connect ne passent que ce qui est donné : ni adresse vide, ni dossier absent, ni sous-dossier vide', async () => {
     const link = computerLink()!;
-    await link.pair({ code: '123456', address: '', folder: null });
-    await link.pair({ code: '123456', address: '192.168.1.20:48217', folder: 'content://arbre' });
+    await link.pairSearch({ address: '' });
+    await link.pairSearch({ address: '192.168.1.20:48217' });
+    await link.pairFinish({ generation: 3, keep: true, folder: 'content://arbre', base: '' });
+    await link.pairFinish({ generation: 3, keep: false, error: 'proof', notFound: false });
     await link.connect({ folder: 'content://arbre' });
     await link.connect({ address: undefined, folder: null });
     await link.connect({ folder: 'content://arbre', base: '' });
     expect(fake.state.calls.map((c) => c.options)).toEqual([
-      { code: '123456' },
-      { code: '123456', address: '192.168.1.20:48217', folder: 'content://arbre' },
+      {},
+      { address: '192.168.1.20:48217' },
+      { generation: 3, keep: true, folder: 'content://arbre' },
+      { generation: 3, keep: false, error: 'proof', notFound: false },
       { folder: 'content://arbre' },
       {},
       { folder: 'content://arbre' },
@@ -118,14 +125,45 @@ describe('appels du greffon', () => {
 
   it('le sous-dossier où est la mémoire accompagne le dossier, jamais seul', async () => {
     const link = computerLink()!;
-    await link.pair({ code: '123456', folder: 'content://documents', base: 'Gtracker' });
+    await link.pairFinish({ generation: 1, keep: true, folder: 'content://documents', base: 'Gtracker' });
     await link.connect({ folder: 'content://documents', base: 'Gtracker' });
     await link.connect({ folder: null, base: 'Gtracker' });
     expect(fake.state.calls.map((c) => c.options)).toEqual([
-      { code: '123456', folder: 'content://documents', base: 'Gtracker' },
+      { generation: 1, keep: true, folder: 'content://documents', base: 'Gtracker' },
       { folder: 'content://documents', base: 'Gtracker' },
       {},
     ]);
+  });
+
+  it('les étapes de l\'appairage relisent ce que rend le greffon ; une raison inconnue est une coupure', async () => {
+    const link = computerLink()!;
+    fake.state.answer = { ...RAW, state: 'searching', generation: 7, candidates: ['192.168.1.20:48217', 4, '', '192.168.1.21:48217'] };
+    expect(await link.pairSearch({})).toMatchObject({ generation: 7, candidates: ['192.168.1.20:48217', '192.168.1.21:48217'], status: { state: 'searching' } });
+    fake.state.answer = { ...RAW, candidates: ['192.168.1.20:48217'] };
+    expect(await link.pairSearch({})).toMatchObject({ generation: -1, candidates: [] });
+
+    fake.state.answer = { ...RAW, state: 'pairing', failure: null, fingerprint: 'ab', partB: '04cd' };
+    expect(await link.pairOffer({ generation: 7, endpoint: '192.168.1.20:48217', partA: '04' })).toEqual({
+      status: expect.objectContaining({ state: 'pairing' }), failure: null, fingerprint: 'ab', partB: '04cd',
+    });
+    expect(fake.state.calls.at(-1)?.options).toEqual({ generation: 7, endpoint: '192.168.1.20:48217', partA: '04' });
+    fake.state.answer = { ...RAW, failure: null, fingerprint: 'ab', partB: null };
+    expect(await link.pairOffer({ generation: 7, endpoint: 'x', partA: '04' })).toMatchObject({ failure: null, partB: null });
+    fake.state.answer = { ...RAW, failure: null };
+    expect(await link.pairOffer({ generation: 7, endpoint: 'x', partA: '04' })).toMatchObject({ failure: 'network' });
+    fake.state.answer = { ...RAW, failure: 'unreachable' };
+    expect(await link.pairOffer({ generation: 7, endpoint: 'x', partA: '04' })).toMatchObject({ failure: 'unreachable' });
+    fake.state.answer = { ...RAW, failure: 'demain' };
+    expect(await link.pairOffer({ generation: 7, endpoint: 'x', partA: '04' })).toMatchObject({ failure: 'network' });
+
+    fake.state.answer = { ...RAW, failure: null, cB: 'ef' };
+    const confirmed = await link.pairConfirm({ generation: 7, cA: '01' });
+    expect(confirmed).toMatchObject({ failure: null, cB: 'ef' });
+    expect(Object.keys(confirmed).sort()).toEqual(['cB', 'failure', 'status']);
+    fake.state.answer = { ...RAW, failure: 'code' };
+    expect(await link.pairConfirm({ generation: 7, cA: '01' })).toMatchObject({ failure: 'code' });
+    fake.state.answer = { ...RAW, failure: null };
+    expect(await link.pairConfirm({ generation: 7, cA: '01' })).toMatchObject({ failure: 'network' });
   });
 
   it('forget rend l\'état', async () => {
@@ -134,9 +172,8 @@ describe('appels du greffon', () => {
   });
 
   it('un appel refusé comme mal formé devient ComputerLinkRefused, toute autre erreur passe telle quelle', async () => {
-    fake.state.rejection = Object.assign(new Error('mal formé'), { code: 'BAD_CODE' });
-    await expect(computerLink()!.pair({ code: '12', folder: null })).rejects.toMatchObject({ refusal: 'code' });
     fake.state.rejection = Object.assign(new Error('mal formé'), { code: 'BAD_ADDRESS' });
+    await expect(computerLink()!.pairSearch({ address: 'x' })).rejects.toMatchObject({ refusal: 'address' });
     await expect(computerLink()!.connect({ address: 'x', folder: null })).rejects.toBeInstanceOf(ComputerLinkRefused);
     const other = new Error('autre');
     fake.state.rejection = other;
@@ -144,8 +181,9 @@ describe('appels du greffon', () => {
   });
 
   it('refusalOf lit le code du greffon', () => {
-    expect(refusalOf({ code: 'BAD_CODE' })).toBe('code');
     expect(refusalOf({ code: 'BAD_ADDRESS' })).toBe('address');
+    // Le code tapé ne va plus au greffon : son refus vient de la page.
+    expect(refusalOf({ code: 'BAD_CODE' })).toBeNull();
     expect(refusalOf({ code: 'UNKNOWN' })).toBeNull();
     expect(refusalOf(null)).toBeNull();
     expect(refusalOf('texte')).toBeNull();

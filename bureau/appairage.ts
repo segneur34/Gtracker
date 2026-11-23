@@ -4,26 +4,30 @@
 // ---------- Déroulé (messages décrits dans `trames.ts`) ----------
 //
 // 1. Sur le PC, l'utilisateur ouvre une fenêtre d'appairage : 2 minutes, un code de 6 chiffres affiché (tiré
-//    uniformément de 000000 à 999999). Trois preuves fausses ferment la fenêtre ; un appairage réussi aussi, et une
+//    uniformément de 000000 à 999999). Trois codes faux ferment la fenêtre ; un appairage réussi aussi, et une
 //    onzième tentative commencée (au plus dix par fenêtre).
-// 2. Le téléphone se connecte en TLS et lit l'empreinte du certificat du PC : SHA-256 des octets DER du certificat,
-//    32 octets. Il envoie `appairer` avec `nonceTelephone`, 32 octets tirés au hasard.
-// 3. Le PC répond `defi` avec `noncePc`, 32 octets tirés au hasard pour cette seule tentative.
-// 4. Le téléphone envoie `preuve` : sa preuve, calculée avec le code tapé par l'utilisateur.
-// 5. Le PC compare (à temps constant) à la preuve qu'il attend. Fausse : `refus` (raison `code`), un échec de plus.
-//    Juste : `appaire`, avec la preuve du PC et un jeton de 32 octets tiré au hasard ; la fenêtre se ferme.
-// 6. Le téléphone vérifie la preuve du PC avant de rien garder ; juste, il garde le jeton, l'empreinte du certificat
-//    (fixée : toute liaison suivante dont le certificat a une autre empreinte est refusée), l'identifiant du PC.
-// Le code ne circule jamais. Le téléphone prouve en premier : le PC ne dit rien qui dépende du code tant que le
-//    téléphone n'a pas prouvé le connaître. Une preuve rejouée échoue : elle porte le `noncePc` d'une autre tentative.
+// 2. Le téléphone se connecte en TLS, sans rien vérifier encore, et lit l'empreinte du certificat du PC : SHA-256 des
+//    octets DER du certificat, 32 octets. Il tire son scalaire x et envoie `appairer` avec `nonceTelephone` (32 octets
+//    tirés au hasard) et sa part SPAKE2 `partA`, calculée avec le code tapé par l'utilisateur et cette empreinte.
+// 3. Le PC tire un scalaire y neuf pour cette seule tentative, calcule sa part `partB` avec le code affiché et
+//    l'empreinte de son propre certificat, et répond `defi` avec `noncePc` (32 octets tirés au hasard) et `partB`.
+//    Une `partA` qui n'est pas un point admis, ou qui donne une clé neutre (part fabriquée sur un code deviné juste),
+//    compte aussitôt comme un code faux, avant toute réponse ; le PC répond pourtant `defi` après le même calcul,
+//    puis refuse la `preuve` comme une confirmation fausse : rien ne distingue ce refus de celui d'un code deviné
+//    faux, ni dans les messages ni dans leur délai.
+// 4. Le téléphone calcule les clés et envoie `preuve` : sa confirmation cA.
+// 5. Le PC vérifie cA (à temps constant). Fausse : `refus` (raison `code`), un échec de plus. Juste : `appaire`,
+//    avec sa confirmation cB et un jeton de 32 octets tiré au hasard ; la fenêtre se ferme.
+// 6. Le téléphone vérifie cB avant de rien garder ; juste, il garde le jeton, l'empreinte du certificat (fixée :
+//    toute liaison suivante dont le certificat a une autre empreinte est refusée), l'identifiant du PC.
+// Le code ne circule jamais, et rien de ce qui circule ne permet de l'essayer hors ligne : chaque tentative n'essaie
+//    qu'un code, et le PC ne dit rien qui dépende du code tant que le téléphone n'a pas confirmé le connaître. Un
+//    faux PC n'obtient du téléphone qu'une confirmation qu'il ne peut pas vérifier, et ne sait pas fabriquer cB. Un
+//    relais vers le vrai PC échoue : les deux liaisons TLS ont deux empreintes, donc deux transcriptions.
 //
-// ---------- Preuves ----------
-//
-//   preuve du téléphone = HMAC-SHA256(clé, « gtracker-appairage-telephone » ‖ 0x00 ‖ empreinte ‖ nonceTelephone ‖ noncePc)
-//   preuve du PC        = HMAC-SHA256(clé, « gtracker-appairage-pc »        ‖ 0x00 ‖ empreinte ‖ nonceTelephone ‖ noncePc)
-// où `clé` est le code en 6 caractères ASCII (zéros en tête compris : « 042917 »), les étiquettes sont en ASCII, 0x00
-// est un octet nul, `‖` met bout à bout, et empreinte, nonceTelephone et noncePc sont leurs 32 octets bruts (pas
-// leur écriture hexadécimale). Une preuve fait 32 octets, écrite en hexadécimal minuscule dans les messages.
+// Formules de l'échange (RFC 9382, suite P256-SHA256-HKDF-HMAC, identités et étiquettes) : en tête de `spake2.ts`.
+// Les octets circulent en hexadécimal minuscule. Un téléphone d'avant cet échange (sans `partA`) est refusé avec la
+// raison `version` : il ne peut plus s'appairer, mais sa liaison par jeton reste.
 //
 // ---------- Jeton ----------
 //
@@ -38,10 +42,12 @@
 //
 // Un PC accepte plusieurs téléphones ; retirer un téléphone révoque son jeton.
 
-import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { ErreurDisque } from './disque'
+import type { ClesSpake2, EtatSpake2 } from './spake2'
+import { ErreurSpake2, commencerAppairage, confirmationValide, conclure as conclureSpake2, tirerScalaire } from './spake2'
 import type { RaisonRefus } from './trames'
-import { TAILLE_EMPREINTE, TAILLE_IDENTIFIANT, TAILLE_JETON, TAILLE_NONCE, TAILLE_PREUVE, nomAdmis } from './trames'
+import { TAILLE_EMPREINTE, TAILLE_IDENTIFIANT, TAILLE_JETON, TAILLE_NONCE, TAILLE_PART_SPAKE2, TAILLE_PREUVE, nomAdmis } from './trames'
 
 /** Source d'octets aléatoires ; `randomBytes` de Node hors des tests. */
 export type Alea = (taille: number) => Uint8Array
@@ -55,22 +61,18 @@ export const CHIFFRES_CODE = 6
 /** Durée d'une fenêtre d'appairage. */
 export const DUREE_FENETRE_MS = 120_000
 
-/** Preuves fausses qui ferment la fenêtre. */
+/** Codes faux (confirmations fausses ou parts refusées) qui ferment la fenêtre. */
 export const ECHECS_MAX = 3
 
 /**
  * Tentatives commencées par fenêtre. Un vrai téléphone en fait une, quelques-unes s'il perd la liaison ; au-delà,
- * c'est un hôte du réseau qui enchaîne les `appairer` sans prouver : la tentative de trop est refusée et ferme la
- * fenêtre, si bien que la mémoire gardée par fenêtre reste bornée (l'utilisateur en rouvre une).
+ * c'est un hôte du réseau qui enchaîne les `appairer` sans confirmer : la tentative de trop est refusée et ferme la
+ * fenêtre, si bien que la mémoire et le calcul dépensés par fenêtre restent bornés (l'utilisateur en rouvre une).
  */
 export const TENTATIVES_MAX = 10
 
 /** Tailles des octets de l'appairage, tenues par `trames.ts` qui lit les messages. */
-export { TAILLE_EMPREINTE, TAILLE_IDENTIFIANT, TAILLE_JETON, TAILLE_NONCE, TAILLE_PREUVE }
-
-/** Étiquettes qui séparent la preuve du téléphone de celle du PC : l'une ne peut pas servir pour l'autre. */
-export const ETIQUETTE_TELEPHONE = 'gtracker-appairage-telephone'
-export const ETIQUETTE_PC = 'gtracker-appairage-pc'
+export { TAILLE_EMPREINTE, TAILLE_IDENTIFIANT, TAILLE_JETON, TAILLE_NONCE, TAILLE_PART_SPAKE2, TAILLE_PREUVE }
 
 /** Version du registre écrit dans le profil. */
 export const VERSION_REGISTRE = 1
@@ -114,30 +116,6 @@ export function codeAdmis(code: string): boolean {
   return new RegExp(`^[0-9]{${CHIFFRES_CODE}}$`).test(code)
 }
 
-function preuve(etiquette: string, code: string, empreinte: Uint8Array, nonceTelephone: Uint8Array, noncePc: Uint8Array): Uint8Array {
-  if (!codeAdmis(code)) throw new ErreurDisque('UNKNOWN', `Code d'appairage mal formé : ${CHIFFRES_CODE} chiffres attendus.`)
-  exigerTaille(empreinte, TAILLE_EMPREINTE, 'Empreinte du certificat')
-  exigerTaille(nonceTelephone, TAILLE_NONCE, 'Nonce du téléphone')
-  exigerTaille(noncePc, TAILLE_NONCE, 'Nonce du PC')
-  const hmac = createHmac('sha256', Buffer.from(code, 'ascii'))
-  hmac.update(Buffer.from(etiquette, 'ascii'))
-  hmac.update(Buffer.from([0]))
-  hmac.update(empreinte)
-  hmac.update(nonceTelephone)
-  hmac.update(noncePc)
-  return hmac.digest()
-}
-
-/** Preuve que le téléphone connaît le code. */
-export function preuveTelephone(code: string, empreinte: Uint8Array, nonceTelephone: Uint8Array, noncePc: Uint8Array): Uint8Array {
-  return preuve(ETIQUETTE_TELEPHONE, code, empreinte, nonceTelephone, noncePc)
-}
-
-/** Preuve que le PC connaît le code. */
-export function preuvePc(code: string, empreinte: Uint8Array, nonceTelephone: Uint8Array, noncePc: Uint8Array): Uint8Array {
-  return preuve(ETIQUETTE_PC, code, empreinte, nonceTelephone, noncePc)
-}
-
 /** Jeton de 32 octets. */
 export function tirerJeton(alea: Alea = randomBytes): Uint8Array {
   const jeton = alea(TAILLE_JETON)
@@ -160,16 +138,37 @@ export function tirerIdentifiant(alea: Alea = randomBytes): string {
 
 // ---------- la fenêtre d'appairage ----------
 
-/** Issue d'une tentative : le jeton à donner au téléphone avec la preuve du PC, ou la raison du refus. */
+/**
+ * Le calcul d'une tentative admise (décodage, masque, multiplication par un scalaire, transcription, dérivations),
+ * refait et jeté quand la part reçue est refusée : une clé neutre est détectée avant la multiplication par y, et
+ * sans ce calcul le `defi` partirait nettement plus tôt. Le délai n'est pas tout à fait celui d'une tentative admise
+ * (le leurre refait en plus le masque w·M) ; cet écart n'apprend rien de plus à l'intrus : son essai est compté comme
+ * un code faux avant toute réponse, et il n'a éprouvé qu'un seul code, comme un essai honnête. Le calcul porte sur un
+ * scalaire neuf et sur la part du PC, jamais sur y, qui ne sert qu'à un seul `conclure`. Rien n'en sort.
+ */
+function calculLeurre(etat: EtatSpake2, alea: Alea): void {
+  const leurre: EtatSpake2 = { ...etat, secret: tirerScalaire(alea) }
+  try {
+    conclureSpake2(leurre, etat.part)
+  } catch (e) {
+    // pB − w·M neutre : probabilité négligeable, et rien à en dire de plus.
+    if (!(e instanceof ErreurSpake2)) throw e
+  }
+}
+
+/** Issue d'une tentative : le jeton à donner au téléphone avec la confirmation cB du PC, ou la raison du refus. */
 export type ConclusionAppairage =
-  | { ok: true; preuvePc: Uint8Array; jeton: Uint8Array }
+  | { ok: true; confirmationB: Uint8Array; jeton: Uint8Array }
   | { ok: false; raison: RaisonRefus; fenetreFermee: boolean }
 
-/** Une tentative commencée : le `noncePc` à envoyer dans `defi`, et la vérification de la preuve, une seule fois. */
-export type TentativeAppairage = { ok: true; noncePc: Uint8Array; conclure(preuve: Uint8Array): ConclusionAppairage }
+/**
+ * Une tentative commencée : le `noncePc` et la part `partB` à envoyer dans `defi`, et la vérification de la
+ * confirmation cA du téléphone, une seule fois.
+ */
+export type TentativeAppairage = { ok: true; noncePc: Uint8Array; partB: Uint8Array; conclure(confirmationA: Uint8Array): ConclusionAppairage }
 
 export type OptionsFenetre = {
-  /** Empreinte SHA-256 du certificat que le PC présente, 32 octets. */
+  /** Empreinte SHA-256 du certificat que le PC présente, 32 octets : l'identité du PC dans l'échange (idB). */
   empreinte: Uint8Array
   horloge?: Horloge
   alea?: Alea
@@ -188,7 +187,8 @@ export class FenetreAppairage {
   readonly code: string
   /** Heure où la fenêtre se ferme d'elle-même, en millisecondes. */
   readonly expireA: number
-  private readonly empreinte: Uint8Array
+  /** Empreinte du certificat du PC, son identité (idB) dans chaque échange de la fenêtre ; publique par nature. */
+  readonly empreinte: Uint8Array
   private readonly horloge: Horloge
   private readonly alea: Alea
   private readonly echecsMax: number
@@ -208,14 +208,19 @@ export class FenetreAppairage {
     this.expireA = this.horloge() + (options.dureeMs ?? DUREE_FENETRE_MS)
   }
 
-  /** Preuves fausses reçues. */
+  /** Codes faux reçus : confirmations fausses et parts refusées. */
   get echecs(): number {
     return this.echecsVus
   }
 
   /** Vrai tant que la fenêtre admet une tentative : ni expirée, ni fermée par un succès, trois échecs ou `fermer`. */
   ouverte(): boolean {
-    return !this.fermee && this.echecsVus < this.echecsMax && this.horloge() < this.expireA
+    return this.ouverteSansEchecs(0)
+  }
+
+  /** Vrai si la fenêtre serait ouverte avec `retires` codes faux de moins. */
+  private ouverteSansEchecs(retires: number): boolean {
+    return !this.fermee && this.echecsVus - retires < this.echecsMax && this.horloge() < this.expireA
   }
 
   /** Millisecondes avant la fermeture, 0 si elle est fermée. */
@@ -234,11 +239,16 @@ export class FenetreAppairage {
   }
 
   /**
-   * Commence une tentative sur le `nonceTelephone` reçu dans `appairer`. Refus `fenetre` si elle est fermée, ou si
-   * `TENTATIVES_MAX` tentatives sont déjà commencées (la fenêtre se ferme alors) ; refus `nonce` sur un nonce déjà vu.
+   * Commence une tentative sur le `nonceTelephone` et la part `partA` reçus dans `appairer`. Refus `fenetre` si elle
+   * est fermée, ou si `TENTATIVES_MAX` tentatives sont déjà commencées (la fenêtre se ferme alors) ; refus `nonce` sur
+   * un nonce déjà vu. Une part qui n'est pas un point admis, ou qui donne une clé neutre, compte aussitôt comme un
+   * code faux : une clé neutre ne vient que d'une part fabriquée sur le code juste. La tentative est pourtant rendue,
+   * avec sa `partB`, après un calcul de même nature qu'une tentative admise (`calculLeurre`), et sa conclusion est celle d'une confirmation
+   * fausse, quelle que soit la confirmation reçue : la réponse n'en dit pas plus qu'un code deviné faux.
    */
-  commencer(nonceTelephone: Uint8Array): TentativeAppairage | { ok: false; raison: RaisonRefus } {
+  commencer(nonceTelephone: Uint8Array, partA: Uint8Array): TentativeAppairage | { ok: false; raison: RaisonRefus } {
     exigerTaille(nonceTelephone, TAILLE_NONCE, 'Nonce du téléphone')
+    exigerTaille(partA, TAILLE_PART_SPAKE2, 'Part du téléphone')
     if (!this.ouverte()) return { ok: false, raison: 'fenetre' }
     const cle = enHex(nonceTelephone)
     if (this.noncesVus.has(cle)) return { ok: false, raison: 'nonce' }
@@ -247,24 +257,44 @@ export class FenetreAppairage {
       return { ok: false, raison: 'fenetre' }
     }
     this.noncesVus.add(cle)
-    const nonceT = Uint8Array.from(nonceTelephone)
     const noncePc = Uint8Array.from(this.alea(TAILLE_NONCE))
     exigerTaille(noncePc, TAILLE_NONCE, 'Nonce du PC')
+    // Un état SPAKE2 par tentative, y neuf (aléa du système hors des tests), conclu une seule fois, ici : il n'est
+    // gardé nulle part, et seules les clés de la tentative restent, jusqu'à la vérification de cA.
+    const etat = commencerAppairage('B', this.code, this.empreinte, this.alea)
+    let cles: ClesSpake2 | null = null
+    try {
+      cles = conclureSpake2(etat, partA)
+    } catch (e) {
+      if (!(e instanceof ErreurSpake2)) throw e
+      // Compté avant toute réponse, que le téléphone poursuive ou non : un seul code éprouvé, comme un essai honnête.
+      this.echecsVus++
+      calculLeurre(etat, this.alea)
+    }
     let conclue = false
     return {
       ok: true,
       noncePc,
-      conclure: (preuveRecue: Uint8Array): ConclusionAppairage => {
+      partB: etat.part,
+      conclure: (confirmationA: Uint8Array): ConclusionAppairage => {
         if (conclue) return { ok: false, raison: 'nonce', fenetreFermee: !this.ouverte() }
         conclue = true
+        const lues = cles
+        cles = null
+        if (lues === null) {
+          // Code faux déjà compté : même issue qu'une confirmation fausse, jugée sur la fenêtre telle qu'elle était
+          // sans lui, et même comparaison à temps constant.
+          egalATempsConstant(confirmationA, new Uint8Array(TAILLE_PREUVE))
+          if (!this.ouverteSansEchecs(1)) return { ok: false, raison: 'fenetre', fenetreFermee: true }
+          return { ok: false, raison: 'code', fenetreFermee: !this.ouverte() }
+        }
         if (!this.ouverte()) return { ok: false, raison: 'fenetre', fenetreFermee: true }
-        const attendue = preuveTelephone(this.code, this.empreinte, nonceT, noncePc)
-        if (!egalATempsConstant(preuveRecue, attendue)) {
+        if (!confirmationValide(lues, confirmationA)) {
           this.echecsVus++
           return { ok: false, raison: 'code', fenetreFermee: !this.ouverte() }
         }
         this.fermee = true
-        return { ok: true, preuvePc: preuvePc(this.code, this.empreinte, nonceT, noncePc), jeton: tirerJeton(this.alea) }
+        return { ok: true, confirmationB: lues.confirmationEnvoyee, jeton: tirerJeton(this.alea) }
       },
     }
   }

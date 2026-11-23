@@ -62,6 +62,8 @@ const EXCEPTIONS: Record<string, string> = {
   // Le hook de l'axe du temps lit les échelles et le survol des composants de graphe.
   'hooks/useTimeChartAxis → components/chartAxes': 'échelles du graphe',
   'hooks/useTimeChartAxis → components/chartHover': 'survol du graphe',
+  // Hors de src/ : l'échange d'appairage est calculé par le même module au téléphone et dans le programme Windows.
+  'library/computerPairing → bureau/spake2': 'calcul de l\'appairage partagé avec le programme Windows',
 };
 
 const sourceFiles = (dir: URL, prefix = ''): string[] =>

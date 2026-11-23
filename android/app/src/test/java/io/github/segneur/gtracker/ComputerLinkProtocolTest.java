@@ -30,9 +30,10 @@ import org.junit.Test;
 
 /**
  * La liaison sans fil côté téléphone, éprouvée sur les jeux d'essai que les tests du PC relisent aussi
- * (bureau/sansFil.vecteurs.json, lu dans le dépôt sans copie) : trames valides et invalides, preuves d'appairage,
- * hachage du jeton, paquets de la découverte ; puis ce que le téléphone ajoute de son côté (messages reçus, chemins
- * demandés, adresses, JSON strict).
+ * (bureau/sansFil.vecteurs.json, lu dans le dépôt sans copie) : trames valides et invalides, messages de l'échange
+ * SPAKE2 (parts et confirmations transportées, calculées par la page), hachage du jeton, paquets de la découverte
+ * (versions 1 et 2) ; puis ce que le téléphone ajoute de son côté (messages reçus, chemins demandés, adresses, ordre
+ * des PC trouvés, JSON strict).
  */
 public class ComputerLinkProtocolTest {
 
@@ -179,16 +180,48 @@ public class ComputerLinkProtocolTest {
         decoder.end();
     }
 
+    /** Le premier cas de l'échange SPAKE2 des jeux d'essai, celui que portent ses trames. */
+    private static Map<String, Object> firstSpake2Case() {
+        return map(list(map(vectors.get("spake2")).get("cas")).get(0));
+    }
+
+    private static Incoming readVectorFrame(String name) throws Exception {
+        return ComputerLinkProtocol.readMessage(decodeAll(vectorFrame(name), ComputerLinkProtocol.WELCOME_LIMITS).get(0));
+    }
+
     @Test
-    public void preuvesDAppairageDuPc() {
-        for (Object o : list(vectors.get("appairage"))) {
-            Map<String, Object> v = map(o);
-            String code = (String) v.get("code");
-            byte[] fp = hex(v.get("empreinteHex"));
-            byte[] nt = hex(v.get("nonceTelephoneHex"));
-            byte[] np = hex(v.get("noncePcHex"));
-            assertEquals(v.get("preuveTelephoneHex"), ComputerLinkProtocol.toHex(ComputerLinkProtocol.phoneProof(code, fp, nt, np)));
-            assertEquals(v.get("preuvePcHex"), ComputerLinkProtocol.toHex(ComputerLinkProtocol.pcProof(code, fp, nt, np)));
+    public void echangeSpake2TransporteOctetPourOctet() throws Exception {
+        Map<String, Object> cas = firstSpake2Case();
+        // Le téléphone envoie sa part dans `appairer`, capacités en dernier, puis sa confirmation dans `preuve`.
+        assertArrayEquals(vectorFrame("appairer, échange SPAKE2"), ComputerLinkProtocol.encodePair(
+            "Pixel 8", hex("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"), hex(cas.get("partAHex"))));
+        assertArrayEquals(vectorFrame("preuve, confirmation du téléphone"), ComputerLinkProtocol.encodeProof(hex(cas.get("confirmationAHex"))));
+        // Il lit la part du PC dans `defi`, puis sa confirmation, le jeton, l'identifiant et le nom dans `appaire`.
+        Incoming defi = readVectorFrame("defi, échange SPAKE2");
+        assertEquals("defi", defi.type);
+        assertArrayEquals(hex(cas.get("partBHex")), defi.partB);
+        assertArrayEquals(hex("202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"), defi.noncePc);
+        Incoming appaire = readVectorFrame("appaire, confirmation du PC");
+        assertEquals("appaire", appaire.type);
+        assertArrayEquals(hex(cas.get("confirmationBHex")), appaire.proof);
+        assertArrayEquals(hex("c0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedf"), appaire.token);
+        assertArrayEquals(hex("101112131415161718191a1b1c1d1e1f"), appaire.computerId);
+        assertEquals("BUREAU", appaire.computerName);
+        assertEquals(ComputerLinkProtocol.PART_SIZE, defi.partB.length);
+        assertEquals(ComputerLinkProtocol.CONFIRMATION_SIZE, appaire.proof.length);
+    }
+
+    @Test
+    public void defiDUnPcAncienSansPartEtPartMalFormeeRefusee() throws Exception {
+        String nonce = "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f";
+        // PC resté à l'ancien échange : `defi` sans part, lu sans erreur ; la page s'arrête alors sur « version ».
+        Incoming old = ComputerLinkProtocol.readMessage(frameOf("{\"type\":\"defi\",\"noncePc\":\"" + nonce + "\"}", new byte[0]));
+        assertNull(old.partB);
+        String part = (String) firstSpake2Case().get("partBHex");
+        String[] wrong = { part.substring(2), part + "00", part.toUpperCase(java.util.Locale.ROOT), "null" };
+        for (String w : wrong) {
+            String value = "null".equals(w) ? "null" : "\"" + w + "\"";
+            assertEquals(w, ComputerLinkProtocol.INVALID_MESSAGE, readReason("{\"type\":\"defi\",\"noncePc\":\"" + nonce + "\",\"partB\":" + value + "}", new byte[0]));
         }
     }
 
@@ -232,6 +265,124 @@ public class ComputerLinkProtocolTest {
         }
     }
 
+    @Test
+    public void decouverteDeVersion2IdentifiantSousTrace() {
+        Map<String, Object> sondes = map(vectors.get("sondes"));
+        for (Object o : list(sondes.get("questionsV2"))) {
+            Map<String, Object> v = map(o);
+            byte[] bytes = hex(v.get("octetsHex"));
+            assertArrayEquals(bytes, ComputerLinkProtocol.encodeQuestion(hex(v.get("nonceHex")), ComputerLinkProtocol.PROBE_VERSION_2));
+            assertEquals(ComputerLinkProtocol.PROBE_VERSION_2, bytes[4]);
+            assertNull(ComputerLinkProtocol.decodeAnswer(bytes));
+        }
+        int seen = 0;
+        for (Object o : list(sondes.get("reponsesV2"))) {
+            Map<String, Object> v = map(o);
+            byte[] bytes = hex(v.get("octetsHex"));
+            byte[] nonce = hex(v.get("nonceHex"));
+            byte[] computerId = hex(v.get("identifiantPcHex"));
+            byte[] trace = hex(v.get("identifiantSondeHex"));
+            int port = ((Double) v.get("port")).intValue();
+            assertArrayEquals(trace, ComputerLinkProtocol.probeId(computerId, nonce));
+            assertArrayEquals(bytes, ComputerLinkProtocol.encodeAnswer(new ProbeAnswer(ComputerLinkProtocol.PROBE_VERSION_2, nonce, port, trace, "")));
+            ProbeAnswer read = ComputerLinkProtocol.decodeAnswer(bytes);
+            assertNotNull(read);
+            assertEquals(ComputerLinkProtocol.PROBE_VERSION_2, read.version);
+            assertArrayEquals(nonce, read.nonce);
+            assertEquals(port, read.port);
+            assertArrayEquals(trace, read.computerId);
+            assertEquals("", read.name);
+            assertNull(ComputerLinkProtocol.decodeQuestion(bytes));
+            // Seul le téléphone qui connaît l'identifiant reconnaît son PC ; la trace ne resert pas pour une autre question.
+            assertTrue(ComputerLinkProtocol.answerFrom(read, computerId, nonce));
+            byte[] otherId = computerId.clone();
+            otherId[0] ^= 1;
+            assertFalse(ComputerLinkProtocol.answerFrom(read, otherId, nonce));
+            byte[] otherNonce = nonce.clone();
+            otherNonce[15] ^= 1;
+            assertFalse(ComputerLinkProtocol.answerFrom(read, computerId, otherNonce));
+            // L'identifiant en clair à la place de sa trace ne passe pas pour une réponse de version 2.
+            assertFalse(ComputerLinkProtocol.answerFrom(new ProbeAnswer(ComputerLinkProtocol.PROBE_VERSION_2, nonce, port, computerId, ""), computerId, nonce));
+            seen++;
+        }
+        assertTrue(seen >= 2);
+
+        // Réponse de version 2 qui porterait encore un nom : lue, nom ignoré.
+        byte[] base = hex(map(list(sondes.get("reponsesV2")).get(0)).get("octetsHex"));
+        byte[] named = Arrays.copyOf(base, base.length + 6);
+        named[base.length - 1] = 6;
+        System.arraycopy("BUREAU".getBytes(StandardCharsets.UTF_8), 0, named, base.length, 6);
+        ProbeAnswer withName = ComputerLinkProtocol.decodeAnswer(named);
+        assertNotNull(withName);
+        assertEquals("", withName.name);
+        // Mais sa longueur doit tomber juste.
+        assertNull(ComputerLinkProtocol.decodeAnswer(Arrays.copyOf(named, named.length - 1)));
+
+        // Version 1 d'un PC ancien : identifiant en clair, reconnu tel quel.
+        Map<String, Object> v1 = map(list(sondes.get("reponses")).get(0));
+        ProbeAnswer old = ComputerLinkProtocol.decodeAnswer(hex(v1.get("octetsHex")));
+        assertNotNull(old);
+        assertEquals(ComputerLinkProtocol.PROBE_VERSION, old.version);
+        assertTrue(ComputerLinkProtocol.answerFrom(old, hex(v1.get("identifiantHex")), hex(v1.get("nonceHex"))));
+    }
+
+    @Test
+    public void pcTrouvesEssayesVersion2DAbordUneFoisChacunQuatreAuPlus() {
+        ComputerLinkProtocol.Candidates<String> found = new ComputerLinkProtocol.Candidates<>(ComputerLinkProtocol.CANDIDATES_MAX);
+        assertTrue(found.isEmpty());
+        assertTrue(found.add("192.168.1.30", ComputerLinkProtocol.PROBE_VERSION, "ancien"));
+        assertTrue(found.add("192.168.1.20", ComputerLinkProtocol.PROBE_VERSION, "neuf, v1"));
+        // La même adresse en version 2 : relevée, pas doublée ; une seconde réponse identique ne change rien.
+        assertTrue(found.add("192.168.1.20", ComputerLinkProtocol.PROBE_VERSION_2, "neuf"));
+        assertFalse(found.add("192.168.1.20", ComputerLinkProtocol.PROBE_VERSION_2, "neuf, encore"));
+        assertFalse(found.add("192.168.1.20", ComputerLinkProtocol.PROBE_VERSION, "neuf, v1 encore"));
+        assertTrue(found.add("192.168.1.40", ComputerLinkProtocol.PROBE_VERSION_2, "autre neuf"));
+        assertEquals(Arrays.asList("neuf", "autre neuf", "ancien"), found.ordered());
+        assertFalse(found.full());
+        assertTrue(found.add("192.168.1.50", ComputerLinkProtocol.PROBE_VERSION, "quatrième"));
+        assertTrue(found.full());
+        assertFalse(found.add("192.168.1.60", ComputerLinkProtocol.PROBE_VERSION_2, "cinquième"));
+        assertEquals(Arrays.asList("neuf", "autre neuf", "ancien", "quatrième"), found.ordered());
+        assertEquals(4, ComputerLinkProtocol.CANDIDATES_MAX);
+    }
+
+    @Test
+    public void unAppareilQuiRepondSurQuatrePortsNePrendQuUnePlace() {
+        ComputerLinkProtocol.Candidates<String> found = new ComputerLinkProtocol.Candidates<>(ComputerLinkProtocol.CANDIDATES_MAX);
+        // Quatre réponses d'une même adresse, sur quatre ports (la clé est l'adresse seule, comme dans `discover`).
+        ComputerLinkProtocol.Endpoint[] bruit = {
+            new ComputerLinkProtocol.Endpoint("192.168.1.66", 40001),
+            new ComputerLinkProtocol.Endpoint("192.168.1.66", 40002),
+            new ComputerLinkProtocol.Endpoint("192.168.1.66", 40003),
+            new ComputerLinkProtocol.Endpoint("192.168.1.66", 40004),
+        };
+        assertTrue(found.add(bruit[0].host, ComputerLinkProtocol.PROBE_VERSION_2, bruit[0].toString()));
+        for (int i = 1; i < bruit.length; i++) assertFalse(found.add(bruit[i].host, ComputerLinkProtocol.PROBE_VERSION_2, bruit[i].toString()));
+        assertFalse(found.full());
+        // Le vrai PC, d'une autre adresse, entre encore.
+        ComputerLinkProtocol.Endpoint pc = new ComputerLinkProtocol.Endpoint("192.168.1.20", 48217);
+        assertTrue(found.add(pc.host, ComputerLinkProtocol.PROBE_VERSION_2, pc.toString()));
+        assertEquals(Arrays.asList("192.168.1.66:40001", "192.168.1.20:48217"), found.ordered());
+    }
+
+    @Test
+    public void aucuneSuiteTlsAnonymeSansChiffrementOuDExportation() {
+        String[] offered = {
+            "TLS_AES_128_GCM_SHA256",
+            "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+            "TLS_ECDH_anon_WITH_AES_128_CBC_SHA",
+            "TLS_DH_anon_WITH_AES_256_GCM_SHA384",
+            "TLS_RSA_WITH_NULL_SHA256",
+            "TLS_ECDHE_RSA_WITH_NULL_SHA",
+            "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
+            "TLS_EMPTY_RENEGOTIATION_INFO_SCSV",
+        };
+        assertEquals(
+            Arrays.asList("TLS_AES_128_GCM_SHA256", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256", "TLS_EMPTY_RENEGOTIATION_INFO_SCSV"),
+            Arrays.asList(ComputerLinkProtocol.authenticatedSuites(offered))
+        );
+    }
+
     /** La trame d'un jeu d'essai, par son nom. */
     private static byte[] vectorFrame(String name) {
         for (Object o : list(vectors.get("trames"))) if (name.equals(map(o).get("nom"))) return hex(map(o).get("octetsHex"));
@@ -240,7 +391,7 @@ public class ComputerLinkProtocolTest {
 
     @Test
     public void messagesDuTelephoneEcritsCommeLeFaitLePc() throws Exception {
-        assertArrayEquals(vectorFrame("appairer avec capacités"), ComputerLinkProtocol.encodePair("Pixel 8", hex("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")));
+        assertArrayEquals(vectorFrame("appairer, échange SPAKE2"), ComputerLinkProtocol.encodePair("Pixel 8", hex("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"), hex(firstSpake2Case().get("partAHex"))));
         assertArrayEquals(vectorFrame("bloc de 5 octets"), ComputerLinkProtocol.encodeBlock(7, 0, "hello-et-plus".getBytes(StandardCharsets.UTF_8), 5));
         List<RemoteFile> files = Arrays.asList(new RemoteFile("sessions/été.gpx", 1234, 1790000000000L));
         assertArrayEquals(vectorFrame("liste, chemin accentué"), ComputerLinkProtocol.encodeList(2, files));
@@ -266,6 +417,12 @@ public class ComputerLinkProtocolTest {
         expected.put("capacites", Arrays.asList((Object) "ecriture"));
         assertArrayEquals(ComputerLinkProtocol.encodeFrame(expected, new byte[0], ComputerLinkProtocol.LIMITS), ComputerLinkProtocol.encodeHello("Pixel 8", hex(token)));
         assertEquals(Arrays.asList("ecriture"), ComputerLinkProtocol.CAPABILITIES);
+        // `appairer` annonce en plus l'échange SPAKE2, comme dans le jeu d'essai que le PC relit.
+        assertEquals(Arrays.asList("ecriture", "spake2"), ComputerLinkProtocol.PAIR_CAPABILITIES);
+        Map<String, Object> pair = null;
+        for (Object o : list(vectors.get("trames"))) if ("appairer, échange SPAKE2".equals(map(o).get("nom"))) pair = map(map(o).get("enTete"));
+        assertNotNull(pair);
+        assertEquals(new ArrayList<Object>(ComputerLinkProtocol.PAIR_CAPABILITIES), pair.get("capacites"));
     }
 
     // ---------- commandes d'écriture ----------
@@ -549,11 +706,18 @@ public class ComputerLinkProtocolTest {
     public void codeDeSixChiffresSeulement() {
         assertTrue(ComputerLinkProtocol.codeAllowed("042917"));
         for (String no : new String[] { "42917", "0429170", "04291a", "０４２９１７", " 42917", null }) assertFalse(String.valueOf(no), ComputerLinkProtocol.codeAllowed(no));
+        // Une part ou une confirmation de la mauvaise taille ne part jamais.
         try {
-            ComputerLinkProtocol.phoneProof("12345", new byte[32], new byte[32], new byte[32]);
+            ComputerLinkProtocol.encodeProof(new byte[31]);
             fail();
-        } catch (IllegalArgumentException e) {
-            // attendu
+        } catch (IllegalArgumentException | FrameException e) {
+            assertTrue(e instanceof IllegalArgumentException);
+        }
+        try {
+            ComputerLinkProtocol.encodePair("Pixel 8", new byte[32], new byte[64]);
+            fail();
+        } catch (IllegalArgumentException | FrameException e) {
+            assertTrue(e instanceof IllegalArgumentException);
         }
         assertTrue(ComputerLinkProtocol.sameBytes(new byte[] { 1, 2 }, new byte[] { 1, 2 }));
         assertFalse(ComputerLinkProtocol.sameBytes(new byte[] { 1, 2 }, new byte[] { 1, 3 }));

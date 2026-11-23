@@ -1,6 +1,10 @@
+import { hmac } from '@noble/hashes/hmac.js';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex, concatBytes, hexToBytes, utf8ToBytes } from '@noble/hashes/utils.js';
 import { describe, expect, it } from 'vitest';
 import { FILE_FORMATS, FORMAT_ID } from '../core/appIdentity';
 import { CODE_LENGTH } from '../library/computerLink';
+import { PAIR_CANDIDATES_MAX } from '../library/computerPairing';
 import { MAX_LISTED_FILE_BYTES } from '../library/reconcile';
 import { NATIVE_LOG_VERSION, parseNativeLog } from '../recording/nativeLog';
 
@@ -351,6 +355,9 @@ describe('noms techniques du Java', () => {
   });
 });
 
+/** Méthodes du greffon de la liaison sans fil : l'appairage en quatre étapes, menées par la page. */
+const PLUGIN_METHODS = ['connect', 'forget', 'pairConfirm', 'pairFinish', 'pairOffer', 'pairSearch', 'status'];
+
 /**
  * La liaison sans fil a deux côtés écrits dans deux langages : `bureau/trames.ts`, `appairage.ts` et `sonde.ts` côté
  * PC, `ComputerLinkProtocol.java` côté téléphone. Leurs jeux d'essai communs (`bureau/sansFil.vecteurs.json`)
@@ -364,6 +371,15 @@ describe('liaison sans fil : mêmes constantes au PC et au téléphone', () => {
   const APPAIRAGE = bureau('appairage.ts');
   const SONDE = bureau('sonde.ts');
   const DISQUE = bureau('disque.ts');
+  const SPAKE2 = bureau('spake2.ts');
+  /** Le peu des jeux d'essai communs que relit ce test. */
+  const VECTEURS = JSON.parse(bureau('sansFil.vecteurs.json')) as {
+    trames: { nom: string; enTete?: { capacites?: unknown } }[];
+    sondes: {
+      questionsV2: { octetsHex: string }[];
+      reponsesV2: { nonceHex: string; identifiantPcHex: string; identifiantSondeHex: string }[];
+    };
+  };
   /** Un entier écrit `48_217` ou `48217`. */
   const int = (text: string): number => Number(text.replace(/_/g, ''));
   const tsConst = (source: string, name: string): number => int(captured(source, new RegExp(`\\bexport const ${name} = ([\\d_]+)\\b`)));
@@ -394,9 +410,13 @@ describe('liaison sans fil : mêmes constantes au PC et au téléphone', () => {
     expect(limits(PROTOCOL, 'WELCOME_LIMITS').map(int)).toEqual(limits(TRAMES, 'LIMITES_ACCUEIL').map(int));
   });
 
-  it("étiquettes des preuves d'appairage et suffixes des écritures en cours", () => {
-    expect(captured(PROTOCOL, /\bPHONE_LABEL = "([^"]+)";/)).toBe(captured(APPAIRAGE, /\bETIQUETTE_TELEPHONE = '([^']+)'/));
-    expect(captured(PROTOCOL, /\bPC_LABEL = "([^"]+)";/)).toBe(captured(APPAIRAGE, /\bETIQUETTE_PC = '([^']+)'/));
+  it("tailles des messages de l'appairage et suffixes des écritures en cours", () => {
+    // Parts, confirmations et empreinte sont calculées par la page (`bureau/spake2.ts`) ; le greffon n'en vérifie que la taille.
+    expect(javaConst('PART_SIZE')).toBe(tsConst(SPAKE2, 'TAILLE_PART'));
+    expect(javaConst('CONFIRMATION_SIZE')).toBe(tsConst(SPAKE2, 'TAILLE_CONFIRMATION'));
+    expect(javaConst('FINGERPRINT_SIZE')).toBe(tsConst(SPAKE2, 'TAILLE_EMPREINTE_SPAKE2'));
+    // L'ancien échange (preuves HMAC du code) n'a plus de place côté téléphone.
+    expect(PROTOCOL).not.toMatch(/\b(PHONE_LABEL|PC_LABEL|phoneProof|pcProof)\b/);
     expect(captured(PROTOCOL, /\bTEMP_SUFFIX = "([^"]+)";/)).toBe(captured(DISQUE, /\bSUFFIXE_REMPLACEMENT = '([^']+)'/));
     expect(captured(PROTOCOL, /\bNEW_SUFFIX = "([^"]+)";/)).toBe(captured(DISQUE, /\bSUFFIXE_NEUF = '([^']+)'/));
     const memory = appJava('MemoryTree.java');
@@ -408,6 +428,29 @@ describe('liaison sans fil : mêmes constantes au PC et au téléphone', () => {
     expect(captured(PROTOCOL, /\bCAPABILITY_WRITE = "([^"]+)";/)).toBe(captured(TRAMES, /\bexport const CAPACITE_ECRITURE = '([^']+)'/));
     expect(captured(PROTOCOL, /\bCAPABILITIES = [^;]*Arrays\.asList\(([^)]*)\)/).trim()).toBe('CAPABILITY_WRITE');
     expect(captured(TRAMES, /\bexport const CAPACITES = \[([^\]]*)\]/).trim()).toBe('CAPACITE_ECRITURE');
+  });
+
+  it("`appairer` annonce l'échange SPAKE2, comme dans la trame que le PC relit", () => {
+    const pair = VECTEURS.trames.find((t) => t.nom === 'appairer, échange SPAKE2');
+    expect(pair?.enTete?.capacites).toEqual([
+      captured(PROTOCOL, /\bCAPABILITY_WRITE = "([^"]+)";/),
+      captured(PROTOCOL, /\bCAPABILITY_SPAKE2 = "([^"]+)";/),
+    ]);
+    expect(captured(PROTOCOL, /\bPAIR_CAPABILITIES = [^;]*Arrays\.asList\(([^)]*)\)/).split(',').map((s) => s.trim())).toEqual(['CAPABILITY_WRITE', 'CAPABILITY_SPAKE2']);
+  });
+
+  it('découverte de version 2 : octet de version et étiquette de la trace de l’identifiant', () => {
+    for (const q of VECTEURS.sondes.questionsV2) expect(parseInt(q.octetsHex.slice(8, 10), 16)).toBe(javaConst('PROBE_VERSION_2'));
+    const label = captured(PROTOCOL, /\bPROBE_LABEL = "([^"]+)";/);
+    expect(VECTEURS.sondes.reponsesV2.length).toBeGreaterThan(0);
+    for (const r of VECTEURS.sondes.reponsesV2) {
+      const trace = hmac(sha256, hexToBytes(r.identifiantPcHex), concatBytes(utf8ToBytes(label), hexToBytes(r.nonceHex))).slice(0, javaConst('COMPUTER_ID_SIZE'));
+      expect(bytesToHex(trace)).toBe(r.identifiantSondeHex);
+    }
+  });
+
+  it('autant de PC essayés par appui que la page en conduit', () => {
+    expect(javaConst('CANDIDATES_MAX')).toBe(PAIR_CANDIDATES_MAX);
   });
 
   it("même liste blanche des écritures, et mêmes dossiers listés, des deux côtés", () => {
@@ -439,12 +482,17 @@ describe('liaison sans fil : mêmes constantes au PC et au téléphone', () => {
     expect(MAIN_ACTIVITY).toContain('registerPlugin(ComputerLinkPlugin.class);');
     expect(PLUGIN).toMatch(/@CapacitorPlugin\(\s*name = "ComputerLink",/);
     expect(captured(PLUGIN, /\bEVENT_STATUS = "([^"]+)";/)).toBe('status');
-    for (const name of ['status', 'pair', 'connect', 'forget']) expect(PLUGIN, name).toMatch(new RegExp(`@PluginMethod\\s+public void ${name}\\(PluginCall call\\)`));
+    for (const name of PLUGIN_METHODS) expect(PLUGIN, name).toMatch(new RegExp(`@PluginMethod\\s+public void ${name}\\(PluginCall call\\)`));
+    expect(PLUGIN).not.toMatch(/@PluginMethod\s+public void pair\(/);
   });
 
-  it('le jeton et l’empreinte ne partent jamais vers la page', () => {
+  it('le jeton et l’empreinte gardée ne partent jamais vers la page', () => {
     const status = between(PLUGIN, 'private JSObject statusObject()', 'private void notifyStatus()');
     expect(status).not.toMatch(/KEY_TOKEN, null|KEY_FINGERPRINT|"jeton"|"empreinte"|"token"/);
+    // Rien de ce que rend une étape de l'appairage ne porte le jeton : seules les parts, confirmations et l'empreinte vue.
+    const puts = [...PLUGIN.matchAll(/\bret\.put\(([^;]*)\);/g)].map((m) => m[1]);
+    expect(puts.length).toBeGreaterThan(0);
+    for (const put of puts) expect(put).not.toMatch(/token|jeton|KEY_FINGERPRINT|computerId/i);
   });
 });
 
@@ -460,7 +508,7 @@ describe('liaison sans fil : ce que la page appelle et lit, le greffon le porte'
   it('la page enregistre le greffon sous son nom et n\'appelle que ses méthodes', () => {
     expect(LINK_TS).toContain("registerPlugin<ComputerLinkPlugin>('ComputerLink')");
     const called = [...new Set([...LINK_TS.matchAll(/\bplugin\.(\w+)\(/g)].map((m) => m[1]))];
-    expect(called.sort()).toEqual(['addListener', 'connect', 'forget', 'pair', 'status']);
+    expect(called.sort()).toEqual(['addListener', ...PLUGIN_METHODS]);
     for (const name of called.filter((n) => n !== 'addListener')) expect(PLUGIN, name).toMatch(new RegExp(`@PluginMethod\\s+public void ${name}\\(PluginCall call\\)`));
     expect(LINK_TS).toContain("addListener('status'");
   });
@@ -468,6 +516,11 @@ describe('liaison sans fil : ce que la page appelle et lit, le greffon le porte'
   it('états et raisons d\'échec : ceux du greffon, ni plus ni moins', () => {
     expect(quoted(captured(LINK_TS, /const STATES[^=]*= \[([^\]]+)\]/)).sort()).toEqual(javaValues('STATE').sort());
     expect(quoted(captured(LINK_TS, /const ERRORS[^=]*= \[([^\]]+)\]/)).sort()).toEqual(javaValues('ERROR').sort());
+    // Raisons d'échec d'une étape de l'appairage : celles que la page peut poser en fermant, plus « injoignable ».
+    const finish = captured(PLUGIN, /\bFINISH_ERRORS = Arrays\.asList\(([^)]*)\)/).split(',').map((n) => n.trim()).filter(Boolean)
+      .map((n) => captured(PLUGIN, new RegExp(`\\bstatic final String ${n} = "([^"]+)";`)));
+    expect(quoted(captured(LINK_TS, /const PAIR_STEP_FAILURES[^=]*= ?\[([^\]]+)\]/)).sort())
+      .toEqual([...finish, captured(PLUGIN, /\bFAILURE_UNREACHABLE = "([^"]+)";/)].sort());
   });
 
   it('les champs de l\'état et les codes de refus sont ceux que la page lit', () => {
@@ -476,10 +529,19 @@ describe('liaison sans fil : ce que la page appelle et lit, le greffon le porte'
       expect(status, field).toContain(`"${field}"`);
       expect(LINK_TS, field).toContain(`o.${field}`);
     }
-    for (const reject of ['BAD_CODE', 'BAD_ADDRESS']) {
+    for (const reject of ['BAD_ADDRESS']) {
       expect(PLUGIN, reject).toMatch(new RegExp(`\\bREJECT_${reject} = "${reject}";`));
       expect(LINK_TS, reject).toContain(`'${reject}'`);
     }
-    for (const option of ['code', 'address', 'folder']) expect(PLUGIN, option).toContain(`call.getString("${option}"`);
+    // Le code tapé ne va jamais au greffon : ni option `code`, ni refus `BAD_CODE`.
+    expect(PLUGIN).not.toMatch(/call\.getString\("code"|BAD_CODE/);
+    for (const option of ['address', 'folder', 'endpoint', 'partA', 'cA', 'error']) expect(PLUGIN, option).toContain(`call.getString("${option}"`);
+    for (const option of ['generation']) expect(PLUGIN, option).toContain(`call.getInt("${option}"`);
+    for (const option of ['keep', 'notFound']) expect(PLUGIN, option).toContain(`call.getBoolean("${option}"`);
+    // Ce que rendent les étapes, lu par la page sous les mêmes noms.
+    for (const field of ['generation', 'candidates', 'failure', 'fingerprint', 'partB', 'cB']) {
+      expect(PLUGIN, field).toContain(`ret.put("${field}"`);
+      expect(LINK_TS, field).toContain(`o.${field}`);
+    }
   });
 });

@@ -4,6 +4,7 @@ import { t } from '../core/i18n';
 import {
   EXCHANGE_SCREEN_ON_MS, exchangeScreenOnUntil, linkSettled, refusalText, shouldAutoConnect, shownLinkStatus,
 } from '../library/computerLink';
+import { pairWithComputer } from '../library/computerPairing';
 import {
   ComputerLinkRefused, computerLink, linkFolderOf, type ComputerLinkPort, type ComputerLinkStatus, type LinkFolder,
 } from '../platform/computerLink';
@@ -246,7 +247,7 @@ export function useComputerLink(): ComputerLinkView {
 
   const pair = useCallback(async (code: string, address: string) => {
     if (!ready) return;
-    await act(() => link.pair({ code, address: address.trim() || undefined, folder: uri, base }));
+    await act(() => pairWithComputer(link, { code, address: address.trim() || undefined, folder: uri, base }));
   }, [act, link, ready, uri, base]);
 
   const search = useCallback(async (address: string) => {

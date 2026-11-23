@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest'
 import type { InfoAdresse } from './sonde'
 import {
   NOM_PC_MAX_OCTETS,
+  VERSION_SONDE,
+  VERSION_SONDE_V2,
   adresseDeDiffusion,
   adressePrivee,
   adressesPrivees,
@@ -11,6 +13,7 @@ import {
   decoderReponse,
   encoderQuestion,
   encoderReponse,
+  identifiantDeSonde,
   lireIPv4,
   memeReseau,
   nomPcPourSonde,
@@ -21,6 +24,8 @@ type Vecteurs = {
     questions: { nonceHex: string; octetsHex: string }[]
     reponses: { nonceHex: string; port: number; identifiantHex: string; nom: string; octetsHex: string }[]
     etrangers: { nom: string; octetsHex: string }[]
+    questionsV2: { nonceHex: string; octetsHex: string }[]
+    reponsesV2: { nonceHex: string; port: number; identifiantPcHex: string; identifiantSondeHex: string; nom: string; octetsHex: string }[]
   }
 }
 const { sondes } = (JSON.parse(readFileSync(path.join(__dirname, 'sansFil.vecteurs.json'), 'utf8')) as Vecteurs)
@@ -32,16 +37,40 @@ describe('question et réponse de découverte', () => {
   it('reproduisent les jeux d’essai partagés avec le téléphone', () => {
     for (const v of sondes.questions) {
       expect(hex(encoderQuestion(deHex(v.nonceHex)))).toBe(v.octetsHex)
-      expect(hex(decoderQuestion(deHex(v.octetsHex))!.nonce)).toBe(v.nonceHex)
+      expect(decoderQuestion(deHex(v.octetsHex))).toEqual({ version: VERSION_SONDE, nonce: deHex(v.nonceHex) })
       expect(decoderReponse(deHex(v.octetsHex))).toBeNull()
     }
     for (const v of sondes.reponses) {
-      const reponse = { nonce: deHex(v.nonceHex), port: v.port, identifiant: deHex(v.identifiantHex), nom: v.nom }
+      const reponse = { version: VERSION_SONDE, nonce: deHex(v.nonceHex), port: v.port, identifiant: deHex(v.identifiantHex), nom: v.nom }
       expect(hex(encoderReponse(reponse))).toBe(v.octetsHex)
       const lue = decoderReponse(deHex(v.octetsHex))!
       expect({ ...lue, nonce: hex(lue.nonce), identifiant: hex(lue.identifiant) }).toEqual({ ...reponse, nonce: v.nonceHex, identifiant: v.identifiantHex })
       expect(decoderQuestion(deHex(v.octetsHex))).toBeNull()
     }
+  })
+
+  it('reproduisent en version 2 les jeux d’essai : identifiant de sonde sous HMAC du nonce, nom vide', () => {
+    expect(sondes.questionsV2.length).toBeGreaterThan(0)
+    for (const v of sondes.questionsV2) {
+      expect(hex(encoderQuestion(deHex(v.nonceHex), VERSION_SONDE_V2))).toBe(v.octetsHex)
+      expect(decoderQuestion(deHex(v.octetsHex))).toEqual({ version: VERSION_SONDE_V2, nonce: deHex(v.nonceHex) })
+      expect(decoderReponse(deHex(v.octetsHex))).toBeNull()
+    }
+    expect(sondes.reponsesV2.length).toBeGreaterThan(1)
+    for (const v of sondes.reponsesV2) {
+      const identifiant = identifiantDeSonde(deHex(v.identifiantPcHex), deHex(v.nonceHex))
+      expect(hex(identifiant)).toBe(v.identifiantSondeHex)
+      // Jamais l'identifiant du PC en clair.
+      expect(v.octetsHex).not.toContain(v.identifiantPcHex)
+      const reponse = { version: VERSION_SONDE_V2, nonce: deHex(v.nonceHex), port: v.port, identifiant, nom: v.nom }
+      expect(hex(encoderReponse(reponse))).toBe(v.octetsHex)
+      expect(decoderReponse(deHex(v.octetsHex))).toEqual(reponse)
+      expect(decoderQuestion(deHex(v.octetsHex))).toBeNull()
+    }
+    // Un autre nonce donne un autre identifiant de sonde : un hôte du réseau ne suit pas le PC d'une question à l'autre.
+    expect(new Set(sondes.reponsesV2.map((v) => v.identifiantSondeHex)).size).toBe(sondes.reponsesV2.length)
+    expect(() => encoderReponse({ version: VERSION_SONDE_V2, nonce: new Uint8Array(16), port: 1, identifiant: new Uint8Array(16), nom: 'PC' })).toThrow()
+    expect(() => identifiantDeSonde(new Uint8Array(15), new Uint8Array(16))).toThrow()
   })
 
   it('ignorent un paquet étranger', () => {
@@ -55,7 +84,8 @@ describe('question et réponse de découverte', () => {
   })
 
   it('refusent d’encoder un champ hors bornes', () => {
-    const base = { nonce: new Uint8Array(16), port: 48217, identifiant: new Uint8Array(16), nom: 'PC' }
+    const base = { version: VERSION_SONDE, nonce: new Uint8Array(16), port: 48217, identifiant: new Uint8Array(16), nom: 'PC' } as const
+    expect(() => encoderReponse({ ...base, version: 3 as never })).toThrow()
     expect(() => encoderQuestion(new Uint8Array(15))).toThrow()
     expect(() => encoderReponse({ ...base, port: 0 })).toThrow()
     expect(() => encoderReponse({ ...base, port: 65536 })).toThrow()

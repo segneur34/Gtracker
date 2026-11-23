@@ -3,10 +3,11 @@ import { isNativeApp } from './runtime';
 
 /**
  * La liaison sans fil du téléphone avec le programme Windows : seul passage vers le greffon
- * `ComputerLinkPlugin.java`, qui cherche l'ordinateur sur le réseau local, s'appaire par le code que l'ordinateur
- * affiche, puis répond à ses demandes de lecture du dossier mémoire (sans jamais y écrire). Le jeton et l'empreinte
- * du certificat restent dans le greffon : la page ne voit que l'état. Hors du téléphone, `computerLink()` rend
- * `null` et rien ne s'exécute.
+ * `ComputerLinkPlugin.java`, qui cherche l'ordinateur sur le réseau local, transporte les étapes de l'appairage par
+ * le code que l'ordinateur affiche (l'échange lui-même est calculé par la page : `library/computerPairing.ts`), puis
+ * répond à ses demandes de lecture du dossier mémoire (sans jamais y écrire). Le jeton reste dans le greffon : la
+ * page ne voit que l'état, et des étapes de l'appairage les parts, confirmations et empreinte qu'elle vérifie. Hors
+ * du téléphone, `computerLink()` rend `null` et rien ne s'exécute.
  */
 
 /** Où en est la liaison. */
@@ -61,10 +62,48 @@ interface LinkFolderOptions {
   base?: string;
 }
 
+/**
+ * Échec d'une étape de l'appairage pour un ordinateur candidat : les raisons du greffon, plus `unreachable` (liaison
+ * impossible avec ce candidat), que la page ne montre jamais telle quelle.
+ */
+export type PairStepFailure = 'code' | 'window' | 'nonce' | 'version' | 'proof' | 'network' | 'protocol' | 'unreachable';
+
+/** Recherche : la génération ouverte, et les adresses des ordinateurs trouvés, dans l'ordre où les essayer. */
+export interface PairSearchResult {
+  status: ComputerLinkStatus;
+  generation: number;
+  /** Vide : l'appairage est déjà fermé, `status` dit pourquoi. */
+  candidates: string[];
+}
+
+/** `appairer` puis `defi` : l'empreinte du certificat vu et la part de l'ordinateur (`null` : ordinateur resté à l'ancien échange). */
+export type PairOfferResult =
+  | { status: ComputerLinkStatus; failure: PairStepFailure }
+  | { status: ComputerLinkStatus; failure: null; fingerprint: string; partB: string | null };
+
+/**
+ * `preuve` puis `appaire` : la confirmation de l'ordinateur, à vérifier avant de rien garder. Son nom n'est montré
+ * qu'une fois gardé, par l'état.
+ */
+export type PairConfirmResult =
+  | { status: ComputerLinkStatus; failure: PairStepFailure }
+  | { status: ComputerLinkStatus; failure: null; cB: string };
+
+/** Fin de l'appairage : garder l'ordinateur confirmé (avec le dossier mémoire lu), ou fermer sur une raison. */
+export type PairFinishOptions =
+  | ({ generation: number; keep: true } & LinkFolderOptions)
+  | { generation: number; keep: false; error: ComputerLinkError; notFound: boolean };
+
 export interface ComputerLinkPort {
   status(): Promise<ComputerLinkStatus>;
-  /** Appaire à l'ordinateur dont `code` est affiché (6 chiffres) ; sans `address`, il est cherché sur le réseau. */
-  pair(options: { code: string; address?: string } & LinkFolderOptions): Promise<ComputerLinkStatus>;
+  /** Appairage, étape 1 : ouvre une génération et cherche l'ordinateur ; sans `address`, sur le réseau. */
+  pairSearch(options: { address?: string }): Promise<PairSearchResult>;
+  /** Étape 2, pour un candidat : sa part (`partA`, 65 octets en hexadécimal) contre celle de l'ordinateur. */
+  pairOffer(options: { generation: number; endpoint: string; partA: string }): Promise<PairOfferResult>;
+  /** Étape 3 : la confirmation du téléphone (`cA`, 32 octets en hexadécimal) contre celle de l'ordinateur. */
+  pairConfirm(options: { generation: number; cA: string }): Promise<PairConfirmResult>;
+  /** Étape 4 : garder (la confirmation de l'ordinateur vérifiée) ou fermer sans rien écrire. */
+  pairFinish(options: PairFinishOptions): Promise<ComputerLinkStatus>;
   /** Relie à l'ordinateur appairé ; sans effet si c'est déjà fait, sinon que le dossier mémoire lu change. */
   connect(options: { address?: string } & LinkFolderOptions): Promise<ComputerLinkStatus>;
   /** Ferme la liaison et oublie l'ordinateur. */
@@ -75,7 +114,10 @@ export interface ComputerLinkPort {
 
 interface ComputerLinkPlugin {
   status(): Promise<unknown>;
-  pair(options: { code: string; address?: string; folder?: string; base?: string }): Promise<unknown>;
+  pairSearch(options: { address?: string }): Promise<unknown>;
+  pairOffer(options: { generation: number; endpoint: string; partA: string }): Promise<unknown>;
+  pairConfirm(options: { generation: number; cA: string }): Promise<unknown>;
+  pairFinish(options: { generation: number; keep: boolean; folder?: string; base?: string; error?: string; notFound?: boolean }): Promise<unknown>;
   connect(options: { address?: string; folder?: string; base?: string }): Promise<unknown>;
   forget(): Promise<unknown>;
   addListener(event: 'status', listener: (status: unknown) => void): Promise<PluginListenerHandle>;
@@ -114,23 +156,69 @@ export const readComputerLinkStatus = (raw: unknown): ComputerLinkStatus => {
   };
 };
 
-/** Refus d'un appel mal formé, lu sur le code de l'erreur du greffon ; `null` pour toute autre erreur. */
+/**
+ * Refus d'un appel mal formé, lu sur le code de l'erreur du greffon ; `null` pour toute autre erreur. Le code tapé
+ * ne va jamais au greffon : son refus vient de la page (`library/computerPairing.ts`).
+ */
 export const refusalOf = (err: unknown): ComputerLinkRefusal | null => {
   const code = typeof err === 'object' && err !== null ? (err as { code?: unknown }).code : undefined;
-  if (code === 'BAD_CODE') return 'code';
   if (code === 'BAD_ADDRESS') return 'address';
   return null;
 };
 
-/** Un appel du greffon dont l'état rendu est remis dans sa forme, et dont un refus devient `ComputerLinkRefused`. */
-const call = async (request: Promise<unknown>): Promise<ComputerLinkStatus> => {
+/** Un appel du greffon dont la réponse est remise dans sa forme par `read`, et dont un refus devient `ComputerLinkRefused`. */
+const callWith = async <T,>(request: Promise<unknown>, read: (raw: unknown) => T): Promise<T> => {
+  let raw: unknown;
   try {
-    return readComputerLinkStatus(await request);
+    raw = await request;
   } catch (err) {
     const refusal = refusalOf(err);
     if (refusal !== null) throw new ComputerLinkRefused(refusal);
     throw err;
   }
+  return read(raw);
+};
+
+const call = (request: Promise<unknown>): Promise<ComputerLinkStatus> => callWith(request, readComputerLinkStatus);
+
+const PAIR_STEP_FAILURES: readonly PairStepFailure[] = ['code', 'window', 'nonce', 'version', 'proof', 'network', 'protocol', 'unreachable'];
+
+const fieldsOf = (raw: unknown): Record<string, unknown> => (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
+
+/** Échec d'une étape tel que le greffon le rend : `null` si elle a abouti ; une raison inconnue se lit comme une coupure. */
+const readFailure = (value: unknown): PairStepFailure | null =>
+  (value === null || value === undefined ? null : (PAIR_STEP_FAILURES.find((f) => f === value) ?? 'network'));
+
+/** La recherche telle que le greffon la rend ; sans génération lisible, aucun candidat. */
+export const readPairSearch = (raw: unknown): PairSearchResult => {
+  const o = fieldsOf(raw);
+  const generation = typeof o.generation === 'number' && Number.isInteger(o.generation) ? o.generation : -1;
+  const candidates = generation >= 0 && Array.isArray(o.candidates)
+    ? o.candidates.filter((c): c is string => typeof c === 'string' && c !== '')
+    : [];
+  return { status: readComputerLinkStatus(raw), generation, candidates };
+};
+
+/** `appairer` puis `defi` tels que le greffon les rend ; une étape aboutie sans empreinte se lit comme une coupure. */
+export const readPairOffer = (raw: unknown): PairOfferResult => {
+  const o = fieldsOf(raw);
+  const status = readComputerLinkStatus(raw);
+  const failure = readFailure(o.failure);
+  if (failure !== null) return { status, failure };
+  const fingerprint = text(o.fingerprint);
+  if (fingerprint === null) return { status, failure: 'network' };
+  return { status, failure: null, fingerprint, partB: text(o.partB) };
+};
+
+/** `preuve` puis `appaire` tels que le greffon les rend ; sans confirmation, l'étape se lit comme une coupure. */
+export const readPairConfirm = (raw: unknown): PairConfirmResult => {
+  const o = fieldsOf(raw);
+  const status = readComputerLinkStatus(raw);
+  const failure = readFailure(o.failure);
+  if (failure !== null) return { status, failure };
+  const cB = text(o.cB);
+  if (cB === null) return { status, failure: 'network' };
+  return { status, failure: null, cB };
 };
 
 /** Le dossier tel que le greffon le reçoit : rien sans dossier, et pas de sous-dossier vide (comportement d'avant le sous-dossier). */
@@ -139,7 +227,12 @@ const folderFields = ({ folder, base }: LinkFolderOptions): { folder?: string; b
 
 const port: ComputerLinkPort = {
   status: () => call(plugin.status()),
-  pair: ({ code, address, ...where }) => call(plugin.pair({ code, ...(address ? { address } : {}), ...folderFields(where) })),
+  pairSearch: ({ address }) => callWith(plugin.pairSearch(address ? { address } : {}), readPairSearch),
+  pairOffer: (options) => callWith(plugin.pairOffer(options), readPairOffer),
+  pairConfirm: (options) => callWith(plugin.pairConfirm(options), readPairConfirm),
+  pairFinish: (options) => call(plugin.pairFinish(options.keep
+    ? { generation: options.generation, keep: true, ...folderFields(options) }
+    : { generation: options.generation, keep: false, error: options.error, notFound: options.notFound })),
   connect: ({ address, ...where }) => call(plugin.connect({ ...(address ? { address } : {}), ...folderFields(where) })),
   forget: () => call(plugin.forget()),
   onStatus: (listener) => {

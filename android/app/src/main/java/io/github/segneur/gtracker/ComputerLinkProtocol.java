@@ -20,12 +20,14 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 /**
- * Liaison sans fil avec le programme Windows, côté téléphone : trames, messages, preuves d'appairage, paquets de la
- * découverte et contrôle des chemins demandés par le PC. Calcul pur, sans Android ni réseau, éprouvé en JVM sur les
- * jeux d'essai communs aux deux côtés (bureau/sansFil.vecteurs.json).
+ * Liaison sans fil avec le programme Windows, côté téléphone : trames, messages (ceux de l'appairage compris), paquets
+ * de la découverte et contrôle des chemins demandés par le PC. Calcul pur, sans Android ni réseau, éprouvé en JVM sur
+ * les jeux d'essai communs aux deux côtés (bureau/sansFil.vecteurs.json).
  *
  * Le format est celui que décrivent les en-têtes de bureau/trames.ts (trames et messages), bureau/appairage.ts
- * (preuves et jeton) et bureau/sonde.ts (découverte UDP) ; ce fichier le reproduit octet pour octet :
+ * (jeton), bureau/spake2.ts (échange authentifié par le code) et bureau/sonde.ts (découverte UDP) ; ce fichier le
+ * reproduit octet pour octet. L'échange SPAKE2 lui-même est calculé par la page (src/library/computerPairing.ts, sur
+ * bureau/spake2.ts) : ici, ses parts et confirmations ne sont que des octets transportés, et le code n'y passe jamais.
  * - trame : longueur de l'en-tête puis longueur du corps, deux entiers non signés de 32 bits gros-boutistes, puis
  *   l'en-tête (objet JSON en UTF-8 strict, sans marque d'ordre d'octets, champ `type` texte non vide), puis le corps ;
  * - le JSON est lu et écrit ici, sans org.json : sa lecture est aussi stricte que celle du PC (pas d'apostrophes, de
@@ -77,8 +79,12 @@ final class ComputerLinkProtocol {
 
     /** Capacité annoncée dans `appairer` et `bonjour` : listage des quatre dossiers et écriture, jamais l'un sans l'autre. */
     static final String CAPABILITY_WRITE = "ecriture";
-    /** Capacités annoncées par le téléphone, dans l'ordre où elles partent. */
+    /** Capacités annoncées par le téléphone dans `bonjour`, dans l'ordre où elles partent. */
     static final List<String> CAPABILITIES = Collections.unmodifiableList(Arrays.asList(CAPABILITY_WRITE));
+    /** Capacité annoncée dans `appairer` : le téléphone mène l'échange SPAKE2 (`partA`), jamais l'ancien échange. */
+    static final String CAPABILITY_SPAKE2 = "spake2";
+    /** Capacités annoncées dans `appairer`, dans l'ordre où elles partent. */
+    static final List<String> PAIR_CAPABILITIES = Collections.unmodifiableList(Arrays.asList(CAPABILITY_WRITE, CAPABILITY_SPAKE2));
 
     /** Sous-dossiers du dossier mémoire dont les fichiers sont listés et lus, en plus de ceux de la racine. */
     static final String SESSIONS_DIR = "sessions";
@@ -319,6 +325,9 @@ final class ComputerLinkProtocol {
         /** Octets du bloc de `ecrire`. */
         byte[] body;
         byte[] noncePc;
+        /** Part du PC dans l'échange SPAKE2 (pB), `null` dans le `defi` d'un PC resté à l'ancien échange. */
+        byte[] partB;
+        /** Confirmation du PC (cB) dans `appaire`. */
         byte[] proof;
         byte[] token;
         byte[] computerId;
@@ -392,6 +401,8 @@ final class ComputerLinkProtocol {
         switch (type) {
             case "defi":
                 m.noncePc = hexField(h, "noncePc", 32);
+                // Absente chez un PC resté à l'ancien échange : la page s'arrête alors sur « version ».
+                if (h.containsKey("partB")) m.partB = hexField(h, "partB", PART_SIZE);
                 break;
             case "appaire":
                 m.proof = hexField(h, "preuve", 32);
@@ -452,13 +463,19 @@ final class ComputerLinkProtocol {
         return h;
     }
 
-    /** Demande d'appairage par le code affiché sur le PC, capacités en dernier champ. */
-    static byte[] encodePair(String name, byte[] nonceTelephone) throws FrameException {
+    /**
+     * Demande d'appairage par le code affiché sur le PC : la part du téléphone dans l'échange SPAKE2 (pA, calculée par
+     * la page), puis les capacités en dernier champ.
+     */
+    static byte[] encodePair(String name, byte[] nonceTelephone, byte[] partA) throws FrameException {
+        requireSize(nonceTelephone, NONCE_SIZE, "Nonce du téléphone");
+        requireSize(partA, PART_SIZE, "Part du téléphone");
         Map<String, Object> h = header("appairer");
         h.put("version", (long) PROTOCOL_VERSION);
         h.put("nom", name);
         h.put("nonceTelephone", toHex(nonceTelephone));
-        h.put("capacites", new ArrayList<Object>(CAPABILITIES));
+        h.put("partA", toHex(partA));
+        h.put("capacites", new ArrayList<Object>(PAIR_CAPABILITIES));
         return encodeFrame(h, new byte[0], LIMITS);
     }
 
@@ -472,8 +489,9 @@ final class ComputerLinkProtocol {
         return encodeFrame(h, new byte[0], LIMITS);
     }
 
-    /** Preuve du téléphone. */
+    /** Confirmation du téléphone dans l'échange SPAKE2 (cA), calculée par la page. */
     static byte[] encodeProof(byte[] proof) throws FrameException {
+        requireSize(proof, CONFIRMATION_SIZE, "Confirmation du téléphone");
         Map<String, Object> h = header("preuve");
         h.put("preuve", toHex(proof));
         return encodeFrame(h, new byte[0], LIMITS);
@@ -724,9 +742,10 @@ final class ComputerLinkProtocol {
     static final int TOKEN_SIZE = 32;
     static final int FINGERPRINT_SIZE = 32;
     static final int COMPUTER_ID_SIZE = 16;
-    /** Étiquettes qui séparent la preuve du téléphone de celle du PC. */
-    static final String PHONE_LABEL = "gtracker-appairage-telephone";
-    static final String PC_LABEL = "gtracker-appairage-pc";
+    /** Part d'un côté dans l'échange SPAKE2 (pA, pB) : point de P-256 en SEC1 non compressé (`TAILLE_PART`). */
+    static final int PART_SIZE = 65;
+    /** Confirmation d'un côté (cA, cB) : sortie de HMAC-SHA256 (`TAILLE_CONFIRMATION`). */
+    static final int CONFIRMATION_SIZE = 32;
 
     /** Vrai pour un code : exactement 6 chiffres ASCII. */
     static boolean codeAllowed(String code) {
@@ -736,36 +755,6 @@ final class ComputerLinkProtocol {
             if (c < '0' || c > '9') return false;
         }
         return true;
-    }
-
-    /** Preuve que le téléphone connaît le code. */
-    static byte[] phoneProof(String code, byte[] fingerprint, byte[] nonceTelephone, byte[] noncePc) {
-        return proof(PHONE_LABEL, code, fingerprint, nonceTelephone, noncePc);
-    }
-
-    /** Preuve que le PC connaît le code, telle que le téléphone l'attend. */
-    static byte[] pcProof(String code, byte[] fingerprint, byte[] nonceTelephone, byte[] noncePc) {
-        return proof(PC_LABEL, code, fingerprint, nonceTelephone, noncePc);
-    }
-
-    /** HMAC-SHA256(code en ASCII, étiquette ‖ 0x00 ‖ empreinte ‖ nonceTelephone ‖ noncePc), octets bruts. */
-    private static byte[] proof(String label, String code, byte[] fingerprint, byte[] nonceTelephone, byte[] noncePc) {
-        if (!codeAllowed(code)) throw new IllegalArgumentException("Code d'appairage mal formé : 6 chiffres attendus.");
-        requireSize(fingerprint, FINGERPRINT_SIZE, "Empreinte du certificat");
-        requireSize(nonceTelephone, NONCE_SIZE, "Nonce du téléphone");
-        requireSize(noncePc, NONCE_SIZE, "Nonce du PC");
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(code.getBytes(StandardCharsets.US_ASCII), "HmacSHA256"));
-            mac.update(label.getBytes(StandardCharsets.US_ASCII));
-            mac.update((byte) 0);
-            mac.update(fingerprint);
-            mac.update(nonceTelephone);
-            mac.update(noncePc);
-            return mac.doFinal();
-        } catch (GeneralSecurityException e) {
-            throw new IllegalStateException(e);
-        }
     }
 
     /** SHA-256 d'octets : empreinte d'un certificat (ses octets DER), hachage d'un jeton. */
@@ -781,6 +770,21 @@ final class ComputerLinkProtocol {
     static String tokenHash(byte[] token) {
         requireSize(token, TOKEN_SIZE, "Jeton");
         return toHex(sha256(token));
+    }
+
+    /**
+     * Suites TLS où le PC présente un certificat et chiffre, parmi celles données : jamais une suite anonyme (sans
+     * certificat, l'empreinte qui identifie le PC dans l'échange d'appairage n'existerait pas), ni sans chiffrement,
+     * ni d'exportation.
+     */
+    static String[] authenticatedSuites(String[] enabled) {
+        List<String> kept = new ArrayList<>();
+        for (String s : enabled) {
+            String u = s.toUpperCase(java.util.Locale.ROOT);
+            if (u.contains("_ANON_") || u.contains("_NULL_") || u.endsWith("_NULL") || u.contains("_EXPORT")) continue;
+            kept.add(s);
+        }
+        return kept.toArray(new String[0]);
     }
 
     /** Égalité de deux suites d'octets dont la durée ne dépend que des longueurs. */
@@ -831,23 +835,42 @@ final class ComputerLinkProtocol {
     // ---------- découverte UDP ----------
 
     static final byte[] PROBE_SIGNATURE = { 0x47, 0x54, 0x52, 0x4b };
+    /** Version 1 : la réponse porte l'identifiant du PC en clair (PC ancien, ou PC neuf qui répond à une APK ancienne). */
     static final int PROBE_VERSION = 1;
+    /**
+     * Version 2 : même disposition, mais la réponse porte, à la place de l'identifiant, sa trace liée à la question
+     * (`probeId`), et un nom vide ; seul un téléphone qui connaît déjà l'identifiant la reconnaît.
+     */
+    static final int PROBE_VERSION_2 = 2;
     static final int PROBE_QUESTION = 0x01;
     static final int PROBE_ANSWER = 0x02;
     static final int PROBE_NONCE_SIZE = 16;
     /** Plus long nom du PC dans une réponse, en octets UTF-8. */
     static final int PC_NAME_MAX_BYTES = 64;
+    /** Étiquette de la trace de l'identifiant dans une réponse de version 2. */
+    static final String PROBE_LABEL = "gtracker-sonde";
+    /** PC retenus au plus par une découverte : chacun est essayé à son tour, un faux ne cache pas le vrai. */
+    static final int CANDIDATES_MAX = 4;
     private static final int QUESTION_SIZE = 6 + PROBE_NONCE_SIZE;
     private static final int ANSWER_FIXED_SIZE = 6 + PROBE_NONCE_SIZE + 2 + COMPUTER_ID_SIZE + 1;
 
-    /** Réponse d'un PC : nonce recopié, port TCP, identifiant, nom. L'adresse est celle d'où vient le paquet. */
+    /**
+     * Réponse d'un PC : version, nonce recopié, port TCP, identifiant (sa trace en version 2), nom (vide en version 2).
+     * L'adresse est celle d'où vient le paquet.
+     */
     static final class ProbeAnswer {
+        final int version;
         final byte[] nonce;
         final int port;
         final byte[] computerId;
         final String name;
 
         ProbeAnswer(byte[] nonce, int port, byte[] computerId, String name) {
+            this(PROBE_VERSION, nonce, port, computerId, name);
+        }
+
+        ProbeAnswer(int version, byte[] nonce, int port, byte[] computerId, String name) {
+            this.version = version;
             this.nonce = nonce;
             this.port = port;
             this.computerId = computerId;
@@ -855,45 +878,66 @@ final class ComputerLinkProtocol {
         }
     }
 
-    private static boolean hasProbeHeader(byte[] packet, int kind) {
-        for (int i = 0; i < PROBE_SIGNATURE.length; i++) if (packet[i] != PROBE_SIGNATURE[i]) return false;
-        return packet[4] == PROBE_VERSION && packet[5] == kind;
+    /** Version du paquet (1 ou 2) s'il porte la signature et la sorte attendues, -1 sinon. */
+    private static int probeVersion(byte[] packet, int kind) {
+        for (int i = 0; i < PROBE_SIGNATURE.length; i++) if (packet[i] != PROBE_SIGNATURE[i]) return -1;
+        if (packet[5] != kind) return -1;
+        return packet[4] == PROBE_VERSION || packet[4] == PROBE_VERSION_2 ? packet[4] : -1;
     }
 
-    /** Octets d'une question. */
+    /** Octets d'une question de version 1. */
     static byte[] encodeQuestion(byte[] nonce) {
+        return encodeQuestion(nonce, PROBE_VERSION);
+    }
+
+    /** Octets d'une question de la version donnée (1 ou 2). */
+    static byte[] encodeQuestion(byte[] nonce, int version) {
         requireSize(nonce, PROBE_NONCE_SIZE, "Nonce de la question");
+        if (version != PROBE_VERSION && version != PROBE_VERSION_2) throw new IllegalArgumentException("Version de la découverte inconnue : " + version + ".");
         ByteBuffer out = ByteBuffer.allocate(QUESTION_SIZE);
-        out.put(PROBE_SIGNATURE).put((byte) PROBE_VERSION).put((byte) PROBE_QUESTION).put(nonce);
+        out.put(PROBE_SIGNATURE).put((byte) version).put((byte) PROBE_QUESTION).put(nonce);
         return out.array();
     }
 
-    /** Le nonce d'une question, `null` pour un paquet étranger. */
+    /** Le nonce d'une question de version 1, `null` pour un paquet étranger. */
     static byte[] decodeQuestion(byte[] packet) {
-        if (packet.length != QUESTION_SIZE || !hasProbeHeader(packet, PROBE_QUESTION)) return null;
+        if (packet.length != QUESTION_SIZE || probeVersion(packet, PROBE_QUESTION) != PROBE_VERSION) return null;
         return java.util.Arrays.copyOfRange(packet, 6, QUESTION_SIZE);
     }
 
-    /** Octets d'une réponse ; le nom doit tenir en 64 octets UTF-8, sans caractère de contrôle. */
+    /**
+     * Octets d'une réponse ; le nom doit tenir en 64 octets UTF-8, sans caractère de contrôle, et être vide en
+     * version 2.
+     */
     static byte[] encodeAnswer(ProbeAnswer answer) {
         requireSize(answer.nonce, PROBE_NONCE_SIZE, "Nonce de la question");
         requireSize(answer.computerId, COMPUTER_ID_SIZE, "Identifiant du PC");
+        if (answer.version != PROBE_VERSION && answer.version != PROBE_VERSION_2) throw new IllegalArgumentException("Version de la découverte inconnue : " + answer.version + ".");
         if (answer.port < 1 || answer.port > 65535) throw new IllegalArgumentException("Port hors bornes : " + answer.port + ".");
         byte[] name = answer.name.getBytes(StandardCharsets.UTF_8);
         if (name.length > PC_NAME_MAX_BYTES || (name.length > 0 && !nameAllowed(answer.name))) throw new IllegalArgumentException("Nom du PC refusé dans une réponse.");
+        if (answer.version == PROBE_VERSION_2 && name.length > 0) throw new IllegalArgumentException("Nom du PC dans une réponse de version 2.");
         ByteBuffer out = ByteBuffer.allocate(ANSWER_FIXED_SIZE + name.length);
-        out.put(PROBE_SIGNATURE).put((byte) PROBE_VERSION).put((byte) PROBE_ANSWER).put(answer.nonce);
+        out.put(PROBE_SIGNATURE).put((byte) answer.version).put((byte) PROBE_ANSWER).put(answer.nonce);
         out.putShort((short) answer.port).put(answer.computerId).put((byte) name.length).put(name);
         return out.array();
     }
 
-    /** La réponse d'un PC, `null` pour un paquet étranger. */
+    /**
+     * La réponse d'un PC, version 1 ou 2, `null` pour un paquet étranger. En version 2, un nom (que le PC n'envoie
+     * plus) est sauté sans être lu : la longueur annoncée doit seulement tomber juste.
+     */
     static ProbeAnswer decodeAnswer(byte[] packet) {
-        if (packet.length < ANSWER_FIXED_SIZE || !hasProbeHeader(packet, PROBE_ANSWER)) return null;
+        if (packet.length < ANSWER_FIXED_SIZE) return null;
+        int version = probeVersion(packet, PROBE_ANSWER);
+        if (version < 0) return null;
         int nameLength = packet[ANSWER_FIXED_SIZE - 1] & 0xff;
         if (nameLength > PC_NAME_MAX_BYTES || packet.length != ANSWER_FIXED_SIZE + nameLength) return null;
         int port = ((packet[6 + PROBE_NONCE_SIZE] & 0xff) << 8) | (packet[7 + PROBE_NONCE_SIZE] & 0xff);
         if (port == 0) return null;
+        byte[] nonce = java.util.Arrays.copyOfRange(packet, 6, 6 + PROBE_NONCE_SIZE);
+        byte[] computerId = java.util.Arrays.copyOfRange(packet, 8 + PROBE_NONCE_SIZE, 8 + PROBE_NONCE_SIZE + COMPUTER_ID_SIZE);
+        if (version == PROBE_VERSION_2) return new ProbeAnswer(version, nonce, port, computerId, "");
         String name;
         try {
             name = StandardCharsets.UTF_8.newDecoder()
@@ -905,12 +949,88 @@ final class ComputerLinkProtocol {
             return null;
         }
         if (!name.isEmpty() && !nameAllowed(name)) return null;
-        return new ProbeAnswer(
-            java.util.Arrays.copyOfRange(packet, 6, 6 + PROBE_NONCE_SIZE),
-            port,
-            java.util.Arrays.copyOfRange(packet, 8 + PROBE_NONCE_SIZE, 8 + PROBE_NONCE_SIZE + COMPUTER_ID_SIZE),
-            name
-        );
+        return new ProbeAnswer(version, nonce, port, computerId, name);
+    }
+
+    /**
+     * Trace de l'identifiant d'un PC dans une réponse de version 2 : les 16 premiers octets de
+     * HMAC-SHA256(clé = identifiant, « gtracker-sonde » en ASCII ‖ nonce de la question). Liée à la question, elle
+     * ne dit rien de l'identifiant à qui ne le connaît pas, et ne resert pas pour une autre question.
+     */
+    static byte[] probeId(byte[] computerId, byte[] nonce) {
+        requireSize(computerId, COMPUTER_ID_SIZE, "Identifiant du PC");
+        requireSize(nonce, PROBE_NONCE_SIZE, "Nonce de la question");
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(computerId, "HmacSHA256"));
+            mac.update(PROBE_LABEL.getBytes(StandardCharsets.US_ASCII));
+            mac.update(nonce);
+            return java.util.Arrays.copyOf(mac.doFinal(), COMPUTER_ID_SIZE);
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /**
+     * Vrai si la réponse vient du PC d'identifiant `computerId`, à la question de nonce `nonce` : identifiant en clair
+     * en version 1, sa trace (`probeId`) en version 2. Une réponse n'est pas une preuve : l'empreinte du certificat,
+     * vérifiée ensuite, l'est.
+     */
+    static boolean answerFrom(ProbeAnswer answer, byte[] computerId, byte[] nonce) {
+        if (answer.version == PROBE_VERSION_2) return sameBytes(answer.computerId, probeId(computerId, nonce));
+        return sameBytes(answer.computerId, computerId);
+    }
+
+    /**
+     * Les PC trouvés par une découverte, dans l'ordre où ils seront essayés : un seul candidat par adresse IP source,
+     * quel que soit le port annoncé (un appareil qui répond plusieurs fois, sur plusieurs ports, ne prend qu'une place
+     * et ne peut pas, seul, écarter le vrai PC) ; les réponses de version 2 d'abord (PC neuf), puis celles de
+     * version 1, chacune dans l'ordre d'arrivée ; au plus `max` adresses.
+     */
+    static final class Candidates<T> {
+        private final int max;
+        private final List<String> keys = new ArrayList<>();
+        private final List<Integer> versions = new ArrayList<>();
+        private final List<T> values = new ArrayList<>();
+
+        Candidates(int max) {
+            this.max = max;
+        }
+
+        /**
+         * Ajoute le PC d'adresse IP `key` (sans le port) ; une adresse déjà vue n'est que relevée en version 2 (sa
+         * réponse de version 2 remplace celle de version 1), une seconde réponse de même version est ignorée. Faux si
+         * rien n'a changé.
+         */
+        boolean add(String key, int version, T value) {
+            int at = keys.indexOf(key);
+            if (at >= 0) {
+                if (version != PROBE_VERSION_2 || versions.get(at) == PROBE_VERSION_2) return false;
+                versions.set(at, PROBE_VERSION_2);
+                values.set(at, value);
+                return true;
+            }
+            if (full()) return false;
+            keys.add(key);
+            versions.add(version);
+            values.add(value);
+            return true;
+        }
+
+        boolean full() {
+            return keys.size() >= max;
+        }
+
+        boolean isEmpty() {
+            return keys.isEmpty();
+        }
+
+        List<T> ordered() {
+            List<T> out = new ArrayList<>();
+            for (int i = 0; i < keys.size(); i++) if (versions.get(i) == PROBE_VERSION_2) out.add(values.get(i));
+            for (int i = 0; i < keys.size(); i++) if (versions.get(i) != PROBE_VERSION_2) out.add(values.get(i));
+            return out;
+        }
     }
 
     // ---------- adresses IPv4 ----------

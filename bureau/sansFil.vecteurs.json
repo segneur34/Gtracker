@@ -1,14 +1,15 @@
 {
-  "description": "Jeux d'essai de la liaison sans fil entre le programme Windows et le téléphone, relus tels quels par les tests du PC et ceux du téléphone. Les formats sont décrits en tête de bureau/trames.ts (trames et messages), bureau/appairage.ts (preuves et jeton) et bureau/sonde.ts (découverte UDP). Tous les octets sont en hexadécimal minuscule. emetteur vaut pc pour un message que le PC envoie au téléphone, telephone pour un message que le téléphone envoie au PC.",
+  "description": "Jeux d'essai de la liaison sans fil entre le programme Windows et le téléphone, relus tels quels par les tests du PC et ceux du téléphone. Les formats sont décrits en tête de bureau/trames.ts (trames et messages), bureau/appairage.ts (jeton), bureau/spake2.ts (échange authentifié par le code) et bureau/sonde.ts (découverte UDP). Tous les octets sont en hexadécimal minuscule. emetteur vaut pc pour un message que le PC envoie au téléphone, telephone pour un message que le téléphone envoie au PC.",
   "lecture": {
     "trames": "Décoder octetsHex donne une trame dont l'en-tête, relu en JSON, vaut enTete (comparer les valeurs, pas l'ordre des champs) et dont le corps vaut corpsHex. Encoder enTete et corpsHex redonne octetsHex quand l'en-tête est écrit dans l'ordre des champs donné, sans espace (JSON.stringify). Chaque message est valide : celui qui le reçoit (le téléphone quand emetteur vaut pc, le PC quand emetteur vaut telephone) le lit sans erreur.",
     "tramesInvalides": "Décoder octetsHex, avec les limites d'une liaison où le téléphone s'est présenté (en-tête 8 388 608 octets, corps 1 048 576), échoue avec erreur ; TRONQUEE seulement quand le flux s'arrête là. Une marque d'ordre d'octets (EF BB BF) en tête de l'en-tête le rend illisible.",
     "messagesInvalides": "Décoder octetsHex, avec les mêmes limites, donne exactement une trame, sans erreur ; lire son message échoue avec erreur (MESSAGE_INVALIDE ou MESSAGE_INCONNU). Le téléphone vérifie ceux dont emetteur vaut pc (les commandes qu'il reçoit), le PC les vérifie tous.",
     "cheminsLecture": "Règle de cheminDuCable (bureau/telephone.ts) : chemins qu'une commande lire peut demander et qu'une liste peut porter ; chaque texte de admis est accepté, chaque texte de refuses refusé. Un téléphone sans la capacité ecriture ne liste que la racine et sessions/, mais le PC accepte la règle entière.",
     "cheminsEcriture": "Règle de cheminEcrivable (bureau/telephone.ts), seule liste blanche de ecrire, valider, effacer et ecrit, des deux côtés : chaque texte de admis est accepté, chaque texte de refuses refusé. Le chemin le plus long admis a 512 caractères, celui de 513 est refusé.",
-    "appairage": "preuveTelephone et preuvePc calculées pour code, empreinte, nonceTelephone et noncePc.",
     "jetons": "hachageHex est le SHA-256 des 32 octets de jetonHex.",
-    "sondes": "Encoder une question ou une réponse redonne octetsHex, et le décodage rend ses champs ; chaque paquet de etrangers est refusé comme question et comme réponse."
+    "sondes": "Encoder une question ou une réponse redonne octetsHex, et le décodage rend ses champs ; chaque paquet de etrangers est refusé comme question et comme réponse.",
+    "sondesV2": "questionsV2 et reponsesV2 : format de la découverte à l'octet de version 2, même disposition que la version 1. Dans une réponse, identifiantSondeHex remplace l'identifiant du PC : les 16 premiers octets de HMAC-SHA256(clé = les 16 octets de identifiantPcHex, « gtracker-sonde » en ASCII ‖ les 16 octets du nonce de la question), et le nom est vide.",
+    "spake2": "Chaque cas de spake2.cas : w tiré de code, puis l'échange de bureau/spake2.ts joué avec x et y fixés (A = le téléphone, idA, B = le PC, idB = les 32 octets de empreinteHex, aad) donne partAHex (pA), partBHex (pB), kHex (K), confirmationAHex (cA, envoyée par le téléphone dans preuve) et confirmationBHex (cB, envoyée par le PC dans appaire). Les trames « appairer, échange SPAKE2 », « defi, échange SPAKE2 », « preuve, confirmation du téléphone » et « appaire, confirmation du PC » portent les octets du premier cas."
   },
   "trames": [
     {
@@ -166,6 +167,34 @@
       "enTete": { "type": "pong", "id": 6, "enregistre": false },
       "corpsHex": "",
       "octetsHex": "00000029000000007b2274797065223a22706f6e67222c226964223a362c22656e7265676973747265223a66616c73657d"
+    },
+    {
+      "nom": "appairer, échange SPAKE2",
+      "emetteur": "telephone",
+      "enTete": { "type": "appairer", "version": 1, "nom": "Pixel 8", "nonceTelephone": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f", "partA": "044e50fb42ed838736f7804ddc29426fdeaa1dc24c4e86e2d7443c1c7d04f9a6612beed26100252aae4c8066f73c6325321268c4be9aa9870d65b2a41565107c68", "capacites": ["ecriture", "spake2"] },
+      "corpsHex": "",
+      "octetsHex": "00000132000000007b2274797065223a226170706169726572222c2276657273696f6e223a312c226e6f6d223a22506978656c2038222c226e6f6e636554656c6570686f6e65223a2230303031303230333034303530363037303830393061306230633064306530663130313131323133313431353136313731383139316131623163316431653166222c227061727441223a2230343465353066623432656438333837333666373830346464633239343236666465616131646332346334653836653264373434336331633764303466396136363132626565643236313030323532616165346338303636663733633633323533323132363863346265396161393837306436356232613431353635313037633638222c22636170616369746573223a5b226563726974757265222c227370616b6532225d7d"
+    },
+    {
+      "nom": "defi, échange SPAKE2",
+      "emetteur": "pc",
+      "enTete": { "type": "defi", "noncePc": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f", "partB": "0450065da00ed463cb5473699b83031c04fccc64f0a15a9db9d9959248d02f8d2e228f70be2f5a22656a8a61f7bf208492e9175c3335227da676eaf5f5bb2fa8cb" },
+      "corpsHex": "",
+      "octetsHex": "000000e9000000007b2274797065223a2264656669222c226e6f6e63655063223a2232303231323232333234323532363237323832393261326232633264326532663330333133323333333433353336333733383339336133623363336433653366222c227061727442223a2230343530303635646130306564343633636235343733363939623833303331633034666363633634663061313561396462396439393539323438643032663864326532323866373062653266356132323635366138613631663762663230383439326539313735633333333532323764613637366561663566356262326661386362227d"
+    },
+    {
+      "nom": "preuve, confirmation du téléphone",
+      "emetteur": "telephone",
+      "enTete": { "type": "preuve", "preuve": "5d87c9fcbb2b7ff9dbd4b99dfa485c8d9e59f53c02a81f6d6578171e0f0790ac" },
+      "corpsHex": "",
+      "octetsHex": "0000005d000000007b2274797065223a22707265757665222c22707265757665223a2235643837633966636262326237666639646264346239396466613438356338643965353966353363303261383166366436353738313731653066303739306163227d"
+    },
+    {
+      "nom": "appaire, confirmation du PC",
+      "emetteur": "pc",
+      "enTete": { "type": "appaire", "preuve": "57a1a178b9f05fb7bbc0a17a36d2cf8732f42f5da828d8024af82026506e3818", "jeton": "c0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedf", "identifiantPc": "101112131415161718191a1b1c1d1e1f", "nomPc": "BUREAU" },
+      "corpsHex": "",
+      "octetsHex": "000000ed000000007b2274797065223a2261707061697265222c22707265757665223a2235376131613137386239663035666237626263306131376133366432636638373332663432663564613832386438303234616638323032363530366533383138222c226a65746f6e223a2263306331633263336334633563366337633863396361636263636364636563666430643164326433643464356436643764386439646164626463646464656466222c226964656e74696669616e745063223a223130313131323133313431353136313731383139316131623163316431653166222c226e6f6d5063223a22425552454155227d"
     }
   ],
   "messagesInvalides": [
@@ -280,24 +309,6 @@
     { "nom": "en-tête sans type", "octetsHex": "00000008000000007b226964223a317d", "erreur": "EN_TETE_ILLISIBLE" },
     { "nom": "en-tête précédé d'une marque d'ordre d'octets", "octetsHex": "0000001900000000efbbbf7b2274797065223a2270696e67222c226964223a317d", "erreur": "EN_TETE_ILLISIBLE" }
   ],
-  "appairage": [
-    {
-      "code": "042917",
-      "empreinteHex": "794b52b389eb92d0301942216091a202ca1589ec7278e58715ab7f73a7226859",
-      "nonceTelephoneHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
-      "noncePcHex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
-      "preuveTelephoneHex": "1712f7c67962110819d76fd43f71222d12ea6380b5cfbbf3722c2aae63ebc135",
-      "preuvePcHex": "789723f4760de247607cd93e05931caffe9e67388e29550904c55a9fe571c7df"
-    },
-    {
-      "code": "999999",
-      "empreinteHex": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf",
-      "nonceTelephoneHex": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
-      "noncePcHex": "606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f",
-      "preuveTelephoneHex": "7f7840f8a5ef269945f566e1c7f93432a8223a7453307d76291dee8942aabed6",
-      "preuvePcHex": "a243c31a38adafff96f504a3c042e66fe827e88b6a4324d06d1a15d35565c197"
-    }
-  ],
   "jetons": [
     {
       "jetonHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
@@ -330,13 +341,70 @@
     ],
     "etrangers": [
       { "nom": "autre signature", "octetsHex": "475452410101000102030405060708090a0b0c0d0e0f" },
-      { "nom": "autre version", "octetsHex": "4754524b0201000102030405060708090a0b0c0d0e0f" },
+      { "nom": "autre version", "octetsHex": "4754524b0301000102030405060708090a0b0c0d0e0f" },
+      { "nom": "question v2 allongée", "octetsHex": "4754524b0201000102030405060708090a0b0c0d0e0f00" },
+      { "nom": "réponse v2 amputée de son dernier octet", "octetsHex": "4754524b0202000102030405060708090a0b0c0d0e0fbc59060e2059a0994134a647739fc96a53c7" },
       { "nom": "question amputée", "octetsHex": "4754524b0101000102030405060708090a0b0c0d0e" },
       { "nom": "question allongée", "octetsHex": "4754524b0101000102030405060708090a0b0c0d0e0f00" },
       { "nom": "réponse au port nul", "octetsHex": "4754524b0102000102030405060708090a0b0c0d0e0f0000101112131415161718191a1b1c1d1e1f025043" },
       { "nom": "réponse dont le nom est plus court qu'annoncé", "octetsHex": "4754524b0102000102030405060708090a0b0c0d0e0fbc59101112131415161718191a1b1c1d1e1f0250" },
       { "nom": "réponse au nom qui n'est pas de l'UTF-8", "octetsHex": "4754524b0102000102030405060708090a0b0c0d0e0fbc59101112131415161718191a1b1c1d1e1f02c328" },
       { "nom": "réponse au nom de 65 octets", "octetsHex": "4754524b0102000102030405060708090a0b0c0d0e0fbc59101112131415161718191a1b1c1d1e1f417878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878" }
+    ],
+    "questionsV2": [
+      { "nonceHex": "000102030405060708090a0b0c0d0e0f", "octetsHex": "4754524b0201000102030405060708090a0b0c0d0e0f" }
+    ],
+    "reponsesV2": [
+      {
+        "nonceHex": "000102030405060708090a0b0c0d0e0f",
+        "port": 48217,
+        "identifiantPcHex": "101112131415161718191a1b1c1d1e1f",
+        "identifiantSondeHex": "060e2059a0994134a647739fc96a53c7",
+        "nom": "",
+        "octetsHex": "4754524b0202000102030405060708090a0b0c0d0e0fbc59060e2059a0994134a647739fc96a53c700"
+      },
+      {
+        "nonceHex": "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+        "port": 48218,
+        "identifiantPcHex": "101112131415161718191a1b1c1d1e1f",
+        "identifiantSondeHex": "6c7328b3d7f00e8991e9ead9ec806bdd",
+        "nom": "",
+        "octetsHex": "4754524b0202f0f1f2f3f4f5f6f7f8f9fafbfcfdfeffbc5a6c7328b3d7f00e8991e9ead9ec806bdd00"
+      }
+    ]
+  },
+  "spake2": {
+    "cas": [
+      {
+        "nom": "code 042917",
+        "code": "042917",
+        "empreinteHex": "794b52b389eb92d0301942216091a202ca1589ec7278e58715ab7f73a7226859",
+        "idA": "gtracker-telephone",
+        "aad": "gtracker-appairage-2",
+        "wHex": "51f1c87c94953110584b4d4da3a03f9833d31cc080777e1f89bbb45372e91b90",
+        "xHex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+        "yHex": "2122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40",
+        "partAHex": "044e50fb42ed838736f7804ddc29426fdeaa1dc24c4e86e2d7443c1c7d04f9a6612beed26100252aae4c8066f73c6325321268c4be9aa9870d65b2a41565107c68",
+        "partBHex": "0450065da00ed463cb5473699b83031c04fccc64f0a15a9db9d9959248d02f8d2e228f70be2f5a22656a8a61f7bf208492e9175c3335227da676eaf5f5bb2fa8cb",
+        "kHex": "044fe243908f378aa1c2a69538822e6ed908c3225d8692575507c649901245150aaa8513bcd739d8100f64e283d32db26502af6ea9bcaa6bb5b58a6bf20f3228b4",
+        "confirmationAHex": "5d87c9fcbb2b7ff9dbd4b99dfa485c8d9e59f53c02a81f6d6578171e0f0790ac",
+        "confirmationBHex": "57a1a178b9f05fb7bbc0a17a36d2cf8732f42f5da828d8024af82026506e3818"
+      },
+      {
+        "nom": "code 999999",
+        "code": "999999",
+        "empreinteHex": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf",
+        "idA": "gtracker-telephone",
+        "aad": "gtracker-appairage-2",
+        "wHex": "49a78616233647566c998224149698f04ec627d45645fbf7f4ed645f16b8a258",
+        "xHex": "4142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f60",
+        "yHex": "6162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f80",
+        "partAHex": "046b9d8c024986a1884ca863e364294524bc2c4e83655a19ed30834e6935a7964e50b48f3af9e19d2f68990431eb2202efd2317d53d3cbc02d1163164e75bddbc8",
+        "partBHex": "044aa84558d81340099624c72e997ee9dae99dea2a301b106c779105b66148e013aaa6bce2c15ff7c8dd33ee55f058401386107a49c0d0b8967de8b57b0dbfa43d",
+        "kHex": "044a418b195ee7fed6e737803ab53cb8750b71c09335a70b030c70921b221664b7976a38df2c904954c97812fff08c3f0a220900ef48cf01b43f860c1342be991b",
+        "confirmationAHex": "1dd3693007a8843d578495c3c8aa422bcb55f01e67114c932e545b657afd269d",
+        "confirmationBHex": "e1fbb5a8c17f5d87f883ae39dfbb4c723ad63cc17f8e9553567281750e86c98a"
+      }
     ]
   }
 }

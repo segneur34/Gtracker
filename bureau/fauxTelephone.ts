@@ -9,7 +9,12 @@
 //   retire l'original et renomme, provisoire effacé sur toute erreur et à la fermeture de la liaison, refus
 //   (`PERMISSION`) d'écrire et d'effacer quand il enregistre une session ;
 // - `ancien`, il fait ce que fait une application d'avant l'écriture sans fil : ni capacité ni `enregistre`, racine
-//   et `sessions/` seulement, rien de modifié dans le dossier, et toute commande d'écriture ferme la liaison.
+//   et `sessions/` seulement, rien de modifié dans le dossier, et toute commande d'écriture ferme la liaison ; il
+//   s'appaire pourtant par l'échange SPAKE2, pour que le banc puisse relier un téléphone qui ne reçoit pas d'écriture.
+// - `ancienEchange`, il se présente comme une application d'avant l'échange SPAKE2 : `appairer` sans `partA`, que le
+//   PC doit refuser (raison `version`) ; s'il répondait `defi`, l'appairage s'arrête en erreur, sans rien prouver.
+// Comme le téléphone à jour, il s'arrête (`RefusPc`, raison `version`) sur un `defi` sans `partB`, et ne garde le
+// jeton qu'une fois la confirmation du PC vérifiée.
 
 import { randomBytes } from 'node:crypto'
 import dgram from 'node:dgram'
@@ -18,15 +23,17 @@ import { mkdir, open, readdir, rename, stat, unlink } from 'node:fs/promises'
 import path from 'node:path'
 import tls from 'node:tls'
 import type { Alea } from './appairage'
-import { TAILLE_NONCE, depuisHex, egalATempsConstant, enHex, preuvePc, preuveTelephone } from './appairage'
+import { TAILLE_NONCE, depuisHex, egalATempsConstant, enHex } from './appairage'
 import { empreinteCertificat } from './certificat'
 import { ErreurDisque, SUFFIXE_NEUF, SUFFIXE_REMPLACEMENT, codeDe, estTemporaire } from './disque'
 import { Liaison } from './sansFil'
-import { TAILLE_NONCE_SONDE, decoderReponse, encoderQuestion } from './sonde'
+import type { VersionSonde } from './sonde'
+import { TAILLE_NONCE_SONDE, VERSION_SONDE, VERSION_SONDE_V2, decoderReponse, encoderQuestion, identifiantDeSonde } from './sonde'
+import { commencerAppairage, confirmationValide, conclure } from './spake2'
 import type { FichierTelephone } from './telephone'
 import { DOSSIERS_DU_CABLE, DOSSIER_SESSIONS, cheminAdmis, cheminDuCable, cheminEcrivable, cheminRefuse, fichiersAdmis, nomProvisoire } from './telephone'
 import type { Capacite, Commande, CommandeEcrire, CommandeValider, Message, RaisonRefus } from './trames'
-import { CAPACITE_ECRITURE, MESSAGE_MAX, PROTOCOLE_SANS_FIL } from './trames'
+import { CAPACITE_ECRITURE, CAPACITE_SPAKE2, MESSAGE_MAX, PROTOCOLE_SANS_FIL, TAILLE_PART_SPAKE2, TAILLE_PREUVE } from './trames'
 
 /** Ce que le téléphone garde après l'appairage (le vrai : dans ses préférences privées). */
 export type MemoireFaux = {
@@ -69,6 +76,8 @@ export type OptionsFauxTelephone = {
   coupureApresEcritures?: number | null
   /** Application d'avant l'écriture sans fil : lecture seule, racine et `sessions/` seulement. */
   ancien?: boolean
+  /** Application d'avant l'échange SPAKE2 : `appairer` sans `partA`, pour vérifier que le PC le refuse. */
+  ancienEchange?: boolean
   /** Le téléphone enregistre une session dès le départ (`enregistre` le change ensuite). */
   enregistre?: boolean
   /** Délai d'attente de chaque réponse du PC, en millisecondes. */
@@ -89,16 +98,29 @@ export type LiaisonFaux = {
   fermer(): void
 }
 
-/** Un PC trouvé par la découverte : l'adresse est celle d'où vient la réponse. */
-export type PcTrouve = { adresse: string; port: number; identifiantPc: string; nom: string }
+/**
+ * Un PC trouvé par la découverte : l'adresse est celle d'où vient la réponse. `identifiantPc` est l'identifiant lu
+ * dans la réponse : celui du PC en version 1, l'identifiant de sonde en version 2 (`identifiantDeSonde`).
+ */
+export type PcTrouve = { adresse: string; port: number; identifiantPc: string; nom: string; version: VersionSonde }
 
 /**
- * Diffuse une question de découverte vers `hote:port` (adresse de diffusion, ou celle du PC) et rend la première
- * réponse à son nonce, `null` après `delaiMs`.
+ * Diffuse une question de découverte vers `hote:port` (adresse de diffusion, ou celle du PC), dans la version donnée
+ * (1 par défaut), et rend la première réponse à son nonce dans cette version, `null` après `delaiMs`. En version 2,
+ * `pcAttendu` (identifiant du PC appairé, en hexadécimal) écarte toute réponse dont l'identifiant de sonde n'est pas
+ * le sien, comme le fait le téléphone appairé.
  */
-export function sonder(hote: string, port: number, delaiMs = 3_000, alea: Alea = randomBytes): Promise<PcTrouve | null> {
+export function sonder(
+  hote: string,
+  port: number,
+  delaiMs = 3_000,
+  alea: Alea = randomBytes,
+  version: VersionSonde = VERSION_SONDE,
+  pcAttendu?: string,
+): Promise<PcTrouve | null> {
   return new Promise((resoudre) => {
     const nonce = alea(TAILLE_NONCE_SONDE)
+    const attendu = version === VERSION_SONDE_V2 && pcAttendu !== undefined ? identifiantDeSonde(Buffer.from(pcAttendu, 'hex'), nonce) : null
     const socket = dgram.createSocket('udp4')
     let fini = false
     const finir = (pc: PcTrouve | null) => {
@@ -112,12 +134,13 @@ export function sonder(hote: string, port: number, delaiMs = 3_000, alea: Alea =
     socket.on('error', () => finir(null))
     socket.on('message', (paquet, source) => {
       const r = decoderReponse(paquet)
-      if (!r || !egalATempsConstant(r.nonce, nonce)) return
-      finir({ adresse: source.address, port: r.port, identifiantPc: enHex(r.identifiant), nom: r.nom })
+      if (!r || r.version !== version || !egalATempsConstant(r.nonce, nonce)) return
+      if (attendu !== null && !egalATempsConstant(r.identifiant, attendu)) return
+      finir({ adresse: source.address, port: r.port, identifiantPc: enHex(r.identifiant), nom: r.nom, version: r.version })
     })
     socket.bind(0, () => {
       socket.setBroadcast(true)
-      socket.send(encoderQuestion(nonce), port, hote)
+      socket.send(encoderQuestion(nonce, version), port, hote)
     })
   })
 }
@@ -186,6 +209,7 @@ export class FauxTelephone {
   private readonly coupureApresBlocs: number | null
   private readonly coupureApresEcritures: number | null
   private readonly ancien: boolean
+  private readonly ancienEchange: boolean
   private readonly delaiMs: number
   private readonly alea: Alea
   private readonly falsifier: ((commande: Commande) => Message | undefined) | undefined
@@ -200,6 +224,7 @@ export class FauxTelephone {
     this.coupureApresBlocs = options.coupureApresBlocs ?? null
     this.coupureApresEcritures = options.coupureApresEcritures ?? null
     this.ancien = options.ancien ?? false
+    this.ancienEchange = options.ancienEchange ?? false
     this.enregistre = options.enregistre ?? false
     this.delaiMs = options.delaiMs ?? 10_000
     this.alea = options.alea ?? randomBytes
@@ -210,22 +235,40 @@ export class FauxTelephone {
     return this.ancien ? {} : { capacites: [CAPACITE_ECRITURE] }
   }
 
-  /** Appaire le téléphone au PC par le code affiché, puis répond à ses commandes. Lève `RefusPc` sur un refus. */
+  /** Les capacités annoncées dans `appairer` : celles de `bonjour`, plus l'échange SPAKE2 pour un téléphone à jour. */
+  private capacitesAppairage(): { capacites?: Capacite[] } {
+    return this.ancien ? {} : { capacites: [CAPACITE_ECRITURE, CAPACITE_SPAKE2] }
+  }
+
+  /**
+   * Appaire le téléphone au PC par le code affiché (échange SPAKE2, `spake2.ts`), puis répond à ses commandes. Lève
+   * `RefusPc` sur un refus, et sur un `defi` sans `partB` (raison `version`).
+   */
   async appairer(hote: string, port: number, code: string): Promise<LiaisonFaux> {
     const liaison = new Liaison(await ouvrirTls(hote, port, this.delaiMs))
     try {
       const der = liaison.certificatDistant()
       if (!der) throw new Error('Le PC ne présente aucun certificat.')
+      // L'empreinte vue est l'identité du PC dans l'échange : un relais, qui présente un autre certificat, échoue.
       const empreinte = empreinteCertificat(der)
-      const nonceTelephone = this.alea(TAILLE_NONCE)
-      liaison.envoyer({ type: 'appairer', version: PROTOCOLE_SANS_FIL, nom: this.nom, nonceTelephone: enHex(nonceTelephone), ...this.capacites() })
+      const nonceTelephone = enHex(this.alea(TAILLE_NONCE))
+      if (this.ancienEchange) {
+        liaison.envoyer({ type: 'appairer', version: PROTOCOLE_SANS_FIL, nom: this.nom, nonceTelephone, ...this.capacites() })
+        this.attendu(await liaison.prochain(this.delaiMs), 'defi')
+        throw new Error("Le PC a accepté l'ancien échange : appairage abandonné.")
+      }
+      // x neuf à chaque appairage : un état SPAKE2 ne sert qu'une fois.
+      const etat = commencerAppairage('A', code, empreinte, this.alea)
+      liaison.envoyer({ type: 'appairer', version: PROTOCOLE_SANS_FIL, nom: this.nom, nonceTelephone, partA: enHex(etat.part), ...this.capacitesAppairage() })
       const defi = this.attendu(await liaison.prochain(this.delaiMs), 'defi')
-      const noncePc = depuisHex(defi.noncePc, TAILLE_NONCE) as Uint8Array
-      liaison.envoyer({ type: 'preuve', preuve: enHex(preuveTelephone(code, empreinte, nonceTelephone, noncePc)) })
+      // Un PC d'avant l'échange SPAKE2 : rien n'est prouvé, jamais de retour à l'ancien échange.
+      if (defi.partB === undefined) throw new RefusPc('version')
+      const cles = conclure(etat, depuisHex(defi.partB, TAILLE_PART_SPAKE2) as Uint8Array)
+      liaison.envoyer({ type: 'preuve', preuve: enHex(cles.confirmationEnvoyee) })
       const appaire = this.attendu(await liaison.prochain(this.delaiMs), 'appaire')
-      // Le jeton n'est gardé qu'une fois la preuve du PC vérifiée : sans elle, ce PC ne connaît pas le code.
-      if (!egalATempsConstant(depuisHex(appaire.preuve, 32) ?? new Uint8Array(0), preuvePc(code, empreinte, nonceTelephone, noncePc))) {
-        throw new Error('Preuve du PC fausse : appairage abandonné.')
+      // Le jeton n'est gardé qu'une fois cB vérifiée : sans elle, ce PC ne connaît pas le code.
+      if (!confirmationValide(cles, depuisHex(appaire.preuve, TAILLE_PREUVE) ?? new Uint8Array(0))) {
+        throw new Error('Confirmation du PC fausse : appairage abandonné.')
       }
       this.memoire = { jeton: appaire.jeton, empreinte: enHex(empreinte), identifiantPc: appaire.identifiantPc, nomPc: appaire.nomPc, adresse: hote, port }
       return this.servir(liaison)

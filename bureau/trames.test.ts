@@ -7,6 +7,7 @@ import type { EnTete, Message, RaisonTrame, Trame } from './trames'
 import {
   CAPACITES,
   CAPACITE_ECRITURE,
+  CAPACITE_SPAKE2,
   DecodeurTrames,
   ErreurTrame,
   LIMITES,
@@ -62,6 +63,8 @@ const exemples: Message[] = [
   { type: 'pong', id: 5 },
   { type: 'erreur', id: 4, code: 'NOT_FOUND', message: 'Fichier disparu.' },
   { type: 'appairer', version: 1, nom: 'Pixel 8', nonceTelephone: nonce, capacites: ['ecriture'] },
+  { type: 'appairer', version: 1, nom: 'Pixel 8', nonceTelephone: nonce, partA: '04'.repeat(65), capacites: ['ecriture'] },
+  { type: 'defi', noncePc: nonce, partB: '04'.repeat(65) },
   { type: 'bonjour', version: 1, nom: 'Pixel 8', jeton: 'cd'.repeat(32), capacites: [] },
   { type: 'ecrire', id: 6, chemin: 'itineraires/tour du lac.json', debut: TAILLE_BLOC, taille: TAILLE_BLOC + 3, octets: Uint8Array.from([0, 1, 255]) },
   { type: 'ecrire', id: 7, chemin: 'reglages/pixel.json', debut: 0, taille: 0, octets: new Uint8Array(0) },
@@ -198,6 +201,11 @@ describe('lireMessage', () => {
     expect(lire({ type: 'appairer', version: 1, nom: 'Pixel\n8', nonceTelephone: nonce })).toBe('MESSAGE_INVALIDE')
     expect(lire({ type: 'appairer', version: 1, nom: '', nonceTelephone: nonce })).toBe('MESSAGE_INVALIDE')
     expect(lire({ type: 'appairer', version: 1, nom: 'x'.repeat(101), nonceTelephone: nonce })).toBe('MESSAGE_INVALIDE')
+    // Une part SPAKE2 facultative, mais de 65 octets en hexadécimal minuscule quand elle est là.
+    for (const part of ['04'.repeat(64), '04'.repeat(66), '0A'.repeat(65), 65, null]) {
+      expect(lire({ type: 'appairer', version: 1, nom: 'Pixel', nonceTelephone: nonce, partA: part }), JSON.stringify(part)).toBe('MESSAGE_INVALIDE')
+      expect(lire({ type: 'defi', noncePc: nonce, partB: part }), JSON.stringify(part)).toBe('MESSAGE_INVALIDE')
+    }
     expect(lire({ type: 'refus', raison: 'autre' })).toBe('MESSAGE_INVALIDE')
   })
 
@@ -261,6 +269,9 @@ describe('lireMessage', () => {
     const neuf = lu([CAPACITE_ECRITURE])
     expect(neuf.type === 'bonjour' && capacitesDe(neuf)).toEqual([...CAPACITES])
     expect(lireMessage({ enTete: { type: 'appairer', version: 1, nom: 'Pixel', nonceTelephone: nonce, capacites: ['ecriture'] }, corps: new Uint8Array(0) })).toMatchObject({ capacites: ['ecriture'] })
+    // « spake2 » s'annonce, mais le PC ne la lit pas : c'est la part du téléphone qui fait l'échange.
+    const spake2 = lireMessage({ enTete: { type: 'appairer', version: 1, nom: 'Pixel', nonceTelephone: nonce, capacites: [CAPACITE_ECRITURE, CAPACITE_SPAKE2] }, corps: new Uint8Array(0) })
+    expect(spake2).toEqual({ type: 'appairer', version: 1, nom: 'Pixel', nonceTelephone: nonce, capacites: ['ecriture'] })
     for (const faux of ['ecriture', [1], [null], {}, null]) {
       expect(raison(() => lu(faux)), JSON.stringify(faux)).toBe('MESSAGE_INVALIDE')
     }
@@ -374,9 +385,14 @@ describe('jeux d’essai partagés avec le téléphone', () => {
 
   it('couvre chaque message de la liaison, dans le sens où il circule', () => {
     const types = new Set(vecteurs.trames.map((v) => `${v.emetteur}:${v.enTete.type}`))
-    for (const attendu of ['pc:ecrire', 'pc:valider', 'pc:effacer', 'pc:lire', 'pc:ping', 'telephone:ecrit', 'telephone:fait', 'telephone:pong', 'telephone:liste', 'telephone:bonjour', 'telephone:appairer']) {
+    for (const attendu of ['pc:ecrire', 'pc:valider', 'pc:effacer', 'pc:lire', 'pc:ping', 'telephone:ecrit', 'telephone:fait', 'telephone:pong', 'telephone:liste', 'telephone:bonjour', 'telephone:appairer', 'pc:defi', 'telephone:preuve', 'pc:appaire', 'pc:refus']) {
       expect(types, attendu).toContain(attendu)
     }
+    // L'appairage par l'échange SPAKE2 : les parts des deux côtés, de 65 octets.
+    const appairer = vecteurs.trames.find((v) => v.enTete.type === 'appairer' && v.enTete.partA !== undefined)
+    const defi = vecteurs.trames.find((v) => v.enTete.type === 'defi')
+    expect(appairer && lireMessage({ enTete: appairer.enTete, corps: new Uint8Array(0) })).toMatchObject({ partA: expect.stringMatching(/^04[0-9a-f]{128}$/) })
+    expect(defi && lireMessage({ enTete: defi.enTete, corps: new Uint8Array(0) })).toMatchObject({ partB: expect.stringMatching(/^04[0-9a-f]{128}$/) })
     expect(vecteurs.trames.some((v) => v.enTete.type === 'ecrire' && v.corpsHex !== '')).toBe(true)
     expect(vecteurs.trames.some((v) => Array.isArray(v.enTete.capacites) && v.enTete.capacites.includes(CAPACITE_ECRITURE))).toBe(true)
   })

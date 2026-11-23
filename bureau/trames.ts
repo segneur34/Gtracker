@@ -35,16 +35,23 @@
 // est un texte de 1 à 100 caractères sans caractère de contrôle.
 //
 // Accueil, téléphone vers PC (premier message de la liaison) :
-//   appairer   { version, nom, nonceTelephone, capacites? }   demande d'appairage par le code affiché sur le PC
+//   appairer   { version, nom, nonceTelephone, partA?, capacites? }   demande d'appairage par le code affiché sur le
+//                                                       PC ; partA : la part SPAKE2 du téléphone, 65 octets (130
+//                                                       chiffres) ; un téléphone d'avant l'échange SPAKE2 ne l'envoie
+//                                                       pas, et le PC le refuse alors (raison `version`)
 //   bonjour    { version, nom, jeton, capacites? }      téléphone déjà appairé, il présente son jeton
 //   capacites, facultatif : tableau de textes, ce que le téléphone sait faire en plus du protocole de base ; seule
-//   connue, « ecriture » (`CAPACITES`) ; un texte inconnu est ignoré, un doublon compte une fois ; absent, le
-//   téléphone ne sait que lire (`lister` limité à la racine et à `sessions/`). Un `capacites` qui n'est pas un tableau
-//   de textes rend le message invalide.
-// Appairage (description des preuves : `appairage.ts`) :
-//   defi       { noncePc }                              PC vers téléphone, réponse à `appairer`
-//   preuve     { preuve }                               téléphone vers PC : preuve du téléphone
-//   appaire    { preuve, jeton, identifiantPc, nomPc }  PC vers téléphone : preuve du PC et jeton de 32 octets
+//   lue par le PC, « ecriture » (`CAPACITES`) ; un téléphone à jour annonce aussi « spake2 » dans `appairer`
+//   (`CAPACITE_SPAKE2`), que le PC ignore : c'est la présence de `partA` qui compte. Un texte inconnu est ignoré, un
+//   doublon compte une fois ; absent, le téléphone ne sait que lire (`lister` limité à la racine et à `sessions/`).
+//   Un `capacites` qui n'est pas un tableau de textes rend le message invalide.
+// Appairage (échange SPAKE2 et confirmations : `spake2.ts` ; déroulé : `appairage.ts`) :
+//   defi       { noncePc, partB? }                      PC vers téléphone, réponse à `appairer` ; partB : la part
+//                                                       SPAKE2 du PC, 65 octets ; un PC à jour l'envoie toujours, et
+//                                                       un téléphone à jour s'arrête (`version`) sur un `defi` sans
+//                                                       elle, sans rien prouver
+//   preuve     { preuve }                               téléphone vers PC : sa confirmation cA, 32 octets
+//   appaire    { preuve, jeton, identifiantPc, nomPc }  PC vers téléphone : sa confirmation cB et un jeton de 32 octets
 //   bienvenue  { identifiantPc, nomPc }                 PC vers téléphone, réponse à un `bonjour` au jeton connu
 //   refus      { raison }                               PC vers téléphone, puis le PC ferme la liaison ;
 //                                                       raison : code, fenetre, nonce, jeton ou version
@@ -91,6 +98,7 @@
 import { ErreurDisque } from './disque'
 import type { CodeErreur } from './disque'
 import type { FichierTelephone } from './telephone'
+import { TAILLE_CONFIRMATION, TAILLE_PART } from './spake2'
 import { cheminDuCable, cheminEcrivable, fichiersAdmis } from './telephone'
 
 /**
@@ -103,9 +111,17 @@ export const PROTOCOLE_SANS_FIL = 1
 /** Capacité d'un téléphone qui liste aussi `itineraires/` et `reglages/`, et reçoit `ecrire`, `valider` et `effacer`. */
 export const CAPACITE_ECRITURE = 'ecriture'
 
-/** Capacités connues de ce protocole, dans l'ordre où `lireMessage` les rend. */
+/**
+ * Capacité d'un téléphone qui s'appaire par l'échange SPAKE2. Annoncée dans `appairer`, jamais lue par le PC : c'est
+ * le champ `partA` qui fait l'échange, et un `appairer` sans lui est refusé.
+ */
+export const CAPACITE_SPAKE2 = 'spake2'
+
+/** Capacités lues par le PC, dans l'ordre où `lireMessage` les rend. */
 export const CAPACITES = [CAPACITE_ECRITURE] as const
-export type Capacite = (typeof CAPACITES)[number]
+
+/** Capacités qu'un message peut porter ; à la lecture, seules restent celles de `CAPACITES`. */
+export type Capacite = (typeof CAPACITES)[number] | typeof CAPACITE_SPAKE2
 
 /** Port TCP où le PC écoute d'abord. */
 export const PORT_SANS_FIL = 48217
@@ -123,7 +139,10 @@ export const TAILLE_PREFIXE = 8
 export const TAILLE_NONCE = 32
 export const TAILLE_JETON = 32
 export const TAILLE_EMPREINTE = 32
-export const TAILLE_PREUVE = 32
+export const TAILLE_PREUVE = TAILLE_CONFIRMATION
+
+/** Taille d'une part SPAKE2 (`partA`, `partB`), en octets. */
+export const TAILLE_PART_SPAKE2 = TAILLE_PART
 
 /** Taille de l'identifiant d'un PC ou d'un téléphone appairé, en octets. */
 export const TAILLE_IDENTIFIANT = 16
@@ -314,13 +333,15 @@ export class DecodeurTrames {
 // ---------- messages ----------
 
 /**
- * Demande d'appairage du téléphone ; `capacites`, absent d'un téléphone qui ne sait que lire, ne garde à la lecture
- * que les capacités connues, sans doublon, dans l'ordre de `CAPACITES`.
+ * Demande d'appairage du téléphone ; `partA`, sa part SPAKE2, absente d'un téléphone d'avant l'échange SPAKE2 ;
+ * `capacites`, absent d'un téléphone qui ne sait que lire, ne garde à la lecture que les capacités connues, sans
+ * doublon, dans l'ordre de `CAPACITES`.
  */
-export type MessageAppairer = { type: 'appairer'; version: number; nom: string; nonceTelephone: string; capacites?: Capacite[] }
+export type MessageAppairer = { type: 'appairer'; version: number; nom: string; nonceTelephone: string; partA?: string; capacites?: Capacite[] }
 /** Téléphone déjà appairé qui présente son jeton ; `capacites` comme pour `appairer`. */
 export type MessageBonjour = { type: 'bonjour'; version: number; nom: string; jeton: string; capacites?: Capacite[] }
-export type MessageDefi = { type: 'defi'; noncePc: string }
+/** Réponse du PC à `appairer` ; `partB`, sa part SPAKE2, toujours envoyée par un PC à jour. */
+export type MessageDefi = { type: 'defi'; noncePc: string; partB?: string }
 export type MessagePreuve = { type: 'preuve'; preuve: string }
 export type MessageAppaire = { type: 'appaire'; preuve: string; jeton: string; identifiantPc: string; nomPc: string }
 export type MessageBienvenue = { type: 'bienvenue'; identifiantPc: string; nomPc: string }
@@ -403,6 +424,9 @@ function lecteur(enTete: EnTete) {
     if (typeof v !== 'string' || v.length !== octets * 2 || !/^[0-9a-f]*$/.test(v)) throw invalide(type, champ)
     return v
   }
+  /** Un champ d'octets facultatif : rien s'il est absent, mais mal formé, il rend le message invalide. */
+  const hexFacultatif = <C extends string>(champ: C, octets: number): { [K in C]?: string } =>
+    enTete[champ] === undefined ? {} : ({ [champ]: hex(champ, octets) } as { [K in C]?: string })
   const nom = (champ: string): string => {
     const v = enTete[champ]
     if (typeof v !== 'string' || !nomAdmis(v)) throw invalide(type, champ)
@@ -426,6 +450,7 @@ function lecteur(enTete: EnTete) {
     position: (champ: string) => entier(champ, 0, Number.MAX_SAFE_INTEGER),
     entier,
     hex,
+    hexFacultatif,
     nom,
     chemin,
     capacites,
@@ -453,11 +478,18 @@ export function lireMessage(trame: Trame): Message {
   if (type !== 'bloc' && type !== 'ecrire' && corps.length > 0) throw invalide(type, 'corps')
   switch (type) {
     case 'appairer':
-      return { type, version: l.version(), nom: l.nom('nom'), nonceTelephone: l.hex('nonceTelephone', TAILLE_NONCE), ...l.capacites() }
+      return {
+        type,
+        version: l.version(),
+        nom: l.nom('nom'),
+        nonceTelephone: l.hex('nonceTelephone', TAILLE_NONCE),
+        ...l.hexFacultatif('partA', TAILLE_PART_SPAKE2),
+        ...l.capacites(),
+      }
     case 'bonjour':
       return { type, version: l.version(), nom: l.nom('nom'), jeton: l.hex('jeton', TAILLE_JETON), ...l.capacites() }
     case 'defi':
-      return { type, noncePc: l.hex('noncePc', TAILLE_NONCE) }
+      return { type, noncePc: l.hex('noncePc', TAILLE_NONCE), ...l.hexFacultatif('partB', TAILLE_PART_SPAKE2) }
     case 'preuve':
       return { type, preuve: l.hex('preuve', TAILLE_PREUVE) }
     case 'appaire':
