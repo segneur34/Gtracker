@@ -134,10 +134,10 @@ function AboutSettings() {
       </div>
       <p className="about__version">{t('Version {v}', { v: __APP_VERSION__ })}</p>
       <p className="about__text">
-        {t('Vos sessions restent sur cet appareil et dans votre dossier mémoire, sans compte. Les fonds de carte et la recherche de lieux passent par des services en ligne.')}
+        {t("Vos sessions, votre profil et vos mesures de fréquence cardiaque restent sur vos appareils et dans votre dossier mémoire. Il n'y a ni compte, ni publicité, ni mesure d'audience, et rien n'est envoyé à l'éditeur de l'application.")}
       </p>
       <p className="about__text">
-        {t("Le lieu qui nomme une session est cherché par le service Photon de komoot : il reçoit le point de départ de la session et, si la sortie finit ailleurs, son point d'arrivée, arrondis à une centaine de mètres, la langue et le rayon de recherche, rien d'autre (Réglages › Mémoire pour s'en passer).")}
+        {t("Deux services en ligne sont appelés, sans compte. Les cartes viennent des serveurs d'OpenStreetMap, qui reçoivent la zone affichée et l'adresse IP de votre connexion. La recherche de lieux passe par le service Photon de komoot : pour nommer une session ou un itinéraire, il reçoit son départ et, si elle finit ailleurs, son arrivée, arrondis à une centaine de mètres (Réglages › Mémoire pour s'en passer) ; dans Planifier, il reçoit le nom que vous cherchez et le centre de la carte, arrondi au kilomètre.")}
       </p>
       <p className="about__text">
         {tRich("Données des cartes et des lieux : © les contributeurs d'OpenStreetMap, sous licence ODbL (<a>openstreetmap.org/copyright</a>).", undefined, {
@@ -151,6 +151,12 @@ function AboutSettings() {
           })}
         </p>
       )}
+      <p className="about__text">
+        {t("L'application n'est ni un instrument de navigation ni un équipement de sécurité : gardez le matériel et les précautions qu'exige votre sortie.")}
+      </p>
+      <p className="about__text">
+        {t("L'application n'est pas un dispositif médical : la fréquence cardiaque et le test au repos donnent des repères pour votre pratique, pas un avis médical.")}
+      </p>
       <SettingsPart label={t('Licences des composants utilisés')} open={licensesOpen} onToggle={() => setLicensesOpen((o) => !o)}>
         <LicensesList />
       </SettingsPart>

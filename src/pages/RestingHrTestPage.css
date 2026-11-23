@@ -6,6 +6,13 @@
   --btn-ink: var(--on-accent);
 }
 
+/* Le « ? » d'un titre de carte reste à droite du titre : le bouton est un bloc flex, qui tomberait sous lui. */
+.rest-page .ui-card__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 /* Boutons d'action sous le déroulé. */
 .rest-buttons {
   display: flex;
