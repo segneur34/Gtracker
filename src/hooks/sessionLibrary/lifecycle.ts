@@ -12,12 +12,12 @@ import {
 } from '../../platform/memoryFolder';
 import { isDesktopApp } from '../../platform/runtime';
 import { nativeErrorMessage } from '../../platform/nativeMessages';
-import { jsonStore, storageStartupFailure } from '../../platform/storage';
+import { jsonStore, settleStoredWrites, storageStartupFailure } from '../../platform/storage';
 import { errorMessage } from '../../core/basics';
 import { libraryState, reportError, setState } from './store';
 import { holdUnwritten, lib, publish, takeUnwritten, writableFolder } from './memory';
 import { noteSettingsGestures, readGestures, refreshFailed } from './summarySettings';
-import { cancelRecordWrite, carryUnwritten, recordEdits, recordTimers } from './recordWrites';
+import { cancelRecordWrite, carryUnwritten, recordEdits, recordTimers, settleRecordWrites } from './recordWrites';
 import { cancelCacheUpdate } from './cache';
 import { scan } from './scan';
 import { completeScan } from './summaryQueue';
@@ -271,6 +271,18 @@ export const startLibraryUi = (isBusy: () => boolean): void => {
     },
   });
   window.addEventListener('pagehide', flushAll);
+};
+
+/**
+ * Juste avant que l'application se ferme (touche retour sur le Profil, croix du programme Windows) : écrit tout
+ * de suite ce qui attendait son délai (fiches, réglages, cache), attend les écritures de fiche déjà en vol, puis
+ * les brouillons et les clés de l'appareil. Ne lève pas : un échec est déjà dit, et la fermeture continue.
+ */
+export const flushBeforeExit = async (): Promise<void> => {
+  await flushWrites().catch(() => undefined);
+  await settleRecordWrites();
+  sessionDraftStore.flush();
+  await settleStoredWrites().catch(() => undefined);
 };
 
 /** Vrai si l'on peut désigner un vrai dossier comme mémoire (Chrome et Edge sur ordinateur). */

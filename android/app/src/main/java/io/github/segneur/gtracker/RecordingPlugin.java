@@ -210,6 +210,8 @@ public class RecordingPlugin extends Plugin {
         settings.guardStillRadiusM = numberOr(call, "guardStillRadiusM", 0);
         settings.guardStillDelayMs = secondsToMs(numberOr(call, "guardStillDelayS", 0));
         settings.guardMaxClosedMs = secondsToMs(numberOr(call, "guardMaxClosedS", 0));
+        settings.guardMovingSpeedMs = numberOr(call, "guardMovingSpeedMs", 0);
+        settings.guardMovingHoldMs = secondsToMs(numberOr(call, "guardMovingHoldS", 0));
         Context context = getContext();
         RecordingService.cancelStoppedNotification(context);
         RecordingService.start(context, settings, new RecordingService.StartResult() {

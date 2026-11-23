@@ -72,6 +72,7 @@ import { ADRESSE_ACCUEIL, HOTE, estDeLApplication } from './origine'
 import { TEXTES_FERMETURE, brancherCanaux, echec, expediteurAdmis, lireTextesFermeture, reussite, uneALaFois } from './pont'
 import type { TextesFermeture } from './pont'
 import { CSP, reponseA } from './protocole'
+import { gardeRechargements } from './rechargement'
 import { STATUT_REFUS, entetesSortants, estUnRefus } from './sortant'
 
 const BANC = process.env.GTRACKER_BANC === '1'
@@ -279,12 +280,14 @@ function gererAutorisations(): void {
 }
 
 // ---------- raccourcis ----------
-// Le menu de Windows est retiré ; on garde le plein écran (F11) et le zoom au clavier, que le menu portait.
+// Le menu de Windows est retiré ; on garde le plein écran (F11), le zoom et le rechargement (F5, Ctrl+R) au clavier,
+// que le menu portait.
 function raccourcis(fenetre: BrowserWindow): void {
   fenetre.webContents.on('before-input-event', (evenement, entree) => {
     if (entree.type !== 'keyDown') return
     const contenu = fenetre.webContents
     if (entree.key === 'F11') fenetre.setFullScreen(!fenetre.isFullScreen())
+    else if (entree.key === 'F5' || (entree.control && !entree.alt && entree.key.toLowerCase() === 'r')) rechargerLaPage(fenetre)
     else if (entree.control && (entree.key === '+' || entree.key === '=')) contenu.setZoomLevel(Math.min(contenu.getZoomLevel() + 0.5, 4))
     else if (entree.control && entree.key === '-') contenu.setZoomLevel(Math.max(contenu.getZoomLevel() - 0.5, -3))
     else if (entree.control && entree.key === '0') contenu.setZoomLevel(0)
@@ -315,6 +318,137 @@ function questionDeFermeture(fenetre: BrowserWindow): void {
         }) === 0
     journal(`fermeture retenue par la page : ${quitter ? 'quitter' : 'rester'}`)
     if (quitter) evenement.preventDefault()
+    // La page reste : une prochaine fermeture videra de nouveau ses écritures.
+    else vidageFait = false
+  })
+}
+
+// ---------- écritures vidées avant de quitter la page ----------
+// La page diffère ses écritures (fiche d'une session, réglages, brouillons) de quelques centaines de millisecondes :
+// avant de fermer la fenêtre ou de recharger la page, la coquille lui demande de les vider (`coquille:fermeture`) et
+// attend sa réponse (`coquille:fermeturePrete`), jamais plus de `DELAI_VIDAGE_MS` : une page figée ne retient pas la
+// fermeture. La question du brouillon (`questionDeFermeture`) vient ensuite, comme avant.
+
+/** Attente la plus longue de la réponse de la page, en millisecondes. */
+const DELAI_VIDAGE_MS = 5000
+
+/** Vrai une fois les écritures vidées pour une fermeture : la demande de fermeture suivante passe. */
+let vidageFait = false
+
+/** Vrai d'une fermeture retenue jusqu'à la fin du vidage : une seconde demande pendant ce temps est sans effet. */
+let fermetureDemandee = false
+
+/** Attente de la page en cours (fermeture ou rechargement), `null` sinon. */
+let vidageCourant: Promise<void> | null = null
+
+/** Réponse attendue de la page, `null` quand rien n'est demandé. */
+let vidageAttendu: (() => void) | null = null
+
+/** Vrai quand la page peut répondre : fenêtre ouverte et processus de la page en vie. */
+function pageVivante(fenetre: BrowserWindow): boolean {
+  return !fenetre.isDestroyed() && !fenetre.webContents.isCrashed()
+}
+
+/** Demande à la page de vider ses écritures ; rend quand elle a répondu, au plus tard après `DELAI_VIDAGE_MS`. */
+function viderLesEcritures(fenetre: BrowserWindow): Promise<void> {
+  journal('vidage des écritures demandé à la page')
+  vidageCourant = new Promise((fin) => {
+    const finir = (ligne: string) => {
+      clearTimeout(plafond)
+      vidageAttendu = null
+      vidageCourant = null
+      journal(ligne)
+      fin()
+    }
+    const plafond = setTimeout(() => finir(`écritures non confirmées après ${DELAI_VIDAGE_MS / 1000} s`), DELAI_VIDAGE_MS)
+    vidageAttendu = () => finir('écritures vidées')
+    fenetre.webContents.send('coquille:fermeture')
+  })
+  return vidageCourant
+}
+
+/**
+ * Retient la première demande de fermeture le temps de vider les écritures de la page (ou d'attendre le vidage déjà
+ * demandé par un rechargement), puis ferme ; la réponse n'est prise que de la page de cette fenêtre (`expediteurAdmis`).
+ */
+function viderAvantFermeture(fenetre: BrowserWindow): void {
+  fenetre.webContents.ipc.on('coquille:fermeturePrete', (evenement) => {
+    if (expediteurAdmis(evenement, fenetre.webContents)) vidageAttendu?.()
+  })
+  fenetre.on('close', (evenement) => {
+    if (vidageFait) return
+    if (fermetureDemandee) {
+      evenement.preventDefault()
+      return
+    }
+    journal('fermeture demandée')
+    if (!vidageCourant && !pageVivante(fenetre)) return
+    evenement.preventDefault()
+    fermetureDemandee = true
+    void (vidageCourant ?? viderLesEcritures(fenetre)).then(() => {
+      fermetureDemandee = false
+      vidageFait = true
+      if (!fenetre.isDestroyed()) fenetre.close()
+    })
+  })
+}
+
+/**
+ * Rechargement demandé au clavier : les écritures sont vidées d'abord, la question du brouillon joue ensuite ; une
+ * fermeture demandée pendant le vidage l'emporte.
+ */
+function rechargerLaPage(fenetre: BrowserWindow): void {
+  if (vidageCourant || fermetureDemandee || vidageFait) return
+  journal('rechargement demandé au clavier')
+  if (!pageVivante(fenetre)) {
+    fenetre.webContents.reload()
+    return
+  }
+  void viderLesEcritures(fenetre).then(() => {
+    if (!fermetureDemandee && !fenetre.isDestroyed()) fenetre.webContents.reload()
+  })
+}
+
+// ---------- chute de la page ----------
+// Si le processus de la page tombe (mémoire épuisée, pilote graphique, plantage de Chromium), la fenêtre resterait
+// blanche : la page est rechargée sur l'accueil, au plus `RECHARGES_MAX` fois sur `FENETRE_RECHARGES_MS`
+// (`rechargement.ts`) ; au-delà, l'utilisateur choisit de relancer le programme ou de le fermer. Rien n'est rechargé
+// pendant une fermeture, ni pendant un vidage (un rechargement au clavier suit déjà).
+const rechargements = gardeRechargements()
+
+function relancerApresChute(fenetre: BrowserWindow): void {
+  fenetre.webContents.on('render-process-gone', (_e, details) => {
+    journal(`page arrêtée : ${details.reason}`)
+    if (details.reason === 'clean-exit' || vidageCourant || fermetureDemandee || vidageFait || fenetre.isDestroyed()) return
+    if (rechargements.autoriser(performance.now())) {
+      journal('page rechargée après sa chute')
+      fenetre.loadURL(ADRESSE_ACCUEIL).catch(() => journal('rechargement de la page impossible'))
+      return
+    }
+    journal('chutes trop rapprochées : relance proposée')
+    if (BANC) return
+    void dialog
+      .showMessageBox(fenetre, {
+        type: 'error',
+        buttons: ['Relancer', 'Fermer'],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true,
+        title: 'Gtracker',
+        message: "La page s'est arrêtée : relancer ?",
+        detail: "Elle s'est arrêtée plusieurs fois en quelques minutes. Relancer redémarre le programme.",
+      })
+      .then(({ response }) => {
+        journal(`relance après les chutes : ${response === 0 ? 'relancer' : 'fermer'}`)
+        if (fenetre.isDestroyed()) return
+        if (response !== 0) {
+          fenetre.close()
+          return
+        }
+        retenirFenetre(fenetre)
+        app.relaunch()
+        app.exit(0)
+      })
   })
 }
 
@@ -548,8 +682,8 @@ function ouvrirFenetre(): void {
       fenetre.showInactive()
     })
   }
-  fenetre.webContents.on('render-process-gone', (_e, details) => journal(`page arrêtée : ${details.reason}`))
-  fenetre.on('close', () => journal('fermeture demandée'))
+  relancerApresChute(fenetre)
+  viderAvantFermeture(fenetre)
   fenetre.on('closed', () => {
     journal('fenêtre fermée')
     fenetrePrincipale = null

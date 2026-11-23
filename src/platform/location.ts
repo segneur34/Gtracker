@@ -42,7 +42,7 @@ export interface LocationFix {
 /**
  * Ce que le service du téléphone doit savoir de la session pour continuer sans la page : son identifiant, ses
  * textes quand l'application est fermée, sa veille du GPS et sa garde. Délais en secondes, rayon en mètres, comme
- * dans `RecordingProfile` ; une valeur nulle ou négative éteint la règle.
+ * dans `RecordingProfile`, vitesse en m/s ; une valeur nulle ou négative éteint la règle.
  */
 export interface ServiceWatchOptions {
   /** Identifiant de la session : le `startedAtMs` de l'en-tête du journal de la page. */
@@ -59,6 +59,9 @@ export interface ServiceWatchOptions {
   guardStillRadiusM: number;
   guardStillDelayS: number;
   guardMaxClosedS: number;
+  /** Vraie vitesse, en m/s, qui tenue `guardMovingHoldS` relance le compte de la garde sans sortir du rayon. */
+  guardMovingSpeedMs: number;
+  guardMovingHoldS: number;
 }
 
 export interface LocationWatchOptions {

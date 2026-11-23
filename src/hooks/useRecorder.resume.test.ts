@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { baseActivity } from '../core/activities';
 import { FILE_FORMATS, STORAGE_KEYS } from '../core/appIdentity';
+import { formatTimeOfDay } from '../core/units';
 import type { LocationFix, LocationSource, StopLocation } from '../platform/location';
 import { SETTLE_MAX_WAIT_S } from '../recording/gpsSettle';
 import { parseJournal } from '../recording/journal';
@@ -603,6 +604,8 @@ describe('reprise silencieuse, cas limites', () => {
     expect(gpsService.adoptions).toBe(0);
     expect(gpsService.orphanStops).toBe(1);
     expect(fresh.getRecorderState().pending?.canContinue).toBe(false);
+    // Arrêtée par « Arrêter » : l'utilisateur l'a vue finir, rien à dire.
+    expect(fresh.getRecorderState().error).toBeNull();
   });
 
   it('sans journal et service vivant : service arrêté, rien d\'autre', async () => {
@@ -927,12 +930,31 @@ describe('« Continuer l\'enregistrement », application tuée puis rouverte', (
     expect(fresh.getRecorderState().pending?.canContinue).toBe(true);
     expect(fresh.getRecorderState().pending?.recovered).toBe(true);
     expect(fresh.getRecorderState().landOnRecording).toBe(true);
+    // « Continuer » encore possible : aucun message.
+    expect(fresh.getRecorderState().error).toBeNull();
 
     vi.setSystemTime(T0 + 20_000 + 601_000);
     fresh = await reload();
     await fresh.recoverInterruptedRecording();
     expect(fresh.getRecorderState().pending?.canContinue).toBe(false);
     expect(fresh.getRecorderState().landOnRecording).toBe(false);
+  });
+
+  it('20 min, coupée par le téléphone, rouverte 40 min après : rangée seule, l\'analyse dit l\'heure de la coupure', async () => {
+    const live = fakeSource();
+    await recorder.startRecording(activity, live);
+    run(live.emit, 0, 1200, 1);
+    await settle();
+    vi.setSystemTime(T0 + 1_200_000 + 40 * 60_000);
+    const fresh = await reload();
+    await fresh.recoverInterruptedRecording();
+    expect(fresh.getRecorderState().pending?.canContinue).toBe(false);
+    const notice = `Enregistrement interrompu à ${formatTimeOfDay(T0 + 1_200_000)} : le téléphone ou l'application s'est arrêté, la trace s'arrête là.`;
+    expect(fresh.getRecorderState().error).toBe(notice);
+    // Rangée seule : le message suit la session jusqu'à son analyse.
+    const saved = await fresh.finishPendingSession();
+    expect(saved?.libraryFile).toBe('rangee.gpx');
+    expect(fresh.getRecorderState().error).toBe(notice);
   });
 
   it.each([[1], [5]])('même journal, segment neuf, source relancée par le geste, durée sans saut, à %i Hz', async (hz) => {
@@ -1653,8 +1675,11 @@ describe.each([[1], [5]])('journal du service : ce que la page n\'a pas reçu es
     expect(state.pending?.canContinue).toBe(false);
     expect(gpsService.adoptions).toBe(0);
     expect(parseJournal(journal.text!).stoppedAtMs).toBe(T0 + 60_000);
+    const notice = `Enregistrement arrêté seul à ${formatTimeOfDay(T0 + 60_000)} : application fermée, le téléphone n'avait pas bougé depuis une heure.`;
+    expect(state.error).toBe(notice);
     expect(fresh.finishingPendingSession(state)).toBe(true);
     expect(await fresh.finishPendingSession()).not.toBeNull();
+    expect(fresh.getRecorderState().error).toBe(notice);
     expect(journal.text).toBeNull();
     expect(gpsService.logClears).toBe(1);
   });
@@ -1672,6 +1697,8 @@ describe.each([[1], [5]])('journal du service : ce que la page n\'a pas reçu es
     expect(gpsService.adoptions).toBe(0);
     expect(state.pending?.pointCount).toBe(30 * hz + 1);
     expect(state.pending?.canContinue).toBe(false);
+    // La reprise manquée n'a pas effacé le journal du service : la raison de l'arrêt est encore lue.
+    expect(state.error).toBe(`Enregistrement arrêté seul à ${formatTimeOfDay(T0 + 31_000)}, 12 h après la fermeture de l'application.`);
   });
 
   it('service en route pour une autre session : ni reprise ni rattrapage, il est arrêté', async () => {

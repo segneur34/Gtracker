@@ -10,7 +10,8 @@
  *
  * Les types sont décrits ici, à la main : ceux de la coquille emploient les types de Node, que l'application n'a pas.
  * Deux gestes de la coquille, sans réponse attendue, s'appellent d'ici : les textes de la question de fermeture
- * (`sendCloseQuestionTexts`) et une ligne du journal daté (`noteJournal`).
+ * (`sendCloseQuestionTexts`) et une ligne du journal daté (`noteJournal`). La tâche à attendre avant de fermer la
+ * fenêtre s'y pose aussi (`onDesktopClose`).
  */
 
 /** Code d'une erreur du pont, lisible par `fileErrorCode`. */
@@ -336,6 +337,11 @@ export interface DesktopBridge {
    * caractères ; absent d'une coquille plus ancienne.
    */
   noter?(argument: { texte: string }): Promise<BridgeAnswer<null>>;
+  /**
+   * Pose la tâche que la coquille attend avant de fermer sa fenêtre (écritures en attente), échec compris ; elle ferme
+   * de toute façon après son propre plafond. Absent d'une coquille plus ancienne.
+   */
+  surFermeture?(rappel: () => Promise<void>): void;
 }
 
 /** Le pont du programme Windows, `null` ailleurs (navigateur, téléphone). */
@@ -355,6 +361,20 @@ export const sendCloseQuestionTexts = (texts: CloseQuestionTexts): void => {
   const bridge = desktopBridge();
   if (!bridge) return;
   void bridge.textes(texts).catch(() => undefined);
+};
+
+/**
+ * Programme Windows : `task` (écritures en attente) est attendue avant que la fenêtre se ferme par sa croix. Sans
+ * effet ailleurs et dans une coquille plus ancienne, qui ferme sans attendre. Un appel au démarrage suffit.
+ */
+export const onDesktopClose = (task: () => Promise<void>): void => {
+  const bridge = desktopBridge();
+  if (typeof bridge?.surFermeture !== 'function') return;
+  try {
+    bridge.surFermeture(() => task().catch(() => undefined));
+  } catch {
+    // Pont refermé : la fenêtre se ferme sans attendre, comme avec une coquille plus ancienne.
+  }
 };
 
 /** Longueur d'une ligne du journal du programme Windows gardée par la coquille, en caractères. */

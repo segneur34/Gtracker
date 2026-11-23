@@ -109,6 +109,17 @@ const application = Object.freeze({
   marquerProposee: sans('application:marquerProposee'),
 })
 
+/**
+ * Avant de fermer la fenêtre ou de recharger la page, la coquille demande à la page de vider ses écritures en attente
+ * (`coquille:fermeture`) : chaque rappel inscrit par `surFermeture` est attendu, la promesse qu'il rend comprise, puis
+ * la réponse part (`coquille:fermeturePrete`), même si un rappel a échoué. Sans rappel inscrit (page d'une version
+ * plus ancienne), elle part aussitôt. La coquille n'attend la réponse que quelques secondes.
+ */
+const rappelsFermeture = new Set<() => unknown>()
+ipcRenderer.on('coquille:fermeture', () => {
+  void Promise.allSettled([...rappelsFermeture].map(async (rappel) => rappel())).then(() => ipcRenderer.send('coquille:fermeturePrete'))
+})
+
 contextBridge.exposeInMainWorld(
   'gtrackerBureau',
   Object.freeze({
@@ -121,5 +132,12 @@ contextBridge.exposeInMainWorld(
     textes: avec('coquille:textes'),
     /** Écrit une étape de la page dans le journal daté du programme : `{ texte }`, borné à 300 caractères. */
     noter: avec('coquille:noter'),
+    /** Inscrit un rappel attendu avant la fermeture ou le rechargement de la page ; rend la fonction de désabonnement. */
+    surFermeture: (rappel: () => unknown) => {
+      rappelsFermeture.add(rappel)
+      return () => {
+        rappelsFermeture.delete(rappel)
+      }
+    },
   }),
 )

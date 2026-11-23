@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DESKTOP_JOURNAL_LINE_MAX, desktopJournalAvailable, noteJournal } from './desktopBridge';
+import { DESKTOP_JOURNAL_LINE_MAX, desktopJournalAvailable, noteJournal, onDesktopClose } from './desktopBridge';
 
 const shell = (extra: Record<string, unknown>) =>
   vi.stubGlobal('window', { gtrackerBureau: { version: '0.0.0', memoire: { ouvrir: async () => null }, textes: async () => null, ...extra } });
@@ -38,5 +38,25 @@ describe('journal du programme Windows, vu de la page', () => {
     expect(() => noteJournal('b')).not.toThrow();
     // La promesse rejetée du premier appel est avalée : rien ne remonte comme rejet non traité.
     await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+});
+
+describe('fermeture du programme Windows, vue de la page', () => {
+  it('pose la tâche à attendre ; son échec ne remonte pas à la coquille', async () => {
+    let rappel: (() => Promise<void>) | null = null;
+    shell({ surFermeture: (r: () => Promise<void>) => { rappel = r; } });
+    const task = vi.fn(async () => Promise.reject(new Error('disque plein')));
+    onDesktopClose(task);
+    expect(rappel).not.toBeNull();
+    await expect(rappel!()).resolves.toBeUndefined();
+    expect(task).toHaveBeenCalledTimes(1);
+  });
+
+  it('sans effet hors du programme Windows et dans une coquille plus ancienne', () => {
+    const task = vi.fn(async () => undefined);
+    expect(() => onDesktopClose(task)).not.toThrow();
+    shell({});
+    expect(() => onDesktopClose(task)).not.toThrow();
+    expect(task).not.toHaveBeenCalled();
   });
 });

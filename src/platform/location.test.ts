@@ -135,6 +135,8 @@ const SERVICE = {
   guardStillRadiusM: 200,
   guardStillDelayS: 3600,
   guardMaxClosedS: 43_200,
+  guardMovingSpeedMs: 0.77,
+  guardMovingHoldS: 5,
 };
 const NATIVE_OPTIONS: LocationWatchOptions = { intervalMs: 1000, distanceFilterM: 0, notificationTitle: 'titre', notificationText: 'texte', service: SERVICE };
 

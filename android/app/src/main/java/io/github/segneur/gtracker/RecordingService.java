@@ -136,10 +136,12 @@ public class RecordingService extends Service {
         /** Délais de la veille « GPS perdu », en millisecondes ; 0 : pas de veille. */
         long gpsLostDelayMs;
         long gpsLostRearmMs;
-        /** Valeurs de la garde : rayon en mètres, durées en millisecondes ; 0 éteint la règle. */
+        /** Valeurs de la garde : rayon en mètres, vitesse en m/s, durées en millisecondes ; 0 éteint la règle. */
         double guardStillRadiusM;
         long guardStillDelayMs;
         long guardMaxClosedMs;
+        double guardMovingSpeedMs;
+        long guardMovingHoldMs;
 
         Bundle toBundle() {
             Bundle bundle = new Bundle();
@@ -157,6 +159,8 @@ public class RecordingService extends Service {
             bundle.putDouble("guardStillRadiusM", guardStillRadiusM);
             bundle.putLong("guardStillDelayMs", guardStillDelayMs);
             bundle.putLong("guardMaxClosedMs", guardMaxClosedMs);
+            bundle.putDouble("guardMovingSpeedMs", guardMovingSpeedMs);
+            bundle.putLong("guardMovingHoldMs", guardMovingHoldMs);
             return bundle;
         }
 
@@ -176,6 +180,8 @@ public class RecordingService extends Service {
             settings.guardStillRadiusM = bundle.getDouble("guardStillRadiusM");
             settings.guardStillDelayMs = bundle.getLong("guardStillDelayMs");
             settings.guardMaxClosedMs = bundle.getLong("guardMaxClosedMs");
+            settings.guardMovingSpeedMs = bundle.getDouble("guardMovingSpeedMs");
+            settings.guardMovingHoldMs = bundle.getLong("guardMovingHoldMs");
             return settings;
         }
     }
@@ -508,7 +514,7 @@ public class RecordingService extends Service {
         }
         // Une source qui n'envoie qu'après un déplacement se tait à l'arrêt, sans être perdue : pas de veille alors.
         watch = next.gpsLostDelayMs > 0 && next.distanceFilterM <= 0 ? new GpsLostWatch(next.gpsLostDelayMs, next.gpsLostRearmMs) : null;
-        guard = new ClosedGuard(next.guardStillRadiusM, next.guardStillDelayMs, next.guardMaxClosedMs);
+        guard = new ClosedGuard(next.guardStillRadiusM, next.guardStillDelayMs, next.guardMaxClosedMs, next.guardMovingSpeedMs, next.guardMovingHoldMs);
         restart = new GpsRestart(GpsRestart.delayFor(GPS_RESTART_AFTER_MS, next.intervalMs, next.distanceFilterM));
         resubscribe = new GpsResubscribe(locationEnabled());
         synchronized (STATE) {
@@ -559,7 +565,7 @@ public class RecordingService extends Service {
         Page target = page;
         if (target != null) target.onFix(fix);
         if (watch != null) apply(watch.onFix(now));
-        guard.onFix(now, fix.lat, fix.lon, fix.accuracyM);
+        guard.onFix(now, fix.lat, fix.lon, fix.accuracyM, fix.speedMs);
     }
 
     private boolean pause(boolean next, long atMs) {

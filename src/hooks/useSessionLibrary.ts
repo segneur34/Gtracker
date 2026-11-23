@@ -54,7 +54,7 @@ export {
 } from './sessionLibrary/sessionRecords';
 export { correctSessionPlace, queueSessionPlace } from './sessionLibrary/placeQueue';
 export {
-  canChooseMemoryFolder, chooseFolder, currentMemoryFolder, openLibrary, reconnectFolder, refreshLibrary,
+  canChooseMemoryFolder, chooseFolder, currentMemoryFolder, flushBeforeExit, openLibrary, reconnectFolder, refreshLibrary,
   startLibraryUi, switchToBrowserMemory,
 } from './sessionLibrary/lifecycle';
 export { countErasable, eraseEverything, factoryReset } from './sessionLibrary/reset';

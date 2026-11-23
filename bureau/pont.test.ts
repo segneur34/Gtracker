@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CANAUX_MEMOIRE } from './memoire'
 import { ORIGINE } from './origine'
 import type { EvenementPont, Gestionnaire } from './pont'
@@ -254,5 +254,75 @@ describe('preload', () => {
     expect(source).toContain("noter: avec('coquille:noter')")
     expect(source).not.toMatch(/exposeInMainWorld\([^)]*ipcRenderer/)
     expect(source).not.toMatch(/from '\.\//)
+  })
+
+  it('nomme les canaux de la coquille comme le processus principal, ceux de la fermeture compris', () => {
+    const lire = (fichier: string) => readFileSync(path.join(__dirname, fichier), 'utf8')
+    const canaux = (source: string) => [...new Set([...source.matchAll(/'(coquille:[A-Za-z]+)'/g)].map((m) => m[1]))].sort()
+    const source = lire('preload.ts')
+    expect(canaux(source)).toEqual(['coquille:fermeture', 'coquille:fermeturePrete', 'coquille:noter', 'coquille:textes'])
+    expect(canaux(lire('main.ts'))).toEqual(canaux(source))
+    expect(source).toContain("ipcRenderer.on('coquille:fermeture',")
+    expect(source).toContain("ipcRenderer.send('coquille:fermeturePrete')")
+    expect(source).toMatch(/surFermeture: \(rappel/)
+  })
+})
+
+describe('vidage des écritures avant la fermeture, côté pont', () => {
+  /** Le pont chargé sur un faux Electron : ce qu'il expose à la page, la demande de la coquille, les réponses parties. */
+  async function charger() {
+    vi.resetModules()
+    const ecouteurs = new Map<string, () => void>()
+    const envoyes: string[] = []
+    let expose: Record<string, unknown> = {}
+    vi.doMock('electron', () => ({
+      contextBridge: { exposeInMainWorld: (_nom: string, api: Record<string, unknown>) => (expose = api) },
+      ipcRenderer: {
+        invoke: async () => undefined,
+        on: (canal: string, ecouteur: () => void) => ecouteurs.set(canal, ecouteur),
+        removeListener: () => undefined,
+        send: (canal: string) => envoyes.push(canal),
+      },
+    }))
+    await import('./preload')
+    const surFermeture = expose.surFermeture as (rappel: () => unknown) => () => void
+    const demander = async () => {
+      ecouteurs.get('coquille:fermeture')!()
+      await new Promise((fin) => setTimeout(fin, 0))
+    }
+    return { surFermeture, demander, envoyes }
+  }
+
+  afterEach(() => {
+    vi.doUnmock('electron')
+  })
+
+  it('répond aussitôt sans rappel inscrit (page plus ancienne)', async () => {
+    const { demander, envoyes } = await charger()
+    await demander()
+    expect(envoyes).toEqual(['coquille:fermeturePrete'])
+  })
+
+  it('attend la promesse de chaque rappel avant de répondre, et répond même si l’un échoue', async () => {
+    const { surFermeture, demander, envoyes } = await charger()
+    let finir: () => void = () => undefined
+    surFermeture(() => new Promise<void>((fin) => (finir = fin)))
+    surFermeture(() => {
+      throw new Error('raté')
+    })
+    surFermeture(async () => Promise.reject(new Error('raté aussi')))
+    await demander()
+    expect(envoyes).toEqual([])
+    finir()
+    await new Promise((fin) => setTimeout(fin, 0))
+    expect(envoyes).toEqual(['coquille:fermeturePrete'])
+  })
+
+  it('n’attend plus un rappel désabonné', async () => {
+    const { surFermeture, demander, envoyes } = await charger()
+    const desabonner = surFermeture(() => new Promise<void>(() => undefined))
+    desabonner()
+    await demander()
+    expect(envoyes).toEqual(['coquille:fermeturePrete'])
   })
 })

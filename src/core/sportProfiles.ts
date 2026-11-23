@@ -6,7 +6,7 @@ import type { SpeedRangeMs } from './speedGradient';
 import type { SportType, TopTarget } from './types';
 import { DEFAULT_MAX_DETOUR_RATIO } from './kinematics';
 import { t } from './i18n';
-import { J_PER_KCAL, kmhToMs, knotsToMs, METERS_PER_DISTANCE_UNIT, type SpeedUnit } from './units';
+import { fromDisplaySpeed, J_PER_KCAL, kmhToMs, knotsToMs, METERS_PER_DISTANCE_UNIT, type SpeedUnit } from './units';
 
 /**
  * Profil d'un support. Regroupe tout ce qui varie d'une activité à l'autre :
@@ -92,11 +92,17 @@ export interface RecordingProfile {
   resumeOfferMaxAgeS: number;
   /**
    * Garde contre un enregistrement jamais repris, application fermée : rayon, en mètres, dont le téléphone ne
-   * s'est pas éloigné pendant `guardStillDelayS` ; l'enregistrement s'arrête alors seul. Commun à tous les supports.
+   * s'est pas éloigné pendant `guardStillDelayS`, sans bouger : aucune vraie vitesse vue pendant ce temps
+   * (`guardMovingSpeedMs`, tenue `guardMovingHoldS`) ; l'enregistrement s'arrête alors seul. Commun à tous les supports.
    */
   guardStillRadiusM: number;
-  /** Temps réel, en secondes, sans sortir de `guardStillRadiusM`, application fermée, avant l'arrêt par la garde. */
+  /** Temps réel, en secondes, sans sortir de `guardStillRadiusM` ni bouger, application fermée, avant l'arrêt par la garde. */
   guardStillDelayS: number;
+  /**
+   * Temps réel, en secondes, pendant lequel la vitesse Doppler des positions doit tenir au-dessus du seuil de vraie
+   * vitesse (`guardMovingSpeedMs`) pour relancer le compte de `guardStillDelayS` : une pointe isolée du GPS ne compte pas.
+   */
+  guardMovingHoldS: number;
   /** Temps réel, en secondes, depuis la fermeture de l'application, au bout duquel la garde arrête l'enregistrement. */
   guardMaxClosedS: number;
 }
@@ -107,8 +113,8 @@ export interface RecordingProfile {
  * Pause automatique sous 0,3 m/s (environ 1 km/h, sous le bruit GPS au repos)
  * pendant 60 s. GPS perdu après 1 min sans position, signalé de nouveau
  * seulement après 2 min de positions revenues. Application fermée, la garde
- * arrête l'enregistrement après 1 h sans s'éloigner de 200 m, ou 12 h après
- * la fermeture.
+ * arrête l'enregistrement après 1 h sans bouger (ni s'éloigner de 200 m, ni
+ * une vraie vitesse tenue 5 s), ou 12 h après la fermeture.
  */
 export const DEFAULT_RECORDING: RecordingProfile = {
   intervalMs: 1000,
@@ -123,6 +129,7 @@ export const DEFAULT_RECORDING: RecordingProfile = {
   resumeOfferMaxAgeS: 600,
   guardStillRadiusM: 200,
   guardStillDelayS: 3600,
+  guardMovingHoldS: 5,
   guardMaxClosedS: 12 * 3600,
 };
 
@@ -716,3 +723,11 @@ export const getActiveThresholds = (
     exit: exit > 0 ? exit : threshold * EXIT_FLOOR_RATIO,
   };
 };
+
+/**
+ * Vraie vitesse de la garde d'un enregistrement application fermée, en m/s : la détente haute du plancher d'arrêt
+ * (`stillThreshold`), là où le masque d'activité sort d'un arrêt complet (`thresholdMaskOptions`). Au-dessus,
+ * tenue `guardMovingHoldS`, le téléphone bouge, même sans s'éloigner de `guardStillRadiusM`.
+ */
+export const guardMovingSpeedMs = (profile: SportProfile): number =>
+  fromDisplaySpeed(getActiveThresholds(profile, profile.stillThreshold).enter, profile.thresholdUnit);

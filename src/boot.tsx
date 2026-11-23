@@ -8,14 +8,14 @@ import { startMarkGuide } from './hooks/useMarkGuide';
 import { startRecordingNotification } from './hooks/recordingNotification';
 import { retrySetAsideJournals } from './hooks/setAsideJournals';
 import { isRecordingActive, recoverInterruptedRecording, subscribeToRecorder } from './hooks/useRecorder';
-import { openLibrary, startIncomingFiles, startLibraryUi } from './hooks/useSessionLibrary';
+import { flushBeforeExit, openLibrary, startIncomingFiles, startLibraryUi } from './hooks/useSessionLibrary';
 import { importRouteGpx } from './hooks/routeFiles';
 import { incomingFiles } from './platform/incomingFile';
 import { startBeepSound } from './hooks/useSportSettings';
 import { startTheme } from './hooks/useTheme';
 import { installBackButton } from './platform/backButton';
 import { clearStaleScreenOn, resetOrientationLock } from './platform/screen';
-import { sendCloseQuestionTexts } from './platform/desktopBridge';
+import { onDesktopClose, sendCloseQuestionTexts } from './platform/desktopBridge';
 import { t } from './core/i18n';
 
 /**
@@ -55,8 +55,10 @@ export const startApp = async (): Promise<void> => {
   );
   startLibraryUi(isRecordingActive);
   installLeaveGuard();
-  // Pendant un enregistrement, la touche retour met l'application en arrière-plan.
-  void installBackButton(() => isRecordingActive(), confirmLeave);
+  // Pendant un enregistrement, la touche retour met l'application en arrière-plan ; sinon, elle la ferme une fois les
+  // écritures en attente sur le disque, comme la croix du programme Windows.
+  void installBackButton(() => isRecordingActive(), confirmLeave, flushBeforeExit);
+  onDesktopClose(flushBeforeExit);
   // Un enregistrement coupé reprend seul si son service a survécu à la page ; sinon, ou arrêté sans décision, il revient en attente.
   const recovered = recoverInterruptedRecording();
   // Bips d'approche des balises, pendant un enregistrement de voile qui suit un parcours.

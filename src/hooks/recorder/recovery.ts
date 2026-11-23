@@ -2,6 +2,7 @@ import { errorMessage } from '../../core/basics';
 import type { Activity } from '../../core/activities';
 import { t } from '../../core/i18n';
 import { DEFAULT_RECORDING, getSportProfile } from '../../core/sportProfiles';
+import { formatTimeOfDay } from '../../core/units';
 import type { SportType } from '../../core/types';
 import { disarmBeltWatch, disarmGpsWatch, getBeeper } from '../../platform/beeper';
 import { recordingJournal } from '../../platform/files';
@@ -407,6 +408,25 @@ const resumeHoldingCommands = async (text: string, parsed: ParsedJournal, activi
   return resumed;
 };
 
+/**
+ * Ce que dit l'analyse d'une session reprise qui ne continue plus, rangée seule : l'heure et la raison de son arrêt.
+ * Arrêtée par la garde du service, application fermée : sa raison, à l'heure de la garde. Arrêtée par « Arrêter »
+ * (ligne `stop` sans garde) : rien, l'utilisateur l'a vue finir. Sinon, le téléphone ou l'application l'a coupée :
+ * la trace s'arrête à sa dernière position.
+ */
+const stopNotice = (parsed: ParsedJournal, guardStop: NativeCatchUp['guardStop']): string | null => {
+  if (guardStop?.reason === 'still') {
+    return t("Enregistrement arrêté seul à {heure} : application fermée, le téléphone n'avait pas bougé depuis une heure.", { heure: formatTimeOfDay(guardStop.atMs) });
+  }
+  if (guardStop?.reason === 'timeout') {
+    return t("Enregistrement arrêté seul à {heure}, 12 h après la fermeture de l'application.", { heure: formatTimeOfDay(guardStop.atMs) });
+  }
+  if (!guardStop && parsed.stoppedAtMs !== null) return null;
+  const atMs = guardStop?.atMs ?? lastFixMsOf(parsed.fixes) ?? parsed.lastLineMs;
+  if (atMs === null) return null;
+  return t("Enregistrement interrompu à {heure} : le téléphone ou l'application s'est arrêté, la trace s'arrête là.", { heure: formatTimeOfDay(atMs) });
+};
+
 /** Reprise en cours : un départ qui arrive pendant celle du lancement l'attend, au lieu de la doubler. */
 let recovering: Promise<JournalRecovery> | null = null;
 
@@ -440,7 +460,7 @@ const recoverOnce = async (): Promise<JournalRecovery> => {
   const orphan = await stopMotionCapture().catch(() => null);
   try {
     // Ce que le service a reçu sans la page, jusqu'à sa mort ou son arrêt par la garde, entre dans la session.
-    const { parsed } = await catchUpJournal(text, parseJournal(text), session?.activity ?? null);
+    const { parsed, catchUp } = await catchUpJournal(text, parseJournal(text), session?.activity ?? null);
     const { header, fixes: list, breaks } = parsed;
     // Ni en-tête ni changement lisibles : aucun calcul deviné, la session sera rangée « à classer ».
     const recoveredMarks = journalMarks(parsed);
@@ -450,7 +470,9 @@ const recoverOnce = async (): Promise<JournalRecovery> => {
     // garde, la session porte une ligne `stop` : elle se range sans « Continuer ».
     const canContinue = recoveryDecision({ ...recoveryFactsOf(parsed), services: NO_RECOVERY_SERVICES, nowMs }) === 'offer';
     // « Continuer l'enregistrement » est sur la page Enregistrer : y mener, sinon l'offre reste invisible depuis l'accueil.
-    if (pending) setState({ pending: { ...pending, canContinue }, saved: null, error: null, landOnRecording: canContinue });
+    // Sans offre, la session se range seule : son analyse s'ouvre avec l'heure et la raison de l'arrêt.
+    const error = canContinue ? null : stopNotice(parsed, catchUp.guardStop);
+    if (pending) setState({ pending: { ...pending, canContinue }, saved: null, error, landOnRecording: canContinue });
     return 'free';
   } catch (err) {
     return setJournalAside(t('Session interrompue non récupérée ({detail})', { detail: errorMessage(err, t('erreur inconnue')) }));

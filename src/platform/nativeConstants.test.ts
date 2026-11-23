@@ -120,7 +120,7 @@ describe("service de l'enregistrement", () => {
   });
 
   it('ni texte ni seuil de la page en dur : rien que la page ne donne au départ', () => {
-    for (const name of ['title', 'text', 'closedText', 'gpsLostTitle', 'stoppedTitle', 'stoppedText', 'gpsLostDelayS', 'gpsLostRearmS', 'guardStillRadiusM', 'guardStillDelayS', 'guardMaxClosedS', 'intervalMs', 'distanceFilterM']) {
+    for (const name of ['title', 'text', 'closedText', 'gpsLostTitle', 'stoppedTitle', 'stoppedText', 'gpsLostDelayS', 'gpsLostRearmS', 'guardStillRadiusM', 'guardStillDelayS', 'guardMaxClosedS', 'guardMovingSpeedMs', 'guardMovingHoldS', 'intervalMs', 'distanceFilterM']) {
       expect(RECORDING_PLUGIN, name).toContain(`"${name}"`);
     }
   });

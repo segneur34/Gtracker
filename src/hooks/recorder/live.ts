@@ -1,7 +1,7 @@
 import { activityDisplayName, type Activity } from '../../core/activities';
 import { t } from '../../core/i18n';
 import type { SessionMark } from '../../core/sessionMarks';
-import type { RecordingProfile } from '../../core/sportProfiles';
+import { getSportProfile, guardMovingSpeedMs, type RecordingProfile } from '../../core/sportProfiles';
 import { recordingJournal } from '../../platform/files';
 import { latestHeartRate } from '../../platform/heartRate';
 import { clearLoggedFixes, type LocationErrorCause, type LocationFix, type LocationSource, type LocationWatchOptions } from '../../platform/location';
@@ -197,7 +197,8 @@ export const buildPendingSession = async (
  * Options de démarrage d'une source, communes au premier démarrage, à « Continuer » et à une reprise manuelle. Pour
  * le service du téléphone : la session en cours (`session.startedAtMs`, celui de l'en-tête du journal), ses textes
  * quand l'application est fermée, et les délais de sa veille du GPS et de sa garde, ceux du profil. La veille n'y
- * tourne que si la page veille aussi (`watchesGps`).
+ * tourne que si la page veille aussi (`watchesGps`). La vraie vitesse de la garde est celle du calcul de l'activité
+ * (`guardMovingSpeedMs`), sans mise à l'échelle par l'allure : rien ne la connaît encore au départ.
  */
 export const sourceOptions = (activity: Activity, recording: RecordingProfile): LocationWatchOptions => ({
   intervalMs: recording.intervalMs,
@@ -215,6 +216,8 @@ export const sourceOptions = (activity: Activity, recording: RecordingProfile): 
     guardStillRadiusM: recording.guardStillRadiusM,
     guardStillDelayS: recording.guardStillDelayS,
     guardMaxClosedS: recording.guardMaxClosedS,
+    guardMovingSpeedMs: guardMovingSpeedMs(getSportProfile(activity.base)),
+    guardMovingHoldS: recording.guardMovingHoldS,
   },
 });
 
