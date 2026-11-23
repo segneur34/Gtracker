@@ -17,6 +17,7 @@ const racine = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 // Documents remis avec le dépôt : obligatoires, un document absent est un renvoi faux.
 const DOCUMENTS = [
   'ARCHITECTURE.md',
+  'CONTRIBUER.md',
   'README.md',
   'docs/ETAT_DU_PROJET.md',
   'docs/MISE_EN_PAGE.md',

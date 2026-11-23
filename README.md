@@ -60,6 +60,7 @@ Les tests Java d'Android se lancent par Gradle (`docs/DEVELOPPER.md`) ; ce que c
 
 ## Documentation
 
+- `CONTRIBUER.md` : par où commencer, quoi lancer et quoi respecter pour travailler dans le dépôt ; à lire en premier.
 - `ARCHITECTURE.md` : règles d'architecture (« règle N » dans le code) et conventions à suivre en ajoutant du code.
 - `docs/ETAT_DU_PROJET.md` : pipeline, persistance et disposition du dossier des sessions (§6.1), tests (§8), dette, chantiers, avancement du plan mobile (§12).
 - `docs/INVENTAIRE.md` : carte des fichiers.
