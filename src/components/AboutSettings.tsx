@@ -27,6 +27,20 @@ const loadList = (file: string, signal: AbortSignal): Promise<LicenseEntry[] | n
     async (response) => (response.ok ? parseLicenseList(await response.text()) : null)
   ).catch(() => null);
 
+/**
+ * Libellé d'une licence du complément versionné, écrit en français dans son fichier : traduit à l'affichage
+ * seulement, les clés restant des littéraux. Un libellé inconnu (nom de licence, texte officiel) reste tel quel.
+ */
+const shownIdentifier = (identifier: string): string => {
+  if (identifier === 'BSD-3-Clause et licences de ses composants') return t('BSD-3-Clause et licences de ses composants');
+  if (identifier === 'Marque de son titulaire') return t('Marque de son titulaire');
+  return identifier;
+};
+const shownText = (text: string): string =>
+  text.startsWith('Le logo GONG (symbole et mot)')
+    ? t("Le logo GONG (symbole et mot) est une marque de son titulaire, montrée dans Gtracker pour une présentation à GONG. Ce n'est pas une licence libre : il ne se réutilise pas ailleurs sans l'accord du titulaire de la marque.")
+    : text;
+
 /** Une ligne du composant, qui se déplie sur le texte de sa licence, dans une zone qui défile. */
 function LicenseRow({ entry, open, onToggle }: { entry: LicenseEntry; open: boolean; onToggle: () => void }) {
   return (
@@ -35,14 +49,14 @@ function LicenseRow({ entry, open, onToggle }: { entry: LicenseEntry; open: bool
         <span className="about-license__name">
           {entry.name} <span className="about-license__version">{entry.version}</span>
         </span>
-        <span className="about-license__id">{entry.identifier || t('Licence non indiquée')}</span>
+        <span className="about-license__id">{shownIdentifier(entry.identifier) || t('Licence non indiquée')}</span>
       </button>
       {open && (
         <div className="about-license__text" tabIndex={0}>
           {entry.notice && <p>{entry.notice}</p>}
           {entry.url && <p><a href={entry.url} target="_blank" rel="noreferrer">{entry.url}</a></p>}
           {entry.components && <p>{entry.components.join(', ')}</p>}
-          <pre>{entry.text || t('Le paquet ne fournit pas le texte de sa licence.')}</pre>
+          <pre>{shownText(entry.text) ||t('Le paquet ne fournit pas le texte de sa licence.')}</pre>
         </div>
       )}
     </li>
