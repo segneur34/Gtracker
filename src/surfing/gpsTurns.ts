@@ -1,4 +1,6 @@
 import { signedDeltaHalfOpen } from '../core/angles';
+import { haversineDistance, initialBearing } from '../core/geo';
+import { detourSpikes } from '../core/kinematics';
 import type { TrackPoint } from '../core/types';
 
 /**
@@ -10,7 +12,10 @@ import type { TrackPoint } from '../core/types';
  * dit ; les virages du gyroscope les remplacent quand la capture existe.
  *
  * Le cap de chaque pas est celui de l'appareil s'il est là (Doppler, juste
- * même à 1 Hz), sinon celui des positions. On le déroule, puis on compte les
+ * même à 1 Hz), sinon celui des positions, lu sur une corde d'environ
+ * `TURN_COURSE_STRIDE_S` : le cap d'un seul pas de 0,2 s suit le bruit du GPS,
+ * et une même vague compterait plus de virages à 5 Hz qu'à 1 Hz (règle 2).
+ * On le déroule, puis on compte les
  * rotations d'un seul sens d'au moins `minDeg` : un virage est compté chaque
  * fois que le cap s'éloigne de `minDeg` de son dernier extrême, dans le sens
  * opposé au virage précédent (hystérésis, qui ignore le tremblement du cap).
@@ -73,6 +78,19 @@ export const TURN_PAUSE_RATE_DEG_S = 15;
 export const TURN_PAUSE_WINDOW_S = 1;
 
 /**
+ * Corde du cap des positions, en secondes : sans cap de l'appareil, le cap
+ * d'un point est celui de la corde qui remonte d'à peu près cette durée
+ * (`chordHeading`). À 1 Hz, c'est le pas lui-même, inchangé ; à 5 Hz, cinq
+ * pas, sur lesquels le bruit de position pèse cinq fois moins. Un peu moins
+ * d'une seconde pour qu'un pas de 1 Hz qui arrive quelques millisecondes en
+ * avance reste un seul pas, comme les caps par pas de la voile.
+ */
+export const TURN_COURSE_STRIDE_S = 0.9;
+
+/** Corde trop courte pour porter un cap, en mètres : celui du pas est gardé. */
+const CHORD_MIN_M = 0.01;
+
+/**
  * Règles d'un virage, surchargeables. Absentes, aucune ne s'applique : le
  * compte brut des rotations. L'analyse d'une session passe `surfTurnRules()`.
  */
@@ -98,15 +116,18 @@ export const surfTurnRules = (o: TurnRules = {}): Required<TurnRules> => ({
   turnPauseWindowS: o.turnPauseWindowS ?? TURN_PAUSE_WINDOW_S,
 });
 
-/** Options du compte au GPS : les règles, la fin de glisse si elle est déjà connue, et le trou de la trace. */
+/**
+ * Options du compte au GPS : les règles, la fin de glisse si elle est déjà
+ * connue, le trou de la trace, et la corde du cap des positions.
+ */
 export interface GpsTurnOptions extends TurnRules {
   /** Fin de glisse, en ms ; absente : `rideEndMsOf` au plancher de lecture. */
   rideEndMs?: number;
   /** Pas le plus long où une borne s'interpole, en secondes ; au-delà, c'est un trou. Défaut : aucun trou. */
   maxGapS?: number;
+  /** Corde minimale du cap des positions, en secondes (`TURN_COURSE_STRIDE_S`) ; 0 : le cap de chaque pas. */
+  courseStrideS?: number;
 }
-
-const headingOf = (p: TrackPoint): number => p.courseDeg ?? p.bearing;
 
 /** Un changement de direction : l'extrême d'où il part, et le point où il atteint `minDeg`. */
 export interface DirectionChange {
@@ -213,6 +234,58 @@ const isGapStep = (track: TrackPoint[], i: number, maxGapS: number): boolean =>
   track[i].segmentStart === true || (track[i].timeMs - track[i - 1].timeMs) / 1000 > maxGapS;
 
 /**
+ * Cap des positions au point `i`, en degrés : celui de la corde depuis le
+ * point dont l'heure est la plus proche de `strideMs` avant lui (la plus
+ * longue à égalité), sans remonter au-delà d'un trou ni d'une reprise (la
+ * corde s'arrête alors au premier point du morceau). La plus proche, et non
+ * la première au-delà : sur une cadence irrégulière, celle-ci peut couvrir
+ * plus de deux secondes et effacer un virage. Le cap du pas (`bearing`) est
+ * gardé quand la corde n'a qu'un pas (1 Hz, long pas d'une cadence variable)
+ * ou ne mesure presque rien. Une corde ne part ni n'arrive sur une position
+ * qui a sauté (`spiked`, `positionSpikes`) : arrivée sautée, le cap du pas,
+ * que le noyau a réparé ; départ sauté, le point d'avant.
+ */
+const chordHeading = (track: TrackPoint[], i: number, strideMs: number, maxGapS: number, spiked: ReadonlySet<number>): number => {
+  const p = track[i];
+  if (spiked.has(i)) return p.bearing;
+  let j = i;
+  while (j > 0 && !isGapStep(track, j, maxGapS) && p.timeMs - track[j].timeMs < strideMs) j--;
+  const beyond = p.timeMs - track[j].timeMs - strideMs;
+  if (j < i - 1 && beyond > 0 && strideMs - (p.timeMs - track[j + 1].timeMs) < beyond) j++;
+  if (spiked.has(j)) {
+    if (j === 0 || isGapStep(track, j, maxGapS)) return p.bearing;
+    j--;
+  }
+  if (j >= i - 1) return p.bearing;
+  const a = track[j];
+  if (haversineDistance(a.lat, a.lon, p.lat, p.lon) < CHORD_MIN_M) return p.bearing;
+  return initialBearing(a.lat, a.lon, p.lat, p.lon);
+};
+
+/**
+ * Marge, en ms, en deçà de la première corde possible, où les sauts de
+ * position se cherchent aussi : un saut écarte le point qui le suit du test
+ * suivant, et la recherche doit voir le même enchaînement que le noyau.
+ */
+const SPIKE_SEARCH_MARGIN_MS = 2000;
+
+const NO_SPIKES: ReadonlySet<number> = new Set();
+
+/**
+ * Indices des positions qui ont sauté puis sont revenues, autour des points
+ * `start` à `end` : la règle du noyau (`detourSpikes`), avec ses valeurs par
+ * défaut, celles du surf, qui n'accorde pas ses filtres à l'allure de la
+ * session. Le noyau a réparé le cap de ces points (sauf vitesse Doppler).
+ */
+const positionSpikes = (track: TrackPoint[], start: number, end: number, strideMs: number): Set<number> => {
+  let lo = start;
+  while (lo > 0 && track[start].timeMs - track[lo - 1].timeMs <= strideMs + SPIKE_SEARCH_MARGIN_MS) lo--;
+  const hi = Math.min(track.length - 1, end + 1);
+  const slice = track.slice(lo, hi + 1);
+  return new Set(detourSpikes(slice, slice.map((p) => p.timeMs)).map((k) => k + lo));
+};
+
+/**
  * Instant, en ms, où la vitesse lissée passe `floorMs` sur le pas `i` (du
  * point `i − 1` au point `i`, l'un dessous, l'autre pas), interpolé en temps.
  * Un trou de la trace ne s'interpole pas : l'instant est celui du point qui
@@ -275,7 +348,10 @@ export interface GpsTurn {
  * ne se juge qu'une fois : un repassage sous le plancher en cours de vague ne
  * la relance pas), et un changement ne compte que suivi d'assez de glisse. Sur
  * un long pas (cadence variable), la glisse restante se mesure depuis le point
- * d'arrivée du dernier pas lu : elle peut être surestimée d'un pas.
+ * d'arrivée du dernier pas lu : elle peut être surestimée d'un pas. Sans cap
+ * de l'appareil, chaque point se lit au cap de la corde d'environ
+ * `courseStrideS` qui y mène (`chordHeading`) : la même vague compte les mêmes
+ * virages à 1 Hz et à 5 Hz.
  */
 export const gpsTurnsOf = (
   track: TrackPoint[], start: number, end: number, minDeg: number, o: GpsTurnOptions = {}
@@ -285,6 +361,7 @@ export const gpsTurnsOf = (
   const settleMs = (o.turnSettleS ?? 0) * 1000;
   const minRideAfterMs = (o.turnMinRideAfterS ?? 0) * 1000;
   const maxGapS = o.maxGapS ?? Infinity;
+  const strideMs = (o.courseStrideS ?? TURN_COURSE_STRIDE_S) * 1000;
   let first = start;
   while (first <= end && track[first].smoothedSpeedMs < floorMs) first++;
   if (first > end) return [];
@@ -292,10 +369,12 @@ export const gpsTurnsOf = (
   const heading: number[] = [];
   const timeMs: number[] = [];
   let lastRead = 0;
+  let spiked: Set<number> | null = null;
   for (let i = start + 1; i <= end; i++) {
     const p = track[i];
     if (p.smoothedSpeedMs < floorMs || p.timeMs < readFromMs) continue;
-    const read = headingOf(p);
+    if (p.courseDeg === undefined && strideMs > 0) spiked ??= positionSpikes(track, start, end, strideMs);
+    const read = p.courseDeg ?? chordHeading(track, i, strideMs, maxGapS, spiked ?? NO_SPIKES);
     heading.push(heading.length === 0 ? 0 : heading[heading.length - 1] + signedDeltaHalfOpen(lastRead, read));
     timeMs.push(p.timeMs);
     lastRead = read;

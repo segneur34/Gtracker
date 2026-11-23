@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { initialBearing } from '../core/geo';
+import { computeKinematics } from '../core/kinematics';
 import type { TrackPoint } from '../core/types';
+import { at, mPerDegLon } from '../test/geo.fixture';
+import { seededRandom } from '../test/sailing.fixture';
 import {
-  COURSE_MIN_SPEED_MS, TURN_MIN_RIDE_AFTER_S, TURN_PAUSE_RATE_DEG_S, TURN_PAUSE_WINDOW_S, TURN_SETTLE_S, countDirectionChanges, directionChanges,
-  gpsTurnsOf, rideEndMsOf, rotationEnds, surfTurnRules, type GpsTurnOptions,
+  COURSE_MIN_SPEED_MS, TURN_COURSE_STRIDE_S, TURN_MIN_RIDE_AFTER_S, TURN_PAUSE_RATE_DEG_S, TURN_PAUSE_WINDOW_S, TURN_SETTLE_S, countDirectionChanges,
+  directionChanges, gpsTurnsOf, rideEndMsOf, rotationEnds, surfTurnRules, type GpsTurnOptions,
 } from './gpsTurns';
 
 /** Points d'une vague à 1 Hz, de caps donnés (cap de l'appareil, ou cap des positions seul). */
@@ -105,24 +109,98 @@ const lin = (points: [number, number][]) => (t: number): number => {
   return points[points.length - 1][1];
 };
 
+/** Pas d'intégration des positions, en secondes : les heures des points en sont des multiples. */
+const PATH_DT_S = 0.01;
+
+/** Tirage gaussien centré réduit, d'un tirage uniforme à graine fixe. */
+const gaussian = (uniform: () => number) => (): number => {
+  let u = 0;
+  while (u === 0) u = uniform();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * uniform());
+};
+
 /**
- * Vague fabriquée : un point tous les `cadenceS` de 0 à `durationS`, à la
- * vitesse (km/h) et au cap (degrés) donnés par des fonctions du temps (s) ;
- * sans cap de l'appareil, le cap est celui des positions.
+ * Vague fabriquée, aux heures `timesS` (secondes, croissantes, de 0 à
+ * `durationS`) : la vitesse (km/h) et le cap (degrés) sont des fonctions du
+ * temps, les positions leur intégrale tous les `PATH_DT_S`, plus un bruit de
+ * position corrélé d'écart type `noiseM` (constante de temps de 8 s, celle
+ * d'un GPS ordinaire), le même pour toutes les cadences d'une même graine.
+ * Le cap du pas (`bearing`) est celui des positions, comme le calcule le
+ * noyau ; avec `device`, le cap de l'appareil est le cap vrai.
  */
-const ride = (durationS: number, speedKmh: (t: number) => number, heading: (t: number) => number, cadenceS: number, device: boolean): TrackPoint[] => {
-  const out: TrackPoint[] = [];
-  for (let k = 0; k * cadenceS <= durationS + 1e-9; k++) {
-    const t = Math.round(k * cadenceS * 1000) / 1000;
+const rideAt = (
+  timesS: readonly number[], durationS: number, speedKmh: (t: number) => number, heading: (t: number) => number, device: boolean,
+  noiseM = 0, seed = 1
+): TrackPoint[] => {
+  const n = Math.round(durationS / PATH_DT_S) + 1;
+  const east = new Float64Array(n);
+  const north = new Float64Array(n);
+  const draw = gaussian(seededRandom(seed));
+  const tauS = 8;
+  let ex = 0;
+  let ey = 0;
+  let x = 0;
+  let y = 0;
+  for (let k = 0; k < n; k++) {
+    east[k] = x + ex;
+    north[k] = y + ey;
+    const t = k * PATH_DT_S;
+    const v = speedKmh(t) * MS_PER_KMH;
+    const h = (heading(t) * Math.PI) / 180;
+    x += v * Math.sin(h) * PATH_DT_S;
+    y += v * Math.cos(h) * PATH_DT_S;
+    ex += (-ex / tauS) * PATH_DT_S + noiseM * Math.sqrt((2 * PATH_DT_S) / tauS) * draw();
+    ey += (-ey / tauS) * PATH_DT_S + noiseM * Math.sqrt((2 * PATH_DT_S) / tauS) * draw();
+  }
+  const positions = timesS.map((t) => {
+    const k = Math.min(n - 1, Math.round(t / PATH_DT_S));
+    return at(east[k], north[k]);
+  });
+  return timesS.map((t, i) => {
     const v = speedKmh(t) * MS_PER_KMH;
     const h = ((heading(t) % 360) + 360) % 360;
-    out.push({
-      lat: 43, lon: 3, time: new Date(t * 1000), timeMs: t * 1000, speedMs: v, smoothedSpeedMs: v,
-      bearing: device ? 0 : h, ...(device ? { courseDeg: h } : {}), speedSource: 'doppler',
-    });
-  }
+    const [a, b] = i === 0 ? [positions[0], positions[1]] : [positions[i - 1], positions[i]];
+    return {
+      ...positions[i], time: new Date(t * 1000), timeMs: Math.round(t * 1000), speedMs: v, smoothedSpeedMs: v,
+      bearing: initialBearing(a.lat, a.lon, b.lat, b.lon), ...(device ? { courseDeg: h } : {}), speedSource: 'doppler',
+    };
+  });
+};
+
+/** Heures régulières, un point tous les `cadenceS` de 0 à `durationS`. */
+const regularTimes = (durationS: number, cadenceS: number): number[] => {
+  const out: number[] = [];
+  for (let k = 0; k * cadenceS <= durationS + 1e-9; k++) out.push(Math.round(k * cadenceS * 1000) / 1000);
   return out;
 };
+
+/** Heures irrégulières, de pas tirés entre 0,2 et 1,5 s (au centième), graine fixe. */
+const irregularTimes = (durationS: number, seed: number): number[] => {
+  const draw = seededRandom(seed);
+  const out = [0];
+  for (;;) {
+    const next = Math.round((out[out.length - 1] + 0.2 + 1.3 * draw()) * 100) / 100;
+    if (next > durationS) return out;
+    out.push(next);
+  }
+};
+
+/**
+ * Vague idéale des règles : un point tous les `cadenceS` de 0 à `durationS`,
+ * à la vitesse (km/h) et au cap (degrés) donnés par des fonctions du temps
+ * (s), immobile : sans cap de l'appareil, le cap du pas est le cap vrai de
+ * l'instant, sans corde (elle ne mesure rien). Les règles s'y éprouvent sur
+ * un cap exact ; le cap des positions, sur `rideAt`.
+ */
+const ride = (durationS: number, speedKmh: (t: number) => number, heading: (t: number) => number, cadenceS: number, device: boolean): TrackPoint[] =>
+  regularTimes(durationS, cadenceS).map((t) => {
+    const v = speedKmh(t) * MS_PER_KMH;
+    const h = ((heading(t) % 360) + 360) % 360;
+    return {
+      lat: 43, lon: 3, time: new Date(t * 1000), timeMs: t * 1000, speedMs: v, smoothedSpeedMs: v,
+      bearing: device ? 0 : h, ...(device ? { courseDeg: h } : {}), speedSource: 'doppler',
+    };
+  });
 
 /** Les règles d'une session, et le trou de la trace du surf. */
 const RULES: GpsTurnOptions = { ...surfTurnRules(), maxGapS: 10 };
@@ -288,6 +366,103 @@ describe('règles des virages : un virage relie deux glisses', () => {
     const slow = ride(12, () => 6, (t) => (t < 6 ? 0 : 120), 1, true);
     expect(count(slow)).toBe(0);
     expect(count(slow, {})).toBe(1);
+  });
+});
+
+describe('cap des positions : une corde de 0,9 s, la même vague à toute cadence', () => {
+  /**
+   * Une vague de 24 s : 20 km/h de 2 à 18 s, le cap à 30° ± 40° sur une
+   * période de 5 s, de 4 à 14 s, puis droit : trois changements de direction
+   * d'au moins 60° (le premier demi-écart, 40°, ne compte pas).
+   */
+  const DURATION_S = 24;
+  const speed = lin([[0, 4], [2, 20], [18, 20], [20, 4], [24, 3]]);
+  const heading = (t: number) => 30 + (t > 4 && t < 14 ? 40 * Math.sin((2 * Math.PI * (t - 4)) / 5) : 0);
+  const EXPECTED = 3;
+  const SEEDS = [1, 2, 3];
+  const wave = (times: number[], noiseM: number, seed: number, device = false) => rideAt(times, DURATION_S, speed, heading, device, noiseM, seed);
+  const turnsOf = (track: TrackPoint[], o: GpsTurnOptions = RULES) => gpsTurnsOf(track, 0, track.length - 1, 60, o);
+  const oneHz = regularTimes(DURATION_S, 1);
+  const fiveHz = regularTimes(DURATION_S, 0.2);
+  /** Un point par seconde, avancé ou retardé de 40 ms au plus. */
+  const jitteredOneHz = (seed: number) => {
+    const draw = seededRandom(seed);
+    return oneHz.map((t) => (t === 0 ? 0 : Math.round((t + (draw() - 0.5) * 0.08) * 100) / 100));
+  };
+
+  it('la corde vaut 0,9 s, surchargeable : à 0, le cap de chaque pas, que le bruit fait trembler à 5 Hz', () => {
+    expect(TURN_COURSE_STRIDE_S).toBe(0.9);
+    const noisy = wave(fiveHz, 1.2, 1);
+    expect(count(noisy)).toBe(EXPECTED);
+    expect(count(noisy, { ...RULES, courseStrideS: 0 })).toBeGreaterThan(EXPECTED);
+  });
+
+  it.each([0, 1.2])('à 1 Hz, rien ne change, gigue de 40 ms comprise : la corde est le pas (bruit de %s m)', (noiseM) => {
+    for (const seed of SEEDS) {
+      for (const times of [oneHz, jitteredOneHz(seed)]) {
+        const track = wave(times, noiseM, seed);
+        expect(turnsOf(track)).toEqual(turnsOf(track, { ...RULES, courseStrideS: 0 }));
+      }
+    }
+  });
+
+  it.each([0, 0.5])('la même vague compte trois virages à 1 Hz, à 5 Hz et en cadence irrégulière, de 0,2 à 1,5 s (bruit de %s m)', (noiseM) => {
+    for (const seed of SEEDS) {
+      for (const times of [oneHz, fiveHz, irregularTimes(DURATION_S, seed)]) expect(count(wave(times, noiseM, seed))).toBe(EXPECTED);
+    }
+  });
+
+  it('bruit de 1,2 m : le même compte à 1 Hz et à 5 Hz, celui de la vague', () => {
+    for (const seed of SEEDS) {
+      expect(count(wave(oneHz, 1.2, seed))).toBe(EXPECTED);
+      expect(count(wave(fiveHz, 1.2, seed))).toBe(EXPECTED);
+    }
+  });
+
+  it("le cap de l'appareil se lit tel quel, sans corde, même à 5 Hz", () => {
+    for (const seed of SEEDS) {
+      const track = wave(fiveHz, 1.2, seed, true);
+      expect(turnsOf(track)).toEqual(turnsOf(track, { ...RULES, courseStrideS: 0 }));
+      expect(count(track)).toBe(EXPECTED);
+    }
+  });
+
+  it('un point toutes les 4 s : le cap du pas, comme avant, sans erreur', () => {
+    const track = wave(regularTimes(DURATION_S, 4), 1.2, 1);
+    expect(turnsOf(track)).toEqual(turnsOf(track, { ...RULES, courseStrideS: 0 }));
+  });
+
+  it.each([false, true])('une position qui saute de 30 m sur le côté, puis revient : ni départ ni arrivée de corde, le même compte à 1 Hz et à 5 Hz (vitesse Doppler %s)', (doppler) => {
+    /** La trace passée par le noyau, le point de 10 s déporté de 30 m à angle droit du cap de 30°. */
+    const jumped = (times: number[], hd: (t: number) => number) => {
+      const raw = rideAt(times, DURATION_S, speed, hd, false).map((p) => ({ lat: p.lat, lon: p.lon, time: p.time, ...(doppler ? { speedMs: p.speedMs } : {}) }));
+      const k = times.findIndex((t) => t >= 10);
+      const shift = at(30 * Math.cos(Math.PI / 6), -30 * Math.sin(Math.PI / 6));
+      const origin = at(0, 0);
+      raw[k] = { ...raw[k], lat: raw[k].lat + shift.lat - origin.lat, lon: raw[k].lon + shift.lon - origin.lon };
+      const track = computeKinematics(raw);
+      return countDirectionChanges(track, 0, track.length - 1, 60, { ...RULES, maxGapS: 10 });
+    };
+    expect(jumped(oneHz, heading)).toBe(EXPECTED);
+    expect(jumped(fiveHz, heading)).toBe(EXPECTED);
+    // En ligne droite : aucun virage sans Doppler, où le noyau répare le cap du point sauté ; avec, il le laisse, mais les deux cadences s'accordent.
+    const straight = () => 30;
+    if (!doppler) expect(jumped(oneHz, straight)).toBe(0);
+    expect(jumped(fiveHz, straight)).toBe(jumped(oneHz, straight));
+  });
+
+  it('la corde ne remonte pas au-delà d\'une reprise', () => {
+    // Ligne droite au nord à 5 Hz ; à 10 s, la trace reprend 50 m plus à l'est. Le cap du pas de la reprise est celui du pas suivant, comme dans le noyau.
+    const straight = (resumed: boolean) => {
+      const track = rideAt(fiveHz, DURATION_S, () => 20, () => 0, false);
+      const k = track.findIndex((p) => p.timeMs >= 10_000);
+      for (let i = k; i < track.length; i++) track[i] = { ...track[i], lon: track[i].lon + 50 / mPerDegLon(track[i].lat) };
+      track[k] = { ...track[k], bearing: track[k + 1].bearing, ...(resumed ? { segmentStart: true } : {}) };
+      return track;
+    };
+    expect(countDirectionChanges(straight(true), 0, fiveHz.length - 1, 60)).toBe(0);
+    // Sans la reprise, la corde enjambe le saut et y voit un virage.
+    expect(countDirectionChanges(straight(false), 0, fiveHz.length - 1, 60)).toBeGreaterThan(0);
   });
 });
 

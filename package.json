@@ -1,7 +1,7 @@
 {
   "name": "gtracker",
   "private": true,
-  "version": "0.02.03",
+  "version": "0.02.04",
   "type": "module",
   "engines": {
     "node": "^22.18.0 || ^24.0.0 || >=26.0.0"
@@ -26,6 +26,8 @@
     "@capacitor/filesystem": "^8.1.5",
     "@capacitor/preferences": "^8.0.1",
     "@fontsource/inter": "^5.3.0",
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0",
     "leaflet": "^1.9.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
