@@ -1,4 +1,4 @@
-// Banc de test : les tutoriels (lot 147, idée 142). La leçon du jour (carte « Aujourd'hui : … ») est en pause : les
+// Banc de test : les tutoriels. La leçon du jour (carte « Aujourd'hui : … ») est en pause : les
 // leçons, leur liste et le bloc de Réglages restent.
 // Usage : node tutoriels.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau ni session, environ 30 s. L'heure de la page est décalée par un script posé avant

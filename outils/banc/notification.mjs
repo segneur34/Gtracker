@@ -1,4 +1,4 @@
-// Banc de test : notification de l'enregistrement (§10, point 101).
+// Banc de test : notification de l'enregistrement.
 // Usage : node notification.mjs <port> <dossier de travail, chemin Windows>
 // Sur un profil neuf, sans réseau. Dure environ 1 min 30. L'activité de voile par défaut est « Wingfoil » (famille « Voile »). La version navigateur de `platform/notification.ts`
 // consigne chaque envoi en `console.debug` (« [notification] titre | texte [chronomètre] (seule) »). Le script vérifie :
@@ -8,7 +8,7 @@
 //     envois sans changement d'état ;
 //  3. pause manuelle : envoi immédiat, « en pause », durée figée, posé seul ; reprise : envoi immédiat sans « en pause » ;
 //  4. arrêt : notification effacée ; l'analyse s'ouvre seule, la session est jetée depuis son menu « … » ;
-//  5. la moyenne en voile (lot 150) : « Moyenne active » dans les menus de Réglages, « Moy. act. » dans un rejeu.
+//  5. la moyenne en voile :« Moyenne active » dans les menus de Réglages, « Moy. act. » dans un rejeu.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CLES, connect } from './lib/cdp.mjs';
@@ -72,7 +72,7 @@ await blockNetwork(['*://*.openstreetmap.org/*']);
 await go('/parametres', 4000);
 await evaluate(`(() => { const b = [...document.querySelectorAll('[role=button]')].find((el) => el.textContent.trim() === 'Activités'); if (b && !document.querySelector('.settings-activities')) b.click(); return 'ok'; })()`);
 await wait(300);
-// Familles repliées depuis le lot 2 des demandes du 15/10 : toutes ouvertes.
+// Les familles de Réglages sont repliées d'office : on les ouvre toutes.
 await evaluate(`document.querySelectorAll('.settings-activities__family-toggle[aria-expanded="false"]').forEach((b) => b.click()); 'ok'`);
 await wait(300);
 await evaluate(`(() => { const b = [...document.querySelectorAll('.settings-activity__toggle')].find((x) => x.textContent.trim().startsWith('Wingfoil')); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); return 'ok'; })()`);

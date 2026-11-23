@@ -7,7 +7,7 @@
 //         [--exe <Gtracker.exe>] (le programme Windows contre Chrome sur le même `dist/` : « avant » est Chrome sur
 //         `vite preview`, « après » une instance du programme par script, sur un profil à part ; sans --avant)
 // Mode d'emploi : LISEZMOI.md, section « Lanceur ». Registre des scripts : scripts.mjs. Node 22 ou plus, sans dépendance.
-// Le passage courant (sans nom) ne comprend plus `tailles` : le jouer par son nom ou `--pages` quand le lot touche la mise en page, le thème ou Réglages.
+// Le passage courant (sans nom) ne comprend plus `tailles` : le jouer par son nom ou `--pages` quand le changement touche la mise en page, le thème ou Réglages.
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';

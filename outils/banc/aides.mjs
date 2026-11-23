@@ -1,4 +1,4 @@
-// Banc de test : aides « ? » partout et barre du haut sans « Accueil » (lot 3 des demandes du 24/10).
+// Banc de test : aides « ? » partout et barre du haut sans « Accueil ».
 // Usage : node aides.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau (tuiles bloquées). Dure environ 1 min. Le script :
 //  1. importe une session de wingfoil et une de surf (`lib/traces.mjs`) ;

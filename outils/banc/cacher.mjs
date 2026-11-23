@@ -1,4 +1,4 @@
-// Banc de test : cacher une famille et une activité (§10, point 100 ; remis sur la voile et le surf au lot 330).
+// Banc de test : cacher une famille et une activité.
 // Usage : node cacher.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Le script fabrique une session de wingfoil (`lib/traces.mjs`), l'importe par la page
 // Sessions (rangée sous Wingfoil, la première activité de voile), et vérifie :
@@ -78,7 +78,7 @@ await settle({ max: 2000, label: 'import' });
 await go('/parametres');
 await openBlock('Activités', '.settings-activities');
 await wait(300);
-// Familles repliées depuis le lot 2 des demandes du 15/10 : toutes ouvertes.
+// Familles repliables : toutes ouvertes au départ.
 await evaluate(`document.querySelectorAll('.settings-activities__family-toggle[aria-expanded="false"]').forEach((b) => b.click()); 'ok'`);
 await wait(300);
 // --- 1. Départ ---

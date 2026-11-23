@@ -1,10 +1,10 @@
 // Banc de test : activité de la trace suivie, changement d'activité pendant l'enregistrement, carte réduite, changement
-// d'activité depuis l'analyse, d'une famille à l'autre comprise (lot 330 : voile et surf).
+// d'activité depuis l'analyse, d'une famille à l'autre comprise (voile et surf).
 // Usage : node activite.mjs <port> <dossier de travail, chemin Windows> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Le script :
 //  1. range un itinéraire de Kite (page Itinéraires), puis vérifie que le suivre sur Enregistrer propose son activité ;
 //  2. enregistre en rejeu ×10 (trace de `lib/traces.mjs`) : Wingfoil, changé en Kite pendant la saisie, carte réduite puis
-//     montée ; à l'arrêt, l'analyse s'ouvre seule (lot 313) sur la session, rangée en Kite ;
+//     montée ; à l'arrêt, l'analyse s'ouvre seule sur la session, rangée en Kite ;
 //  3. depuis l'analyse, de Kite à Wingfoil (même famille : même module, fiche mise à jour), puis de Wingfoil à Surf avec un
 //     brouillon (seuil saisi) : la confirmation est posée, la session change de module (`/surf/analyse`) et le brouillon
 //     est abandonné ;
@@ -155,7 +155,7 @@ console.log('carte montée :', carteMontee);
 check('« Afficher la carte » : la carte revient', carteMontee >= 1, String(carteMontee));
 console.log('Arrêter :', await holdStop());
 const ouverte = await attendreAnalyse(evaluate);
-console.log('analyse ouverte seule (lot 313) :', ouverte);
+console.log('analyse ouverte seule :', ouverte);
 check('à l\'arrêt, l\'analyse de la session s\'ouvre seule', ouverte === 'ok', ouverte);
 await settle({ max: 5000 });
 const adresse = await evaluate(`location.pathname + location.search`);

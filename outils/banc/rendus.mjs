@@ -1,4 +1,4 @@
-// Banc de test : rendus de React pendant un enregistrement (lot 67, « ne redessiner que les chiffres »).
+// Banc de test : rendus de React pendant un enregistrement (seuls les chiffres, la carte et l'horloge se redessinent).
 // Usage : node rendus.mjs <port> <dossier de travail, chemin Windows>
 // Sur un profil neuf, sans réseau, environ 3 min 30 en temps réel (`TEMPS=10` : 25 s, mêmes ordres de grandeur).
 // Une mesure, pas une preuve de neutralité (les comptes varient de quelques unités d'un passage à l'autre) : le script
@@ -124,9 +124,9 @@ console.log('Arrêter :', down);
 { const fin = await analyseOuvertePuisJetee(evaluate); check('arrêt tenu : analyse ouverte seule, puis session jetée', fin === 'ok', fin); }
 await settle({ max: 2000 });
 
-// Plafonds, larges (les comptes varient de quelques unités d'un passage à l'autre) : avant le lot 67, la page entière
-// (`RecordingScreen` 90, `AppShell` 60 par minute) se redessinait à chaque position ; aujourd'hui seuls les chiffres,
-// la carte et l'horloge le font.
+// Plafonds, larges (les comptes varient de quelques unités d'un passage à l'autre) : redessiner la page entière
+// (`RecordingScreen` 90, `AppShell` 60 par minute) à chaque position dépasserait ces plafonds ; seuls les chiffres,
+// la carte et l'horloge doivent se redessiner.
 const n = (phase, name) => phase.counts[name] ?? 0;
 /** Le détail (les comptes) n'est écrit qu'en cas d'échec : le relevé d'un passage reste comparable à l'autre. */
 const plafond = (label, ok, detail = '') => check(label, ok, ok ? '' : detail);

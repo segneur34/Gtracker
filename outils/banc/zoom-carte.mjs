@@ -1,5 +1,5 @@
 // Banc de test : graphe zoomé vu sur la carte, lecture au-dessus des graphes, double-clic qui zoome
-// (lot 2 des demandes du 23/10 ; remis sur la voile et le surf au lot 330).
+// (voile et surf).
 // Usage : node zoom-carte.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Dure environ 2 min. Le script :
 //  1. importe une session de wingfoil et une de surf (`lib/traces.mjs`), toutes deux avec la FC ;

@@ -1,4 +1,4 @@
-// Banc de test : parcours de voile et bips d'approche des balises (§10, point 77).
+// Banc de test : parcours de voile et bips d'approche des balises.
 // Usage : node balises.mjs <port> <dossier de travail, chemin Windows> [<dossier des captures>]
 // Sur un profil neuf. Le script :
 //  1. pose un parcours en Wingfoil sur la page Itinéraires (numéros, pas de type de voie, bloc « Tracé et balises »),
@@ -11,7 +11,7 @@
 //     départ), puis « Passer » et « Bips » coupés ;
 //  4. éprouve l'éditeur de la courbe dans Réglages : glisser le dernier point, ajouter un point,
 //     « Vibrer aussi », « Écouter », « Par défaut ».
-// Verdicts (lot 159) : chiffres attendus par construction (balises, distances 300 − 6t, caps, bips à ±1 s ; rien sur la
+// Verdicts : chiffres attendus par construction (balises, distances 300 − 6t, caps, bips à ±1 s ; rien sur la
 // valeur tirée au glisser, 13 ou 14 m selon le pixel) ; fin par « Tout passe. » ou le nombre d'échecs, code 0 ou 1.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -259,7 +259,7 @@ console.log(beeps.map((b, k) => {
   check('bips ×1 : autant de courts dans les deux approches (à un près)', approche1.length > 0 && Math.abs(approche1.length - approche2.length) <= 1, `${approche1.length} / ${approche2.length}`);
 }
 console.log('Arrêter :', await holdStop());
-// Lot 313 : l'analyse s'ouvre seule, la session se jette depuis son menu « … ».
+// L'analyse s'ouvre seule, la session se jette depuis son menu « … ».
 console.log('Supprimer :', await analyseOuvertePuisJetee(evaluate));
 await wait(1000);
 

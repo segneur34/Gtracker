@@ -1,4 +1,4 @@
-// Banc de test : le bouton glissant qu'on fait glisser (demande du 22/10), sur le thème de Réglages (Clair, Sombre, Auto).
+// Banc de test : le bouton glissant qu'on fait glisser, sur le thème de Réglages (Clair, Sombre, Auto).
 // Ni le Profil (période en bouton ovale) ni les Statistiques (fenêtre de sélection) n'ont plus de bouton glissant ;
 // la fenêtre de sélection est éprouvée par statistiques.mjs.
 // Usage : node glisser.mjs <port> [<dossier des captures>]

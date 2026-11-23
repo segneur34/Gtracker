@@ -1,10 +1,10 @@
-// Banc du bouton « Enregistrer la session » (24/09/2026, refait le 29/10 sur la page d'aujourd'hui, n° 84) :
+// Banc du bouton « Enregistrer la session » :
 // brouillon du vent, du seuil et des notes, avertissement en quittant, écriture dans la fiche, relecture après
 // rechargement, Annuler. Profil Chrome neuf : OPFS vide au départ.
 // Usage : node session-save.mjs <port>
 // La session est la trace de voile de `lib/traces.mjs` (wingfoil, le calcul par défaut de la voile : « Wingfoil »).
-// Ce que la page d'aujourd'hui change par rapport à la première version : l'analyse s'ouvre par son adresse (la
-// ligne de la page Sessions n'y mène plus), le vent se saisit par « Régler » (boussole sur la carte), le seuil
+// Gestes de la page : l'analyse s'ouvre par son adresse (la
+// ligne de la page Sessions n'y mène pas), le vent se saisit par « Régler » (boussole sur la carte), le seuil
 // d'activité est dans l'onglet « réglages », les notes dans « matos et conditions », et la barre est
 // `.ui-savebar` (« Non enregistré : … », « Annuler », « Enregistrer la session »).
 // Chaque étape dit « ok » ou « ÉCHEC » ; le script rend 1 au premier échec compté.

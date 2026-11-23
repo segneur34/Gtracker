@@ -1,4 +1,4 @@
-// Diagnostic du pumping d'une session de voile sur foil (lot 22) : la trace est
+// Diagnostic du pumping d'une session de voile sur foil : la trace est
 // relue par la chaîne de l'application (lecture du GPX, filtres accordés à
 // l'allure, seuil de la session), les vols sont ceux de l'onglet « pumping »
 // (`sailingFlights`), et le pumping de chacun est mesuré sur la capture des
@@ -14,7 +14,7 @@
 // `--seuil` est le seuil d'activité de la session (sa fiche), sinon la
 // suggestion de l'application ; `--min-vol` la durée minimale d'un vol listé,
 // sinon celle du profil. Sont imprimés : les constantes des coups et de la
-// cadence qui valide une série (lot 50), l'état de la capture (fenêtres
+// cadence qui valide une série, l'état de la capture (fenêtres
 // gardées, si elle est élaguée), puis par vol l'heure, la durée, la part
 // couverte par la capture, le décollage et sa vitesse, les coups, la
 // cadence, le temps pompé, la distance par coup et la part du vol validée par

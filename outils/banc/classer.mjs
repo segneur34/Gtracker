@@ -1,4 +1,4 @@
-// Banc de test : session à classer, activité demandée avant l'analyse (§10, point 88, remis sur la voile et le surf au lot 330).
+// Banc de test : session à classer, activité demandée avant l'analyse.
 // Usage : node classer.mjs <port> <dossier de travail, chemin Windows> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Le script fabrique un GPX dont la balise <type> ne dit rien (« other », comme certaines
 // applications), l'importe depuis la page Sessions, et vérifie :

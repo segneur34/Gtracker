@@ -1,4 +1,4 @@
-// Banc de test : « Mettre à jour », relecture du dossier mémoire sans relancer (§10, point 88, remis sur la voile au lot 330).
+// Banc de test : « Mettre à jour », relecture du dossier mémoire sans relancer.
 // Usage : node miseajour.mjs <port> <dossier de travail, chemin Windows> [<dossier des captures>]
 // Sur un profil neuf (mémoire du navigateur), sans réseau. Le script fabrique ses GPX (`lib/traces.mjs`, wingfoil). Il :
 //  1. importe une sortie, garde son GPX et sa fiche, les retire du dossier pendant que la page est ouverte : la liste ne
@@ -7,9 +7,9 @@
 //     sessions/ : « Mettre à jour » fait apparaître les deux, range la fiche avec son GPX, garde son nom et son activité,
 //     et crée la fiche du second ;
 //  3. relit une fois de plus : « rien de nouveau » ; enfin, le bouton est là dans Réglages › Mémoire, carte repliée comprise ;
-//  3 bis. fiche changée en OPFS sous l'application ouverte (lot 148) : le nom saisi dans l'analyse et les notes de l'autre
+//  3 bis. fiche changée en OPFS sous l'application ouverte : le nom saisi dans l'analyse et les notes de l'autre
 //     appareil sont gardés tous les deux, le résumé aussi, sans message ;
-//  4. marqueur d'une version plus récente (lot 148) : à l'ouverture et à « Mettre à jour », aucun fichier ne change (noms,
+//  4. marqueur d'une version plus récente : à l'ouverture et à « Mettre à jour », aucun fichier ne change (noms,
 //     tailles, dates), un GPX à la racine et un GPX sans fiche restent tels quels, l'import est grisé et la carte de la
 //     mémoire le dit.
 import { writeFileSync } from 'node:fs';

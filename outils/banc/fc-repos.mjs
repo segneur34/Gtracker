@@ -1,4 +1,4 @@
-// Banc de test : tests de FC repos recopiés dans le dossier mémoire, `fc-repos.json` (lot 173).
+// Banc de test : tests de FC repos recopiés dans le dossier mémoire, `fc-repos.json`.
 // Usage : node fc-repos.mjs <port> [<dossier des captures>]
 // Sur un profil neuf (mémoire du navigateur, OPFS), sans réseau. Pas de ceinture : la page joue la FC d'exemple à ×30
 // (`?vitesse=30`, 9 s pour le test entier). Le script vérifie :

@@ -1,4 +1,4 @@
-// Banc de test : bouton « Note » de l'enregistrement et repères dans l'analyse (lot 3 des demandes du 10-14/10).
+// Banc de test : bouton « Note » de l'enregistrement et repères dans l'analyse.
 // Usage : node notes.mjs <port> <dossier de travail> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Dure environ 2 min, 20 s avec `TEMPS=10` (horloge de la page accélérée). Pour chaque
 // famille (Voile, Surf), le script :
@@ -58,7 +58,7 @@ const flags = () => evaluate(`[...document.querySelectorAll('.an-map-panel .leaf
 const marksList = () => evaluate(`(() => { const l = document.querySelector('.an-marks'); return l ? [...l.querySelectorAll('input')].map((i) => i.closest('div').innerText.replace(/\\n+/g, ' ') + ' [' + (i.value || i.placeholder) + ']').join(' | ') : '(pas de liste)'; })()`);
 const refLines = () => evaluate(`document.querySelectorAll('.recharts-reference-line').length`);
 /**
- * Bulle d'un fanion (lot 189, cartes sans react-leaflet) : clic sur le fanion `n` de la carte, arrêté à la carte pour
+ * Bulle d'un fanion : clic sur le fanion `n` de la carte, arrêté à la carte pour
  * que son cadre ne l'agrandisse pas (téléphone) ; texte de la bulle, heure masquée (elle suit l'heure du passage).
  */
 const flagPopup = async (n) => {
@@ -138,7 +138,7 @@ for (const [family, speedMs, graphTab] of [['Avec vent', 8, 'graphiques'], ['San
   console.log('Arrêter :', await holdStop());
   await vwait(2500);
   const ouverte = await attendreAnalyse(evaluate);
-  console.log('analyse ouverte seule (lot 313) :', ouverte);
+  console.log('analyse ouverte seule :', ouverte);
   check(`${family} : à l'arrêt, l'analyse s'ouvre seule`, ouverte === 'ok', ouverte);
   // L'analyse se calcule en vrai temps : l'adresse de l'analyse, puis une page immobile.
   await waitFor(`location.pathname.endsWith('/analyse')`, { timeout: 6000, label: 'analyse' });

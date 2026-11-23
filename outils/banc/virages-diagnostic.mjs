@@ -1,4 +1,4 @@
-// Diagnostic des virages d'une session de surf (lot 40) : la trace est relue
+// Diagnostic des virages d'une session de surf : la trace est relue
 // par la chaîne de l'application (lecture du GPX, cinématique du calcul, seuil
 // de la session), les vagues sont celles de l'onglet « vagues »
 // (`runSurfSession`), et chacune reçoit ses virages du GPS (`gpsTurns.ts`) et

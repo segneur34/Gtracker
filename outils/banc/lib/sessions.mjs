@@ -1,4 +1,4 @@
-// Banc de test : la page « Sessions » (lot 346), une seule liste pour la voile et le surf à `/sessions`.
+// Banc de test : la page « Sessions », une seule liste pour la voile et le surf à `/sessions`.
 // Ces aides prennent l'`evaluate` d'une connexion (`connect`, lib/cdp.mjs) et rendent 'ok' ou ce qui a manqué, sans
 // lever : le `check` ou le `console.log` du script le dit.
 //

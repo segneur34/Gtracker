@@ -2,7 +2,7 @@
 // Usage : node carte-reveil.mjs <port> <dossier de travail, chemin Windows>
 // Sur un profil neuf, sans réseau ; tuiles fausses (`lib/tuiles.mjs`), dont `setMode` simule la panne et le 404. Environ
 // 3 min en temps réel : les reprises attendent 3, 12 et 30 s de vrai temps de page (le script n'est pas `accelerable`).
-// Le script (remis sur la voile au lot 330) importe une session de wingfoil, ouvre son analyse, puis, à chaque passage, déplace la carte vers des cases jamais vues
+// Le script importe une session de wingfoil, ouvre son analyse, puis, à chaque passage, déplace la carte vers des cases jamais vues
 // (`panBy`, sans animation) pendant que les tuiles sont coupées : elles restent vides, Leaflet les croit chargées.
 //  1. Veille, réseau rendu pendant : page cachée, signaux `online` et `moveend` (rien ne part), page gelée (cachée et
 //     JavaScript suspendu par le débogueur, comme un écran éteint, voir `carte-direct.mjs`), réseau rendu, page rendue,

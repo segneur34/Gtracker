@@ -1,4 +1,4 @@
-// Banc de test : GPS perdu pendant un enregistrement (lot 115, décisions du 01/11).
+// Banc de test : GPS perdu pendant un enregistrement.
 // Usage : node gps-perdu.mjs <port> <dossier de travail, chemin Windows>
 // Sur un profil neuf, sans réseau. Dure environ 2 min 30, à temps réel (rejeu ×1, minuteur de 60 s).
 // Le script écrit une trace de voile datée de maintenant : 20 s de positions, un trou de 90 s, puis 30 s. Il vérifie :
@@ -110,7 +110,7 @@ await wait(Math.max(0, startedAt + 135_000 - Date.now()));
 check('toujours un seul son', lostTones.length === 1, `${lostTones.length} son(s)`);
 
 console.log('Arrêter :', await holdStop());
-// Lot 313 : l'analyse s'ouvre seule, la session se jette depuis son menu « … ».
+// L'analyse s'ouvre seule, la session se jette depuis son menu « … ».
 { const fin = await analyseOuvertePuisJetee(evaluate); check('arrêt tenu : analyse ouverte seule, puis session jetée', fin === 'ok', fin); }
 await wait(500);
 

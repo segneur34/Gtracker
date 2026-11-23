@@ -51,7 +51,7 @@ for (let s = SETTLE_S; s + WINDOW_S <= 180; s++) {
 }
 const expectedLowest = Math.round(best);
 
-/** Ouvre l'aide « ? » nommée (lot 3 du 24/10 : les explications sont sous un « ? »). */
+/** Ouvre l'aide « ? » nommée (les explications sont sous un « ? »). */
 const openHelp = async (label) => {
   const done = await evaluate(`(() => { const b = document.querySelector('button.ui-help[aria-label="Aide : ${label}"]'); if (!b) return false; if (b.getAttribute('aria-expanded') !== 'true') b.click(); return true; })()`);
   await wait(200);

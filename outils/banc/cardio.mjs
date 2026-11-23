@@ -1,16 +1,16 @@
-// Banc de test : onglet « cardio » et FC dans toutes les analyses (lot 7 des demandes du 10-13/10, étape analyse).
+// Banc de test : onglet « cardio » et FC dans toutes les analyses.
 // Usage : node cardio.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Dure environ 2 min. Le script :
 //  1. importe une wing en ligne droite avec une FC qui monte, une session de voile (`make-gpx.mjs`) et une session de
-//     surf, toutes avec la FC (`gpxtpx:hr`), et une wing sans FC (la course de ces étapes est retirée au lot 303) ;
+//     surf, toutes avec la FC (`gpxtpx:hr`), et une wing sans FC (la course n'existe plus) ;
 //  2. sans FC max ni âge : l'onglet « cardio » juste après celui des graphes, FC moyenne et max, pas de zones,
 //     « La retenir » qui range la FC max de la sortie ; la wing sans FC n'a pas l'onglet ;
 //  3. FC max et FC de repos saisies : le tableau des zones calées sur S1 et S2 (réserve cardiaque), « Voir » qui trace les passages
 //     d'une zone sur la carte, effacés à la fermeture de l'onglet ;
-//     un profil repris d'ailleurs, FC de repos écrite en texte (lot 150) : écartée, des zones plausibles ;
-//     énergie estimée par la FC (lot 96) : sans poids ni âge, l'invite ; avec poids, année de naissance et sexe, la
+//     un profil repris d'ailleurs, FC de repos écrite en texte : écartée, des zones plausibles ;
+//     énergie estimée par la FC : sans poids ni âge, l'invite ; avec poids, année de naissance et sexe, la
 //     tuile « Énergie estimée » (« env. … kcal », « dont env. … kcal au repos ») et son « ? » en voile et en surf ;
-//     (dérive, nuage FC / vitesse et case « Zones », propres à la course, retirés au lot 303) ;
+//     (dérive, nuage FC / vitesse et case « Zones », propres à la course, qui n'existe plus) ;
 //  4. la courbe de FC dans l'onglet des graphes des trois modules ;
 //  5. Réglages : « Seuils cardio » (S1 et S2, zones, Personnaliser, Revenir au calcul), la ligne « Seuils cardio »
 //     de la carte d'une activité (−8 en voile), la case « Ceinture cardio » en voile et en surf, les chiffres
@@ -165,7 +165,7 @@ for (const key of ['wing', 'surf', 'voile']) {
   const text = await panel('Cardio');
   check(`${key} : FC moyenne et max`, /FC moyenne \/ \d+ bpm/.test(text) && /FC max \/ \d+ bpm/.test(text));
   check(`${key} : pas de zones, et la raison`, text.includes('Pour les zones d\'effort'));
-  // Énergie estimée par la FC (lot 96) : profil vide, l'invite à la place de la tuile.
+  // Énergie estimée par la FC : profil vide, l'invite à la place de la tuile.
   check(`${key} : invite au poids et à l'année de naissance`,
     text.includes('renseignez votre poids et votre année de naissance') && !text.includes('Énergie estimée'), text.slice(0, 400));
   check(`${key} : courbe de FC`, (await chartsIn('Cardio')) >= 1);
@@ -210,7 +210,7 @@ console.log('  rouvre cardio :', await clickTab('cardio'));
 await settle({ max: 800 });
 check('wing : surbrillance pas ramenée', (await violetPaths()) === violetBefore);
 
-// --- 3 ter. Énergie estimée par la FC (lot 96) : poids, année de naissance et sexe saisis ---
+// --- 3 ter. Énergie estimée par la FC : poids, année de naissance et sexe saisis ---
 const beforeEnergy = await runner();
 await setRunner({ ...beforeEnergy, weightKg: 75, birthYear: 1986, sex: 'm' });
 const ENERGY_TILE = /Énergie estimée\s*\/ env\. \d+ kcal dont env\. \d+ kcal au repos/;
@@ -224,7 +224,7 @@ for (const key of ['voile', 'surf']) {
   console.log(`  ${key}, énergie :`, tile);
   check(`${key} : tuile « Énergie estimée » (${tile})`, ENERGY_TILE.test(text) && !text.includes('renseignez votre poids'), text.slice(0, 400));
   if (key === 'voile') {
-    // 1 h 02 de FC autour de 120 bpm, homme de 75 kg, 40 ans : env. 650 kcal (diagnostic du lot 96).
+    // 1 h 02 de FC autour de 120 bpm, homme de 75 kg, 40 ans : env. 650 kcal.
     const value = Number(tile.match(/env\. (\d+) kcal/)?.[1]);
     check(`voile : ordre de grandeur de Keytel (${value} kcal, 600 à 700 attendus)`, value >= 600 && value <= 700);
     console.log('  ? énergie :', await evaluate(`(() => { const b = document.querySelector(${JSON.stringify(ENERGY_HELP)}); if (!b) return 'absent'; b.click(); return 'ok'; })()`));
@@ -254,7 +254,7 @@ await settle({ max: 1500 });
 check('voile : « Fréquence cardiaque » dans graphiques', (await panel('Graphiques')).toLowerCase().includes('fréquence cardiaque'));
 await shoot('cardio-voile');
 
-// --- Profil repris d'un autre appareil, FC de repos écrite en texte : écartée, jamais concaténée (lot 150) ---
+// --- Profil repris d'un autre appareil, FC de repos écrite en texte : écartée, jamais concaténée ---
 const cleanRunner = await runner();
 await setRunner({ ...cleanRunner, hrRest: '50' });
 await go(paths.wing, 6000);
@@ -281,7 +281,7 @@ const openSettings = async () => {
   await go('/parametres', 3000);
 };
 await openSettings();
-// La méthode de calcul est dans l'aide des zones, sous son « ? » (lot 3 des demandes du 19/10).
+// La méthode de calcul est dans l'aide des zones, sous son « ? ».
 await evaluate(`[...document.querySelectorAll('button.ui-help[aria-label="Aide : Seuils cardio"]')].find((b) => !b.closest('.settings-activity'))?.click()`);
 await wait(200);
 const zonesRow = () => evaluate(`(() => {

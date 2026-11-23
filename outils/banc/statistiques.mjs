@@ -1,4 +1,4 @@
-// Banc de test : la page des statistiques (lot 5 des demandes du 10-13/10, remise sur la voile et le surf, lot 330).
+// Banc de test : la page des statistiques (voile et surf).
 // Usage : node statistiques.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Le script fabrique neuf sessions (`lib/traces.mjs`) : cinq de wingfoil, deux de kite
 // (sans activité créée pour lui) et deux de surf, datées en jours avant aujourd'hui, les importe par la page Sessions, puis
@@ -346,7 +346,7 @@ const symbols = await evaluate(`[...document.querySelectorAll('.recharts-scatter
 check('graphe : un rond, un triangle', symbols === 'rond,triangle', symbols);
 await click('.stats-chips[aria-label="Donnée"] .ui-tab', 'Durée');
 await wait(400);
-// Lot 16 (fiche 24) : en « Durée », la ligne pleine des heures par semaine s'ajoute au pointillé, avec sa légende seule.
+// En « Durée », la ligne pleine des heures par semaine s'ajoute au pointillé, avec sa légende seule.
 const legendDuree = await evaluate(`[...document.querySelectorAll('.stats-legend__item')].map((i) => i.textContent.trim()).join(' · ')`);
 check('légende en Durée : heures par semaine seule', legendDuree === 'heures par semaine', legendDuree);
 const lignesDuree = await evaluate(`document.querySelectorAll('.recharts-line-curve').length`);

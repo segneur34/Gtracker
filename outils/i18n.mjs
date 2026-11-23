@@ -8,7 +8,7 @@
 // littéral. Une entrée de dictionnaire avec contexte s'écrit « texte||contexte » (`MARQUE_CONTEXTE`).
 //
 // Contrôles des dictionnaires (`src/locales/en.json`, `es.json`) : traduction orpheline (clé absente du code), variable
-// `{nom}` ou balise `<b>` absente ou en trop, mot refusé par la garde du nom (`src/heritage.test.ts`). Les clés sans
+// `{nom}` ou balise `<b>` absente ou en trop, mot refusé (voir `MOT_INTERDIT`). Les clés sans
 // traduction sont listées et comptées ; elles ne font échouer que quand le chantier est déclaré clos (`TRADUCTION_CLOSE`).
 //
 // Lecteur de jetons maison (TypeScript 7 n'expose pas d'analyseur en JavaScript) : chaînes des trois formes, gabarits
@@ -41,7 +41,7 @@ const ACCORDEES = new Set(['tn', 'tnRich'])
 /** Fichiers qui définissent ces fonctions : leurs appels internes portent une clé variable. */
 const DEFINITIONS = ['src/core/i18n.ts', 'src/components/tRich.ts']
 
-/** Mot refusé par `src/heritage.test.ts`, écrit en morceaux : cette garde lit aussi `outils/`. */
+/** Mots refusés dans les textes (l'ancien nom du produit et une tournure de l'ancienne application), écrits en morceaux pour que ce fichier ne les porte pas lui-même. */
 export const MOT_INTERDIT = new RegExp('(?<![gG])' + 'track' + 'er|application compl' + 'ète', 'i')
 
 // ---------- lecteur de jetons ----------

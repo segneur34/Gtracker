@@ -1,5 +1,5 @@
 // Banc de test : barre d'onglets repliable des analyses, régularité depuis la plus vieille session, et dernier
-// affichage des statistiques retenu (lot 1 des demandes du 16/10).
+// affichage des statistiques retenu.
 // Usage : node barre.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau, environ 1 min. Le script :
 //  1. importe une session de surf (10 jours avant aujourd'hui) et une de wingfoil (`lib/traces.mjs`, 20 jours avant) ;

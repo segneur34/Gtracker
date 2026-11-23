@@ -1,4 +1,4 @@
-// Banc du renommage d'une session (lot II) : nom saisi depuis le « … » d'une ligne de la page Sessions, écrit dans la
+// Banc du renommage d'une session : nom saisi depuis le « … » d'une ligne de la page Sessions, écrit dans la
 // fiche, relu après rechargement, affiché en tête de l'analyse, effacé par un nom vide, puis donné depuis l'en-tête de
 // l'analyse et relu dans la liste. Sans nom donné, ligne et en-tête portent le nom calculé (l'activité seule : le
 // service de lieux est bloqué au banc, `lieu.mjs` le simule). Profil Chrome neuf.

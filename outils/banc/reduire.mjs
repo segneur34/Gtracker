@@ -1,4 +1,4 @@
-// Banc de test : « Tout réduire » et nom ou pseudo de Réglages (demandes du 19/10 au soir).
+// Banc de test : « Tout réduire » et nom ou pseudo de Réglages.
 // Usage : node reduire.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Dure environ 20 s. Le script :
 //  1. ouvre tous les blocs, familles, activités et parties, un choix d'icône et une aide, puis appuie sur

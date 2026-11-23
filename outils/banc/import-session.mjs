@@ -1,4 +1,4 @@
-// Banc de la porte d'import (lot 330, brief 319 point 9) : les sessions de voile et de surf de l'ancienne application
+// Banc de la porte d'import : les sessions de voile et de surf de l'ancienne application
 // entrent par des fichiers, et seulement par eux.
 // Usage : node import-session.mjs <port> [<dossier des captures>]
 // Les octets viennent du jeu d'essai figé `src/test/legacyImport.fixture.ts` (ce que l'ancienne application écrit pour une

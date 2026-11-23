@@ -1,4 +1,4 @@
-// Banc de test : un fichier de réglages par appareil (§10, point 90).
+// Banc de test : un fichier de réglages par appareil.
 // Usage : node reglages.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau, dans la mémoire du navigateur (« PC »). Le script vérifie :
 //  1. au premier lancement, l'appareil écrit reglages/pc.json ;
@@ -14,11 +14,11 @@
 //     revient pas au rechargement ;
 //  8. « Importer un fichier de réglages » : un JSON quelconque et le fichier de l'appareil refusés ; celui d'une
 //     tablette rangé sous son nom, « Annuler » dans la confirmation, puis repris depuis la liste ; pas de bandeau ensuite ;
-//  9. bornes de couleur du Wingfoil (lot 150) : 12-30, on efface 30, on retape 35 : 12-35 ; une borne vidée puis quittée
+//  9. bornes de couleur du Wingfoil : 12-30, on efface 30, on retape 35 : 12-35 ; une borne vidée puis quittée
 //     reprend son défaut et garde l'autre ; les deux vidées : plus de réglage, « défaut » ;
-// 10. le seuil suit la session (lot 148, Q57) : seuil du Wingfoil changé, la fiche de sa session recalculée ; seconde
+// 10. le seuil suit la session : seuil du Wingfoil changé, la fiche de sa session recalculée ; seconde
 //     ouverture, fiche intacte (lastModified) ; réglages d'un autre appareil (seuil différent, sans geste) : fiche intacte.
-// Les activités de Léa sont de voile et de surf (lot 330) ; la session du pas 10 est la trace de voile de `lib/traces.mjs`.
+// Les activités de Léa sont de voile et de surf ; la session du pas 10 est la trace de voile de `lib/traces.mjs`.
 import { CLES, connect, DOSSIER_MEMOIRE, FORMATS } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
 import { traceVoile } from './lib/traces.mjs';

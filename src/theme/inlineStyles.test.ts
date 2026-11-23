@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 /**
- * Cliquet des styles en ligne (élément 160, dette de l'audit) : le nombre de `style={{` par fichier `.tsx` de `src/`
+ * Cliquet des styles en ligne : le nombre de `style={{` par fichier `.tsx` de `src/`
  * ne remonte pas. Un style qui se répète ou qui ne dépend d'aucune valeur calculée va dans une classe
  * (`components/ui/ui.css` pour un utilitaire commun, la feuille de la page sinon) ; seuls restent en ligne ceux qui
  * portent une valeur calculée (couleur d'une activité, largeur en %, rotation d'un chevron).
  *
  * Le relevé est `outils/styles-en-ligne.json`, écrit par `node outils/styles-en-ligne.mjs --figer`. Une baisse ne fait
- * rien échouer ; la figer garde le gain. Une hausse voulue se fige de la même façon, en le disant au lot.
+ * rien échouer ; la figer garde le gain. Une hausse voulue se fige de la même façon, en le disant dans le message du commit.
  */
 
 interface Fs {

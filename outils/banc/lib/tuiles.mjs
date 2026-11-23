@@ -1,4 +1,4 @@
-// Banc de test : fausses tuiles de carte (lot 74). Les requêtes de tuiles d'OpenStreetMap (avec ou sans
+// Banc de test : fausses tuiles de carte. Les requêtes de tuiles d'OpenStreetMap (avec ou sans
 // sous-domaine) et d'Esri sont interceptées (`Fetch`) et servies par une image synthétique de 256 × 256, après
 // un délai réglable, sans jamais toucher au réseau ; chaque requête et chaque annulation sont notées.
 // Usage : `const tuiles = await fakeTiles(b, { delayMs })` après `connect`, puis `b.blockNetwork(BLOCKED_EXCEPT_TILES)`

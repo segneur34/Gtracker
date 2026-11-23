@@ -1,9 +1,9 @@
-// Banc de test : vignettes de la page Sessions et tuiles gardées (lot 74).
+// Banc de test : vignettes de la page Sessions et tuiles gardées.
 // Usage : node vignettes.mjs <port> <dossier de travail, chemin Windows> [<dossier des captures>]
 // Sur un profil neuf ; tuiles fausses (`lib/tuiles.mjs` : damier beige et bleu pâle servi en 50 ms, sans réseau), le
 // reste bloqué. Le script :
 //  1. écrit 60 sessions de voile synthétiques de 20 min à 1 Hz (boucles de tailles et de lieux différents, wingfoil et
-//     kite ; 150 avant le lot 330, ramenées à 60 pour tenir en quelques minutes) et les importe ;
+//     kite ; 60 seulement, pour tenir en quelques minutes) et les importe ;
 //  2. ouvre la page Sessions à pied, la fait défiler jusqu'en bas puis attend que chaque vignette soit dessinée ;
 //     relève les cartes Leaflet vivantes (`.leaflet-container`), les compteurs du DOM (`Memory.getDOMCounters`), le
 //     tas JavaScript après un ramasse-miettes, les requêtes de tuiles (doubles, annulées) et leur répartition par
@@ -11,7 +11,7 @@
 //  3. relève le style calculé de la mention d'OpenStreetMap de la première vignette ;
 //  4. capture les six premières vignettes : plan, économe et thème sombre, à 1400 px puis à 390 px (densité 2) ;
 //  5. écrit 10 000 tuiles dans le cache du navigateur, sans index, et mesure la liste des tuiles gardées
-//     (`tileStore.list()`) au premier chargement (index à refaire depuis le lot 74), puis au suivant (index rangé).
+//     (`tileStore.list()`) au premier chargement (index à refaire), puis au suivant (index rangé).
 // Les durées sont en secondes (le masque commun `N ms` les effacerait) et changent d'un passage à l'autre.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';

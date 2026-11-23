@@ -1,4 +1,4 @@
-// Banc de test : logos des activités (demande du 17/10, remis sur la voile et le surf au lot 330, onze logos au lot 349).
+// Banc de test : logos des activités (onze logos).
 // Usage : node icones.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Dure environ 1 min. Le script importe cinq sessions synthétiques (`lib/traces.mjs`) par
 // la page Sessions (deux de wingfoil, une de kite, une de surf, une sans type, à classer), puis vérifie :

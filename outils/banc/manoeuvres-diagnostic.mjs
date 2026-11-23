@@ -155,7 +155,7 @@ const timeline = buildWindTimeline(
 );
 const result = classifyManeuvers(detection, timeline, options);
 const counted = result.locations.length;
-// Sens incertain (virage vu en un seul pas, lot 44) : compté dans le total, hors du % de réussite.
+// Sens incertain (virage vu en un seul pas) : compté dans le total, hors du % de réussite.
 const undecided = result.undecided ?? 0;
 const directed = counted - undecided;
 const failed = result.tackFail + result.jibeFail;

@@ -1,4 +1,4 @@
-// Banc de test : aides de Réglages sous des « ? » (lot 3 des demandes du 19/10).
+// Banc de test : aides de Réglages sous des « ? ».
 // Usage : node reglages-aide.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Dure environ 40 s. Le script :
 //  1. ouvre tous les blocs, toutes les familles, activités et parties : plus aucun `title` sur une ligne de
@@ -152,7 +152,7 @@ const routeHelp = await evaluate(`(() => {
 })()`);
 await wait(300);
 const routesOpen = await evaluate(`document.body.innerText`);
-// Depuis le lot 3 du 24/10, les aides valent partout : le mode d'emploi des bips d'un parcours passe sous le « ? » du bloc.
+// Les aides valent partout : le mode d'emploi des bips d'un parcours passe sous le « ? » du bloc.
 check("Itinéraires : le mode d'emploi des bips sous le « ? » du bloc Balises sonores",
   !/tirez un point/i.test(routes) && routeHelp === true && /tirez un point/i.test(routesOpen), routeHelp);
 

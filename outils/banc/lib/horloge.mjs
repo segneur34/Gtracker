@@ -1,4 +1,4 @@
-// Banc de test : horloge accélérée de la page (n° 90).
+// Banc de test : horloge accélérée de la page.
 // `connect` (lib/cdp.mjs) l'injecte dans chaque document quand `TEMPS` > 1 : le temps de la page passe `TEMPS` fois
 // plus vite. Accélérés : `Date` (`new Date()` sans argument et `Date.now()` ; `new Date(x)` inchangé),
 // `performance.now()`, les délais de `setTimeout` et `setInterval` (divisés par `TEMPS`), l'horodatage passé à

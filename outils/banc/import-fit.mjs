@@ -1,4 +1,4 @@
-// Banc de test : import de fichiers FIT de montre (lot 35, partie A, remis sur la voile et le surf au lot 330). À verdict.
+// Banc de test : import de fichiers FIT de montre. À verdict.
 // Usage : node import-fit.mjs <port> <dossier de travail, chemin Windows> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Dure environ 40 s. Le script fabrique ses FIT (`src/test/fit.fixture.ts`, aucun vrai
 // fichier), les importe par les vrais champs de fichier de la page Sessions (`DOM.setFileInputFiles`), et vérifie :

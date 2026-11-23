@@ -1,4 +1,4 @@
-// Banc de test : bibliothèque commune du protocole DevTools (lot 76, n° 90).
+// Banc de test : bibliothèque commune du protocole DevTools.
 // Une seule mise en route pour tous les scripts : onglet, console, dialogues, attente d'une page prête au lieu d'un
 // sommeil fixe, import de GPX, lecture des fiches, captures, contrôles. Mode d'emploi : LISEZMOI, « Bibliothèque ».
 // Les diagnostics (durées des attentes, durée totale) vont sur stderr, jamais sur stdout : la sortie standard d'un
@@ -11,7 +11,7 @@ import { TEMPS, horlogeScript } from './horloge.mjs';
 export const BASE = process.env.BASE ?? 'http://localhost:5174';
 export { TEMPS };
 
-// Noms techniques de l'application, écrits ici une seule fois (lot 322). Un script .mjs ne peut pas importer
+// Noms techniques de l'application, écrits ici une seule fois. Un script .mjs ne peut pas importer
 // `src/core/appIdentity.ts` sans le crochet `charge-ts` : les valeurs en sont recopiées. Une clé changée côté application se
 // change ici, jamais dans un script : une clé fausse ne casse rien, le script injecte dans une clé que plus rien ne lit et
 // « passe » à tort.

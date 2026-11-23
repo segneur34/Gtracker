@@ -1,5 +1,4 @@
-// Banc de test : coût du survol des graphes et des clics « Voir » sur une longue trace (lot B de l'audit, §10, point 93 ;
-// remis sur la voile au lot 330).
+// Banc de test : coût du survol des graphes et des clics « Voir » sur une longue trace.
 // Usage : node survol.mjs <port> <dossier de travail, chemin Windows> [<dossier des captures>]
 // Sur un profil neuf. La recherche de lieux est bloquée, pour un résultat sans réseau et toujours le même ;
 // seules les tuiles OSM passent, pour les captures. Le script :

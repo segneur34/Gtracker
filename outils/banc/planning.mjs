@@ -1,4 +1,4 @@
-// Banc de test : planification d'un itinéraire de voile (page /itineraires ; remis sur la page réduite au lot 330).
+// Banc de test : planification d'un itinéraire de voile (page /itineraires).
 // Usage : node planning.mjs <port> <dossier de travail, chemin Windows> [<dossier des captures>]
 // Le bloc « Tracé et balises (n) » réunit la bande de chiffres, les actions et la liste des balises.
 // La page ne calcule plus rien : les balises se relient en ligne droite, plus de mode, de type de voie ni de revêtement.

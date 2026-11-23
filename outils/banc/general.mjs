@@ -1,7 +1,7 @@
-// Banc de test : onglet « général » complet et rangée « avancé » (demande du 22/10).
+// Banc de test : onglet « général » complet et rangée « avancé ».
 // Usage : node general.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau (tuiles bloquées). Dure environ 40 s (lib/cdp.mjs). Le script :
-//  1. importe une wing (bords et manœuvres, vent du nord) et une session de surf (course et vélo retirés au lot 303) ;
+//  1. importe une wing (bords et manœuvres, vent du nord) et une session de surf (ni course ni vélo) ;
 //  2. voile, à 1400×1000 : la première rangée « général · avancé », les chiffres du nouveau général (distance en vol,
 //     virements et empannages réussis, top 2 s et 100 m), la mini-boussole et « Régler » ; « avancé » déplie les
 //     onglets, « tops » ouvert, « avancé » refermé replie rangée et panneau, rouvert les rend ; la flèche qui cache
@@ -206,7 +206,7 @@ await clickButton(`document.querySelector('.an-map-panel .an-wind')`, 'Terminé'
 await wait(500);
 check('« Terminé » ferme la boussole', !(await evaluate(`Boolean(document.querySelector('.an-wind'))`)));
 
-// --- 4. Surf (course et vélo retirés au lot 303) ---
+// --- 4. Surf ---
 // Une session neuve s'ouvre sur « général », « avancé » fermé, quel que soit l'état laissé (23/10).
 await setAdvanced(true);
 await go(paths.surf, 6000);
@@ -218,7 +218,7 @@ for (const label of ['Durée de la session', 'Vagues', 'Sur la vague', 'Plus lon
 check('surf, général : sans rame, retour au pic ni distance totale', !/Vitesse de rame|Retour au pic|Distance totale/.test(general), general);
 check('session neuve : « général » ouvert, « avancé » fermé', !(await advancedOpen()) && general !== '(absent)');
 check('surf : première rangée « général · avancé »', (await row(0)) === 'général | avancé', await row(0));
-// La même session rouverte après une autre page s'ouvre aussi sur « général » seul, « avancé » fermé (lot 145, 05/11).
+// La même session rouverte après une autre page s'ouvre aussi sur « général » seul, « avancé » fermé.
 await setAdvanced(true);
 await go('/statistiques', 2000);
 await go(paths.surf, 6000);

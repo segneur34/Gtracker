@@ -1,4 +1,4 @@
-// Banc de test : bandeau d'un fichier reçu d'une autre application (lot 35, partie B). À verdict.
+// Banc de test : bandeau d'un fichier reçu d'une autre application. À verdict.
 // Usage : node fichier-recu.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau, serveur de développement (le script importe `/src/...` dans la page). Dure environ 30 s.
 // L'intention d'Android, le greffon et sa copie ne se prouvent qu'au téléphone : ici, une fausse file privée remplace le

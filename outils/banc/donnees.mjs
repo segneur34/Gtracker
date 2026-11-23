@@ -1,4 +1,4 @@
-// Banc de test : données sûres (lot A, §10, point 92, remis sur la voile au lot 330).
+// Banc de test : données sûres.
 // Usage : node donnees.mjs <port> <dossier de travail, chemin Windows> [<dossier des captures>]
 // Sur un profil neuf (mémoire du navigateur), avec le serveur de développement (le script importe `/src/...`).
 // Aucun réseau (les tuiles de la carte sont bloquées, les demandes à l'IGN, à Overpass et à BRouter relevées : aucune). Le script fabrique ses GPX (`lib/traces.mjs`, wingfoil). Il vérifie :
@@ -79,7 +79,7 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });
 console.log('— 1. cache allégé');
 await go('/sessions');
 await importFiles([firstPath], 'input[type=file][accept*=".gpx"][multiple]');
-// Le dossier n'existe qu'à la première écriture, après le calcul dans le worker (lot 161) : `listOpfs` ne rend pas de liste avant.
+// Le dossier n'existe qu'à la première écriture, après le calcul dans le worker : `listOpfs` ne rend pas de liste avant.
 await waitFor(async () => { const names = await listOpfs('sessions'); return Array.isArray(names) && names.some((n) => n.endsWith('.json')); }, { timeout: 10000, label: 'fiche' });
 await settle({ max: 3000, label: 'import' });
 const gpx = (await listOpfs('sessions')).find((n) => n.endsWith('.gpx'));

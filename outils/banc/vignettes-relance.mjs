@@ -1,12 +1,12 @@
-// Banc de test : vignettes de la page Sessions gardées d'un lancement à l'autre (lot 118 : traces ; lot 121 : images finies).
+// Banc de test : vignettes de la page Sessions gardées d'un lancement à l'autre (traces, puis images finies).
 // Usage : node vignettes-relance.mjs <port> <dossier de travail, chemin Windows>
 // Sur un profil neuf ; tuiles fausses (`lib/tuiles.mjs`, servies en 50 ms, sans réseau), le reste bloqué. Le script :
 //  1. écrit 30 sessions de voile synthétiques de 20 min à 1 Hz (boucles de tailles et de lieux différents, wingfoil et
-//     kite ; remis sur la voile au lot 330) et les importe ;
+//     kite) et les importe ;
 //  2. efface les vignettes gardées (caches `gtracker-vignettes` et `gtracker-vignettes-images`), puis ouvre la page Sessions
 //     à pied à 390 × 844, densité 2 (premier lancement : chaque vignette relit son GPX), attend les vignettes visibles,
 //     laisse 3 s à l'écriture du magasin et relève l'empreinte SHA-1 de chaque image visible (la référence), puis le
-//     nombre et le poids moyen des images finies gardées (cache `gtracker-vignettes-images` ; 0 avant le lot 121) ;
+//     nombre et le poids moyen des images finies gardées (cache `gtracker-vignettes-images`) ;
 //  3. relance la page trois fois, processeur ralenti six fois (`Emulation.setCPUThrottlingRate`), et mesure depuis la
 //     navigation : « trace », jusqu'à ce que chaque vignette visible porte une image (la trace seule, d'attente, compte) ;
 //     « fond », jusqu'à ce que chaque vignette visible ait montré son image finie (empreinte égale à la référence),
@@ -82,7 +82,7 @@ const HASHES = `(async () => {
   }
   return out;
 })()`;
-/** Images finies gardées sur l'appareil (lot 121) : nombre et poids total, sans créer le cache s'il manque. */
+/** Images finies gardées sur l'appareil : nombre et poids total, sans créer le cache s'il manque. */
 const KEPT_IMAGES = `(async () => {
   if (!(await caches.has('${CACHES.vignettesImages}'))) return { count: 0, bytes: 0 };
   const cache = await caches.open('${CACHES.vignettesImages}');

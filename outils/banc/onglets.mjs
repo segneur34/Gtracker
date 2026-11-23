@@ -1,10 +1,9 @@
-// Banc de test : onglets choisis par activité, et « tops » (lot 3 des demandes du 14/10, seconde série ; remis sur la voile
-// et le surf au lot 330).
+// Banc de test : onglets choisis par activité, et « tops » (voile et surf).
 // Usage : node onglets.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Dure environ 2 min. Le script :
 //  1. importe une session de wingfoil, une de kite et une de surf (`lib/traces.mjs`), ouvre tous les onglets de chaque
 //     analyse et, avec `DUMP=x`, relève leur texte dans `x-wingfoil.txt`, `x-kite.txt` et `x-surf.txt` ; avec
-//     `RELEVE_SEUL=1`, il s'arrête là (pour la version d'avant un lot) ;
+//     `RELEVE_SEUL=1`, il s'arrête là (pour la version d'avant un changement) ;
 //  2. dans Réglages, partie Onglet analyse : la ligne « Onglets » du Wingfoil, du Kite, du Surf et du Surf foil, ses
 //     défauts (« tops » montré en voile, pas en surf ; « vols » et « pumping » sur foil seulement) ;
 //  3. « tops » et « vagues » changés en surf, « tops » caché en kite, « vmg » caché en wingfoil, rangés par activité ;
@@ -163,7 +162,7 @@ await go(paths.surf, 6000);
 const surfTabs = await tabLabels();
 console.log('\nsurf, onglets :', surfTabs);
 check('surf : « tops » entre « rame » et « graphiques », sans « vagues »', /rame \| tops \| graphiques/.test(surfTabs) && !/vagues/.test(surfTabs), surfTabs);
-// Ouvert au relevé du point 1 : l'application ne le retient plus (05/11), le banc le rejoue (`lib/onglets.mjs`).
+// Ouvert au relevé de l'étape 1 : l'application ne le retient plus, le banc le rejoue (`lib/onglets.mjs`).
 const memorized = await evaluate(`JSON.parse(localStorage.getItem('banc.onglets') ?? '{}').surf?.vagues`);
 check(`« vagues » laissé ouvert (${memorized}), son panneau absent`, memorized === true && (await panel('Vagues')) === '(absent)');
 console.log('tops :', await clickTab('tops'));

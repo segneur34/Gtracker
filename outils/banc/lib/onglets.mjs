@@ -1,12 +1,12 @@
-// Banc de test : onglets des analyses ouverts d'office (lot 145, 05/11). Depuis le 05/11, l'application ne retient
+// Banc de test : onglets des analyses ouverts d'office. L'application ne retient
 // plus les onglets ouverts : toute ouverture d'une analyse rend « général » seul, « avancé » fermé. Les scripts, qui
 // posaient les onglets voulus dans `gtracker.sections` (clés `sailing-onglets`, `running`, `cycling`, `intervals`,
 // `muscu`, `surf`) et la rangée « avancé » ouverte, continuent de les y poser : ce script, injecté à chaque page
 // (`Page.addScriptToEvaluateOnNewDocument`), les relit avant l'application (qui les efface au démarrage), les garde
 // sous `banc.onglets` et, à chaque nouvelle analyse montée (`.an-page`), clique une fois sur chaque onglet voulu
 // (`[data-tab=clé]`), dès qu'il paraît. Il retient aussi les onglets que le script ouvre ou ferme d'un clic, comme
-// l'application le faisait : le relevé d'une page rechargée reste celui d'avant le lot.
-// « avancé » : rouvert à chaque fois qu'il se referme, puis « général » rouvert (22/10), comme avant ; `general.mjs`
+// l'application le faisait autrefois : le relevé d'une page rechargée reste celui d'avant ce changement.
+// « avancé » : rouvert à chaque fois qu'il se referme, puis « général » rouvert, comme avant ; `general.mjs`
 // éprouve la rangée fermée sans ce script.
 // Usage : `await send('Page.addScriptToEvaluateOnNewDocument', { source: ONGLETS });` ; `ongletsSource({ memoire: false })`
 // pour ne rien rejouer ni retenir (seule la rangée « avancé » est ouverte d'office : `onglets.mjs`, réouverture).
@@ -15,7 +15,7 @@ import { CLES } from './cdp.mjs';
 /** Analyse → clés de `gtracker.sections` où ses onglets étaient retenus. */
 const MODULES = {
   '/voile/analyse': ['sailing-onglets'],
-  // Course, vélo et Entraînement sans analyse depuis les lots 302, 303 et 305.
+  // Seules la voile et le surf ont une analyse.
   '/surf/analyse': ['surf'],
 };
 

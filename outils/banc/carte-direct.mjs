@@ -1,8 +1,8 @@
-// Banc de test : la carte du direct pendant un enregistrement de voile (lot 104, carte figée en pause manuelle ; à pied jusqu'au lot 303).
+// Banc de test : la carte du direct pendant un enregistrement de voile (carte figée en pause manuelle).
 // Usage : node carte-direct.mjs <port> <dossier de travail, chemin Windows>
 // Sur un profil neuf, sans réseau, environ 8 min en temps réel, 1 min avec `TEMPS=10` (horloge de la page accélérée).
 // Deux passages en rejeu ×1 d'une wing à 3 m/s vers l'est, 1 Hz, vitesse du capteur sur chaque point, chacun fini
-// par l'arrêt tenu, l'analyse ouverte seule, puis « Supprimer » dans son menu « … » (lot 313) :
+// par l'arrêt tenu, l'analyse ouverte seule, puis « Supprimer » dans son menu « … » :
 //  1. pause manuelle (« Pause » de la page) de 60 à 90 s pendant laquelle le rejeu avance (la planche continue, le
 //     GPS reste allumé), puis « Reprendre » : la flèche suit pendant la pause, sans trace dessinée ni distance qui
 //     monte, et après la reprise aucun trait entre le point de la pause et celui de la reprise, ni passager (relevés
@@ -12,7 +12,7 @@
 //     comme un écran éteint : au réveil, le rejeu rend d'un coup ce qui est échu ; `Page.setWebLifecycleState`
 //     ne convient pas, le Chrome sans fenêtre jette la page gelée et en recharge une autre), et une immobilité de
 //     150 à 225 s (pause automatique du pré-réglage de la Voile, 1,5 km/h sur 60 s ; second trou de 280 à 295 s).
-// La « Moyenne active » (lot 150, voile et surf) est relevée sans verdict.
+// La « Moyenne active » (voile et surf) est relevée sans verdict.
 // Toutes les 2 s de page, un relevé : « Points » de la partie GPS (les positions arrivent), distance de la carte « En
 // cours », déplacement de la carte (`.leaflet-map-pane`), place de la flèche dans la carte, longueur des tracés de la
 // trace (leur `d` : Leaflet réduit une ligne droite à ses deux bouts), « Recentrer », bandeau de pause automatique. Une phase dit « figée » sur trois relevés de suite où les points
@@ -224,7 +224,7 @@ const startReplay = async (track) => {
 const endReplay = async (pass) => {
   dumpSamples(pass);
   const stop = await holdStop();
-  // Lot 313 : l'analyse s'ouvre seule, la session se jette depuis son menu « … ».
+  // L'analyse s'ouvre seule, la session se jette depuis son menu « … ».
   const thrown = await analyseOuvertePuisJetee(evaluate);
   await settle({ max: 2000 });
   check(`${pass} : arrêt tenu, analyse ouverte, puis « Supprimer »`, stop === 'ok' && thrown === 'ok', `${stop} / ${thrown}`);

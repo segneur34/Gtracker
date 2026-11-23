@@ -1,16 +1,16 @@
-// Banc de test : coût de la trace colorée sur la carte d'une longue sortie (lot 73, « trace colorée en une seule couche »).
+// Banc de test : coût de la trace colorée sur la carte d'une longue sortie (la trace colorée tient en une seule couche).
 // Usage : node carte-perf.mjs <port> <dossier de travail, chemin Windows> [<dossier des captures>]
 // Sur un profil neuf, sans réseau ; tuiles fausses (`lib/tuiles.mjs`), servies en 400 ms : les zooms rapides
-// laissent des tuiles en route, dont on compte les requêtes, les doubles et les annulées (lot 74). Le script :
+// laissent des tuiles en route, dont on compte les requêtes, les doubles et les annulées. Le script :
 //  1. écrit une longue session de wingfoil de 1 h à 5 Hz (18 000 points, `traceLongue` de `lib/traces.mjs` : des bords qui se
-//     recoupent ; remis sur la voile au lot 330, 3 h d'avant ramenées à 1 h pour que le passage reste court) ;
+//     recoupent ; 1 h seulement pour que le passage reste court) ;
 //  2. l'importe, ouvre son analyse et relève, sur la carte de l'analyse : le nombre de couches de Leaflet
 //     (`map._layers`), les canevas du volet de la trace et l'histogramme des pixels de ce canevas (couleurs,
 //     parts) ;
 //  3. mesure 10 zooms puis 10 déplacements de la carte (sans animation) : durées du moteur (`Performance.getMetrics`,
 //     ScriptDuration et TaskDuration), durée de chaque geste jusqu'à l'image suivante, et requêtes de tuiles ;
-//  4. retourne à la bibliothèque et relève la vignette de la session (couches, histogramme ; image fixe depuis le
-//     lot 74, sans carte ni canevas).
+//  4. retourne à la bibliothèque et relève la vignette de la session (couches, histogramme ; image fixe,
+//     sans carte ni canevas).
 // Un compteur de tracés (`stroke` du canevas de la trace, posé avant le chargement de la page) relève « tracés au premier
 // dessin » et « tracés sur un geste » (moyenne des 10 zooms du plan) : ces deux nombres baissent quand la trace compte moins de couleurs.
 // Les durées sont en secondes (le masque commun `N ms` les effacerait) : le relevé change d'un passage à l'autre,
@@ -81,7 +81,7 @@ const listOpfs = (path) => evaluate(`(async () => {
 const MAP = (scope) => `(window.__cartes ?? []).filter((m) => m._container?.isConnected && m._container.closest(${JSON.stringify(scope)})).at(-1)`;
 const ANALYSE = '.an-map-frame';
 const VIGNETTE = '.lib-row__preview';
-/** Vignette dessinée : sa carte (avant le lot 74) ou son image fixe. */
+/** Vignette dessinée : sa carte (ancienne vignette) ou son image fixe. */
 const VIGNETTE_READY = `${VIGNETTE} .leaflet-trace-pane canvas, ${VIGNETTE} img.lib-row__preview-image`;
 
 /** Couches de la carte et canevas de son volet de trace. */

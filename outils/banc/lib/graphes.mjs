@@ -1,5 +1,5 @@
-// Banc de test : gestes sur les graphes zoomables d'une analyse (lot 2 des demandes du 23/10), sortis de
-// `zoom-carte.mjs` pour être partagés avec `fluidite.mjs` (lot 114). Sélecteurs d'un panneau et de son n-ième
+// Banc de test : gestes sur les graphes zoomables d'une analyse, sortis de
+// `zoom-carte.mjs` pour être partagés avec `fluidite.mjs`. Sélecteurs d'un panneau et de son n-ième
 // graphe, point visé dans la zone de tracé, double-clic à la souris, survol et double toucher daté comme par un doigt.
 // Usage : `const { plotPoint, mouse, doubleClick, hover, doubleTap, pinch } = graphGestures(b)` après `connect`.
 
@@ -56,7 +56,7 @@ export const graphGestures = ({ send, evaluate, settle, wait }) => {
   };
   /**
    * Pincement à deux doigts, datés comme un vrai geste : doigts à `from` (fractions de la largeur du tracé, à mi-hauteur)
-   * au départ, à `to` à la fin, en `steps` mouvements espacés de `stepMs`. Écarter zoome (lot 164). Sous ralenti, le geste
+   * au départ, à `to` à la fin, en `steps` mouvements espacés de `stepMs`. Écarter zoome. Sous ralenti, le geste
    * s'allonge : chaque mouvement attend que la page l'ait reçu, comme les événements qu'un téléphone regroupe.
    */
   const pinch = async (title, nth, { from = [0.4, 0.6], to = [0.1, 0.9], steps = 12, stepMs = 16 } = {}) => {

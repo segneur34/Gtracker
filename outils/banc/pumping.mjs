@@ -1,4 +1,4 @@
-// Banc de test : pumping foil en surf (§10, point 104 ; séries validées par leur cadence, lot 50).
+// Banc de test : pumping foil en surf (séries validées par leur cadence).
 // Usage : node pumping.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau, serveur de développement (le script importe `/src/...` dans la page).
 // Le script fabrique lui-même, dans la page, une session de surf foil de quatre vols et ses capteurs
@@ -55,7 +55,7 @@ const pumpPanels = `[${panelOf('Pumping')}, ${panelOf('Vols')}].filter(Boolean)`
 /** Tableaux des deux panneaux : séries d'abord, puis vols. */
 const pumpTables = `${pumpPanels}.flatMap((p) => [...p.querySelectorAll('table')])`;
 /**
- * Capteurs lus : depuis le lot 63, le surf ne lit le `.imu` qu'à l'ouverture de l'onglet (« vols » ou « pumping »).
+ * Capteurs lus : le surf ne lit le `.imu` qu'à l'ouverture de l'onglet (« vols » ou « pumping »).
  * Attend que « Lecture des capteurs » disparaisse et que la tuile « Cadence » paraisse (plafond 10 s).
  */
 const sensorsRead = () => waitFor(`(() => {
@@ -98,7 +98,7 @@ const recordAt = (startMs) => evaluate(`(async () => {
 const openActivities = async () => {
   if (!(await evaluate(`document.querySelector('.settings-activities') !== null`))) await clickText('Activités', '[role=button]');
   await wait(400);
-  // Familles repliées depuis le lot 2 des demandes du 15/10 : toutes ouvertes.
+  // Les familles de Réglages sont repliées d'office : on les ouvre toutes.
   await evaluate(`document.querySelectorAll('.settings-activities__family-toggle[aria-expanded="false"]').forEach((b) => b.click()); 'ok'`);
   await wait(300);
 };
@@ -133,7 +133,7 @@ const foilRows = await rows('Surf foil');
 check('case Pumping sur Surf foil', /Pumping/.test(foilRows ?? ''), foilRows);
 const surfRows = await rows('Surf');
 check('pas de case Pumping sur Surf (sans foil)', !/Pumping/.test(surfRows ?? ''), surfRows);
-// L'aide du seuil est sous son « ? » (lot 3 des demandes du 19/10) : ouverte, lue, refermée.
+// L'aide du seuil est sous son « ? » : ouverte, lue, refermée.
 console.log('aide du seuil de vol :', await evaluate(`(() => {
   const row = [...(${card('Surf foil')}?.querySelectorAll('.settings-row') ?? [])].find((r) => r.textContent.includes('Seuil de vol'));
   const help = row?.querySelector('.ui-help'); if (!help) return '(absente)';
@@ -192,7 +192,7 @@ const imported = await evaluate(`(async () => {
 })()`);
 console.log('import :', JSON.stringify(imported));
 const startMs = imported?.start;
-// Le dossier n'existe qu'à la première écriture, après le calcul dans le worker (lot 161) : l'erreur de lecture rendue avant n'est pas une fiche.
+// Le dossier n'existe qu'à la première écriture, après le calcul dans le worker : l'erreur de lecture rendue avant n'est pas une fiche.
 const record = await waitFor(async () => { const r = await recordAt(startMs); return r && typeof r === 'object' ? r : null; }, { timeout: 20000, label: 'fiche' });
 await settle({ max: 2000, label: 'import' });
 check('session rangée', record !== null, record ? `${record.gpx}, activité ${record.activityId}` : '');

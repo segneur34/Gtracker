@@ -44,7 +44,7 @@ const openCard = (name) => evaluate(`(() => {
     title?.click();
   }
   return new Promise((r) => setTimeout(() => {
-    // Familles repliées depuis le lot 2 des demandes du 15/10 : toutes ouvertes.
+    // Les familles de Réglages sont repliées d'office : on les ouvre toutes.
     document.querySelectorAll('.settings-activities__family-toggle[aria-expanded="false"]').forEach((b) => b.click());
     setTimeout(() => {
       const card = [...document.querySelectorAll('.settings-activity')].find((c) => c.querySelector('.settings-activity__name')?.textContent.trim() === ${JSON.stringify(name)});
@@ -168,7 +168,7 @@ console.log('import :', await evaluate(`(async () => {
   input.dispatchEvent(new Event('change', { bubbles: true }));
   return 'ok, ' + imu.length + ' octets';
 })()`));
-// Le dossier n'existe qu'à la première écriture, après le calcul dans le worker (lot 161) : pas de liste avant.
+// Le dossier n'existe qu'à la première écriture, après le calcul dans le worker : pas de liste avant.
 await waitFor(async () => { const f = await sessionFiles(); return Array.isArray(f) && f.some((n) => n.endsWith('.imu')) && f.some((n) => n.endsWith('.json')) && f.some((n) => n.endsWith('.gpx')); }, { timeout: 6000, label: 'fichiers rangés' });
 await settle({ max: 2000, label: 'import' });
 let files = await sessionFiles();
@@ -288,7 +288,7 @@ console.log('comparer :', await evaluate(`(() => {
 await wait(600);
 // Seule courbe de la page à ce moment : les onglets à graphes sont fermés.
 check('deux courbes comparées', await evaluate(`[...document.querySelectorAll('.recharts-line path')].map((p) => p.getAttribute('stroke')).join(',')`) === '#1565c0,#ef6c00');
-// Courbe zoomable et lue au-dessus (lot 2 des demandes du 24/10) : survol, puis double-clic.
+// Courbe zoomable et lue au-dessus : survol, puis double-clic.
 const curvePoint = await evaluate(`(async () => {
   const c = document.getElementById('sailing-jump-curve')?.closest('.an-carte-panels > *')?.querySelector('.zoom-chart');
   if (!c) return null;

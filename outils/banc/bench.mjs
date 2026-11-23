@@ -1,8 +1,8 @@
 // Banc de test : pilote un Chrome sans fenêtre par le protocole DevTools.
 // Usage : node bench.mjs <port> analyse <gpx>
-// Scénario : rejeu du GPX à ×600 → Arrêter → analyse ouverte seule (lot 313), puis relevé de la page d'analyse voile.
-// L'ancien scénario « fichier » (ouverture dans /voile) est retiré : depuis le lot 3a, /voile est la bibliothèque.
-// Verdicts (lot 159) : les chiffres de l'analyse sont confrontés à ce que la trace de `make-gpx.mjs` donne par construction
+// Scénario : rejeu du GPX à ×600 → Arrêter → analyse ouverte seule, puis relevé de la page d'analyse voile.
+// L'ancien scénario « fichier » (ouverture dans /voile) est retiré : /voile est la bibliothèque.
+// Verdicts : les chiffres de l'analyse sont confrontés à ce que la trace de `make-gpx.mjs` donne par construction
 // (points, durée, distance, top 2 s, manœuvres, vent du nord) ; fin par « Tout passe. » ou le nombre d'échecs, code 0 ou 1.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { CLES, connect } from './lib/cdp.mjs';
@@ -65,7 +65,7 @@ await waitFor(async () => (await records())?.length >= 1, { timeout: 6000, label
 await settle({ max: 2000 });
 const fiches = await records();
 console.log('fiche rangée : ' + fiches.length + ', points ' + fiches[0]?.summary?.pointCount);
-console.log('analyse ouverte seule (lot 313) :', await attendreAnalyse(evaluate));
+console.log('analyse ouverte seule :', await attendreAnalyse(evaluate));
 await settle({ max: 5000 });
 
 console.log('résultat :', await snapshot());
@@ -91,7 +91,7 @@ if (SHOT) {
   const shot = await send('Page.captureScreenshot', { format: 'png' });
   writeFileSync(SHOT, Buffer.from(shot.result.data, 'base64'));
 }
-// Bulle d'un rond de manœuvre (lot 189, cartes sans react-leaflet) : virements montrés sur la carte, clic sur le premier
+// Bulle d'un rond de manœuvre : virements montrés sur la carte, clic sur le premier
 // rond (tous ratés, bord rouge), relevé après le texte des verdicts pour ne pas le changer.
 console.log('virements sur la carte :', await evaluate(`(() => { const b = document.querySelector('button[title="Afficher les virements sur la carte"]'); if (!b) return 'absent'; b.click(); return 'ok'; })()`));
 await settle({ max: 1000 });

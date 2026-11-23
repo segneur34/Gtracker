@@ -1,4 +1,4 @@
-// Banc de test : relevé de toutes les pages à toutes les tailles de téléphone (lot 5 des demandes du 23/10).
+// Banc de test : relevé de toutes les pages à toutes les tailles de téléphone.
 // Usage : node tailles.mjs <port> <dossier de travail> [<dossier des captures>]
 // Sur un profil neuf, sans réseau (tuiles bloquées), environ 8 à 12 min. Le script ne corrige rien : il relève.
 //  1. importe une session de chaque famille (voile, surf) par la page ;

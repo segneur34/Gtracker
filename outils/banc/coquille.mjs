@@ -1,4 +1,4 @@
-// Banc de test : mise en page commune des analyses (`AnalysisShell`, lot 65), relevée pour sa neutralité.
+// Banc de test : mise en page commune des analyses (`AnalysisShell`), relevée pour sa neutralité.
 // Usage : node coquille.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau (tuiles bloquées). Dure environ 1 min (lib/cdp.mjs). Le script relève surtout, pour
 // comparer la sortie avant et après, et vérifie que chaque page se monte à chaque taille, sans déborder à droite.

@@ -1,4 +1,4 @@
-// Banc de test : virages du surf mesurés par le gyroscope (lot 40).
+// Banc de test : virages du surf mesurés par le gyroscope.
 // Usage : node virages.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau, serveur de développement (le script importe `/src/...` dans la page).
 // Le script fabrique lui-même, dans la page, une session de surf de trois vagues et ses capteurs (`.imu` synthétique,

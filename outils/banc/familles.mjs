@@ -1,8 +1,8 @@
-// Banc de test : familles repliables dans Réglages (lot 2 des demandes du 15/10).
+// Banc de test : familles repliables dans Réglages.
 // Usage : node familles.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Dure environ 30 s. Le script :
 //  1. avec `DUMP=x.txt`, ouvre toutes les familles, toutes les activités et toutes leurs parties, et relève le texte
-//     de la liste des activités ; avec `RELEVE_SEUL=1`, il s'arrête là (pour la version d'avant le lot) ;
+//     de la liste des activités ; avec `RELEVE_SEUL=1`, il s'arrête là (pour la version d'avant un changement) ;
 //  2. vérifie, sur un profil neuf : les deux en-têtes de famille (Voile et Surf), aucune carte d'activité ;
 //  3. « Voile » ouverte : ses activités, l'œil qui cache la famille sans la replier, puis la rend ;
 //  4. après rechargement : Voile toujours ouverte, les autres fermées ;

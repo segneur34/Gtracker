@@ -1,4 +1,4 @@
-// Banc du brouillon de voile entre deux sessions (lot 54, étape 9) :
+// Banc du brouillon de voile entre deux sessions :
 // le vent saisi dans A n'apparaît pas dans B, y compris juste après le changement de session, et revient en A
 // une fois « Enregistrer la session » cliqué. La fiche de A porte le vent, celle de B non.
 // Étape 6 : un nouveau brouillon de A survit au rechargement de la page (clé `gtracker.brouillons`), jusqu'à « Annuler ».
@@ -136,7 +136,7 @@ check('fiche A porte le vent', ficheA.includes(`${WIND}`), ficheA);
 check('fiche B sans vent', !/"windDeg":\s*\d/.test(ficheB), ficheB);
 
 // 6. Page rechargée avec un brouillon en cours : il est gardé sur l'appareil (clé `gtracker.brouillons`, écriture différée
-// d'une seconde) jusqu'à « Enregistrer la session » ou « Annuler ». Contre un état d'avant ce lot, le brouillon se perd au
+// d'une seconde) jusqu'à « Enregistrer la session » ou « Annuler ». Sur une version qui ne garde pas le brouillon, il se perd au
 // rechargement : les contrôles de cette étape échouent alors, sans faire échouer le script lui-même.
 console.log('--- 6. rechargement avec un brouillon ---');
 const WIND2 = (WIND + 37) % 360;

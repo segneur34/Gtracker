@@ -1,4 +1,4 @@
-// Banc de test : la page « Profil » (demandes du 18/10, du 19/10 et du 20/10), une période en un coup d'œil.
+// Banc de test : la page « Profil », une période en un coup d'œil.
 // Usage : node profil.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Le script fabrique six sessions de 20 min en ligne droite (`traceSurf`, une seule
 // phase), datées en jours avant aujourd'hui (deux de wingfoil, une de surf et une de kite cette année, une de wingfoil

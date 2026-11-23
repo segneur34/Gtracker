@@ -1,5 +1,4 @@
-// Banc de test : onglet du matériel et des notes dans les deux analyses (lot 2 des demandes du 14/10, seconde série ;
-// remis sur la voile et le surf au lot 330).
+// Banc de test : onglet du matériel et des notes dans les deux analyses (voile et surf).
 // Usage : node materiel.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Dure environ 1 min. Le script :
 //  1. ouvre dans Réglages les cartes Wingfoil et Surf, partie Matériel : la ligne « Matériel » (deux intitulés) n'est
@@ -10,7 +9,7 @@
 //  3. la même chose pour une session de surf : onglet « matériel et notes », champs sous les intitulés du Surf,
 //     conditions en texte libre ;
 //  4. à 390×844 : pas de débordement ;
-//  5. Statistiques, matériel croisé (lot 146) : une liste de matériel à trois groupes pour Wingfoil, trois sessions
+//  5. Statistiques, matériel croisé : une liste de matériel à trois groupes pour Wingfoil, trois sessions
 //     équipées par l'onglet « matos et conditions » ; une ligne par groupe porté (pas celle du groupe jamais porté),
 //     croisement en ET (Aile 5 m : 2 sessions, Aile 5 m et Foil 900 : 1), adresse `materiel=groupe:piece,…`, résumé de
 //     « Sélection », retour arrière d'un cran, ancienne adresse à une pièce relue dans son groupe ; sans liste (Surf),
@@ -159,7 +158,7 @@ for (const path of [voilePath, surfPath]) {
 }
 await shoot('materiel-telephone');
 
-// --- 5. Statistiques : matériel croisé (lot 146) ---
+// --- 5. Statistiques : matériel croisé ---
 await send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 1000, deviceScaleFactor: 1, mobile: false });
 await go('/', 3000);
 await evaluate(`(() => {

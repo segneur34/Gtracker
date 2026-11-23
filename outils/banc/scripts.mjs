@@ -38,16 +38,16 @@ export const SCRIPTS = [
   { nom: 'activite', args: ['{port}', '{travail}', '{captures?}'], pages: ['enregistrer', 'voile', 'surf', 'planification'], solo: true },
   { nom: 'aides', args: ['{port}', '{captures?}'], pages: ['voile', 'statistiques', 'profil', 'sessions'] },
   { nom: 'allure-session', args: ['{port}', '{gpx}', '{gpx2}'], pages: ['voile', 'enregistrer'] },
-  // À propos et licences de Réglages (lot 151) : `fetch` remplacé par une liste synthétique, puis le repli sans `licences.json`.
+  // À propos et licences de Réglages : `fetch` remplacé par une liste synthétique, puis le repli sans `licences.json`.
   { nom: 'apropos', args: ['{port}', '{captures?}'], pages: ['reglages'] },
   { nom: 'balises', args: ['{port}', '{travail}', '{captures?}'], pages: ['planification', 'enregistrer', 'reglages', 'voile'], solo: true },
   { nom: 'barre', args: ['{port}', '{captures?}'], pages: ['voile', 'statistiques'] },
   { nom: 'bench', args: ['{port}', 'analyse', '{gpx}'], pages: ['enregistrer', 'voile'] },
   { nom: 'brouillon-voile', args: ['{port}', '{travail}'], pages: ['voile'] },
   { nom: 'cacher', args: ['{port}', '{captures?}'], pages: ['reglages', 'sessions', 'enregistrer', 'surf'] },
-  // Mesure (lot 73) : couches de la carte, histogramme du canevas de la trace, durées des zooms et déplacements (en s, changent à chaque passage) ;
-  // requêtes de tuiles pendant les gestes, fausses tuiles servies en 400 ms (lot 74).
-  // Carte du direct en pause manuelle, trous de position et page cachée (lot 104) ; relevés détaillés sur la sortie d'erreur.
+  // Mesure : couches de la carte, histogramme du canevas de la trace, durées des zooms et déplacements (en s, changent à chaque passage) ;
+  // requêtes de tuiles pendant les gestes, fausses tuiles servies en 400 ms.
+  // Carte du direct en pause manuelle, trous de position et page cachée ; relevés détaillés sur la sortie d'erreur.
   { nom: 'carte-direct', args: ['{port}', '{travail}'], pages: ['enregistrer', 'voile'], solo: true, accelerable: true },
   { nom: 'carte-perf', args: ['{port}', '{travail}', '{captures?}'], pages: ['sessions'], sansCache: true, delaiMin: 15 },
   // Le fond de carte revient seul après une veille : tuiles coupées, cases en échec, page cachée puis gelée ; relevés détaillés sur la sortie d'erreur.
@@ -65,15 +65,15 @@ export const SCRIPTS = [
   { nom: 'fluidite', args: ['{port}', '{travail}', '{captures?}'], pages: ['voile', 'surf', 'sessions'], solo: true, sansCache: true, delaiMin: 20 },
   { nom: 'general', args: ['{port}', '{captures?}'], pages: ['voile', 'surf'] },
   { nom: 'glisser', args: ['{port}', '{captures?}'], pages: ['reglages'] },
-  // GPS perdu (lot 115) : rejeu ×1 avec un trou de 90 s ; alerte, son unique et notification, puis tout effacé au retour.
+  // GPS perdu : rejeu ×1 avec un trou de 90 s ; alerte, son unique et notification, puis tout effacé au retour.
   { nom: 'gps-perdu', args: ['{port}', '{travail}'], pages: ['enregistrer'], solo: true },
   { nom: 'graphes', args: ['{port}', '{captures?}'], pages: ['surf', 'voile'] },
   { nom: 'icones', args: ['{port}', '{captures?}'], pages: ['sessions', 'reglages'] },
-  // Fichiers FIT de montre (lot 35) : FIT fabriqués, chiffres et FC à l'écran, doublon, refus, question du dossier.
+  // Fichiers FIT de montre : FIT fabriqués, chiffres et FC à l'écran, doublon, refus, question du dossier.
   { nom: 'import-fit', args: ['{port}', '{travail}', '{captures?}'], pages: ['sessions', 'voile', 'surf'] },
-  // Fichier reçu d'une autre application (lot 35) : bandeau, sur une fausse file privée à la place du greffon ; l'intention d'Android ne se prouve qu'au téléphone.
+  // Fichier reçu d'une autre application : bandeau, sur une fausse file privée à la place du greffon ; l'intention d'Android ne se prouve qu'au téléphone.
   { nom: 'fichier-recu', args: ['{port}', '{captures?}'], pages: ['sessions'], dev: true },
-  // Porte d'import (lot 330) : les sessions de voile et de surf de l'ancienne application, par ses octets figés (`src/test/legacyImport.fixture.ts`) : paquets, GPX + fiche + capteurs, GPX seul, autre sport, fiche plus récente, dossier refusé.
+  // Porte d'import : les sessions de voile et de surf de l'ancienne application, par ses octets figés (`src/test/legacyImport.fixture.ts`) : paquets, GPX + fiche + capteurs, GPX seul, autre sport, fiche plus récente, dossier refusé.
   { nom: 'import-session', args: ['{port}', '{captures?}'], pages: ['sessions', 'voile', 'surf'] },
   // Bibliothèque (rejeu, notes, import, doublon, à classer, suppression, relance, fichier de réglages de l'appareil, paire GPX + fiche, réglages d'un autre appareil) ; ses traces sont fabriquées dans le dossier de travail. Rejeu ×600 : 9 s en temps réel.
   { nom: 'library', args: ['{port}', '{travail}', '{captures?}'], pages: ['sessions', 'reglages'], solo: true },
@@ -87,7 +87,7 @@ export const SCRIPTS = [
   { nom: 'onglets', args: ['{port}', '{captures?}'], pages: ['surf', 'voile', 'reglages'] },
   // Fond de l'image de partage : les tuiles d'OpenStreetMap.
   { nom: 'partage', args: ['{port}', '{travail}', '{captures?}'], pages: ['voile', 'enregistrer'], reseau: true },
-  // Planification réduite (lot 304) : balises en ligne droite, quatre GPX fabriqués dans le dossier de travail, rangement et réouverture.
+  // Planification réduite : balises en ligne droite, quatre GPX fabriqués dans le dossier de travail, rangement et réouverture.
   { nom: 'planning', args: ['{port}', '{travail}', '{captures?}'], pages: ['planification'] },
   { nom: 'planification-verrou', args: ['{port}', '{captures?}'], pages: ['planification'] },
   { nom: 'prereglages', args: ['{port}', '{captures?}'], pages: ['reglages', 'voile'] },
@@ -116,14 +116,14 @@ export const SCRIPTS = [
   { nom: 'fc-repos', args: ['{port}', '{captures?}'], pages: ['profil'], solo: true },
   { nom: 'test-fcrepos', args: ['{port}', '{captures?}'], pages: ['profil', 'reglages'], solo: true },
   // Carte du direct sur un itinéraire suivi : hors-piste sans saut, attributs SVG des tracés en plan et en satellite.
-  // Tutoriels (lot 147) : carte du jour de l'accueil, leçon, liste, bloc de Réglages ; jours changés par l'heure de la page.
+  // Tutoriels : carte du jour de l'accueil, leçon, liste, bloc de Réglages ; jours changés par l'heure de la page.
   { nom: 'tutoriels', args: ['{port}', '{captures?}'], pages: ['sessions', 'reglages'] },
-  // Mesure (lot 74) : 150 vignettes défilées (cartes vivantes, DOM, tas, tuiles), mention d'OSM, captures par thème et largeur, list() à 10 000 tuiles.
+  // Mesure : 60 vignettes défilées (cartes vivantes, DOM, tas, tuiles), mention d'OSM, captures par thème et largeur, list() à 10 000 tuiles.
   { nom: 'vignettes', args: ['{port}', '{travail}', '{captures?}'], pages: ['sessions'], sansCache: true, dev: true, delaiMin: 20 },
-  // Mesure (lot 118) : vignettes gardées d'un lancement à l'autre ; temps jusqu'aux vignettes visibles à la relance, processeur
+  // Mesure : vignettes gardées d'un lancement à l'autre ; temps jusqu'aux vignettes visibles à la relance, processeur
   // ralenti six fois (en s, change à chaque passage), et images identiques au premier lancement.
   { nom: 'vignettes-relance', args: ['{port}', '{travail}'], pages: ['sessions'], solo: true, sansCache: true },
-  // Virages du surf par le gyroscope (lot 40) : case de Réglages, colonne des vagues, vague hors capture.
+  // Virages du surf par le gyroscope : case de Réglages, colonne des vagues, vague hors capture.
   // Captures de l'onglet « manœuvres » et du tableau des tops de la voile, ordinateur et téléphone (à lire avant et après).
   { nom: 'manoeuvres-vues', args: ['{port}', '{captures}'], pages: ['voile'] },
   { nom: 'virages', args: ['{port}', '{captures?}'], pages: ['surf', 'reglages', 'enregistrer'], dev: true },

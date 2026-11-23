@@ -1,4 +1,4 @@
-// Banc de l'allure imposée propre à chaque session (lot D de l'audit, 24/09/2026). Deux sessions
+// Banc de l'allure imposée propre à chaque session. Deux sessions
 // enregistrées par rejeu ; l'allure imposée à la première passe par le brouillon, s'écrit dans sa
 // fiche, recalcule son résumé, et ne touche pas la seconde.
 // Profil Chrome neuf. Usage : node allure-session.mjs <port> <GPX 1> <GPX 2>, chemins Windows ;
@@ -31,8 +31,8 @@ const holdStop = async () => {
   return evaluate(`(() => { const b = window.__stopButton; b.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerType: 'mouse' })); b.click(); return 'ok'; })()`);
 };
 const clickText = (text) => evaluate(`(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim().startsWith(${JSON.stringify(text)})); if (!b) return 'absent'; b.click(); return 'ok'; })()`);
-// Saisie dans un champ contrôlé par React : setter natif, événement `input`, puis Entrée. Depuis le lot 157,
-// l'allure n'est écrite dans le brouillon qu'à Entrée ou en quittant le champ.
+// Saisie dans un champ contrôlé par React : setter natif, événement `input`, puis Entrée. L'allure
+// n'est écrite dans le brouillon qu'à Entrée ou en quittant le champ.
 const typeInto = (selector, value) => evaluate(`(() => { const el = ${selector}; if (!el) return 'absent'; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, ${JSON.stringify(value)}); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); return 'ok'; })()`);
 const ALLURE_LABEL = `[...document.querySelectorAll('label')].find((l) => l.textContent.includes('Allure de la session'))`;
 const ALLURE_INPUT = `${ALLURE_LABEL}?.querySelector('input')`;
@@ -62,7 +62,7 @@ const recordAndAnalyse = async (gpx) => {
   await clickText('Démarrer');
   await wait(8000);
   await holdStop();
-  console.log('analyse ouverte seule (lot 313) :', await attendreAnalyse(evaluate));
+  console.log('analyse ouverte seule :', await attendreAnalyse(evaluate));
   await waitFor("location.pathname.includes('/analyse')", { timeout: 6000, label: 'analyse ouverte' });
   await settle({ max: 6000, label: 'analyse' });
   const url = await evaluate('location.pathname + location.search');

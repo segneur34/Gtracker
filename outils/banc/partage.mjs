@@ -127,7 +127,7 @@ for (const s of SESSIONS) {
   // L'essentiel de « général » se retrouve dans l'image (distance, temps, moyenne).
   const shared = general.filter((g) => g.value !== '—' && c.some((x) => x.label === g.label));
   check(`${s.page} : chiffres communs avec « général »`, shared.length >= 3, shared.map((g) => g.label).join(' | '));
-  // Lignes ajoutées le 05/11 (lot 145) : sans appréciation donnée, pas de pastille « Appréciation » (« — » écarté).
+  // Sans appréciation donnée, pas de pastille « Appréciation » (« — » écarté).
   check(`${s.page} : pas d'« Appréciation » sans appréciation`, !c.some((x) => x.label === 'Appréciation'));
   check(`${s.page} : les six premières enfoncées`, c.filter((x) => x.on).length === Math.min(6, c.length) && c.slice(0, 6).every((x) => x.on));
   const size = await imageSize();

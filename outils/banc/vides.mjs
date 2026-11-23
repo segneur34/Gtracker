@@ -1,9 +1,9 @@
-// Banc de test : lot 1 des demandes du 20/10 (retouches et défauts).
+// Banc de test : retouches et défauts divers (vent inconnu, légende du surf, barres du haut et du bas, renommage).
 // Usage : node vides.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau (tuiles bloquées). Dure environ 1 min. Le script :
 //  1. importe une session de wingfoil en aller simple (vent impossible à estimer) et une session de surf ;
 //  2. voile : « manœuvres », « vmg » et « vent » ouverts disent « Vent inconnu », avec « Régler le vent », qui ouvre
-//     la boussole sur la carte (22/10 ; « Ouvrir l'onglet général » avant) ;
+//     la boussole sur la carte ;
 //  3. surf : la légende de la répartition ne redit pas le pourcentage « sur la vague » ; la rame garde le sien ;
 //  4. à 360×800 : « / » mène au Profil ; la page Sessions sans lien Profil ni Statistiques, avec « Planification » à côté de
 //     « Tris » (pastille pleine à l'encre, de la même hauteur ; plus rien en bas de la liste) ; barre du bas Profil · Sessions · rond · Statistiques · Réglages, sans débordement ;

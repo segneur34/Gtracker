@@ -1,4 +1,4 @@
-// Banc de la bibliothèque (lot 3a, remis sur la voile et le surf au lot 330) : mémoire du navigateur (OPFS),
+// Banc de la bibliothèque : mémoire du navigateur (OPFS),
 // enregistrement rangé, notes dans la fiche, import, doublon, à classer, suppression, relance, fichier de réglages de
 // l'appareil, puis (ancien `library2`) paire GPX + fiche réimportée et fichier de réglages d'un autre appareil.
 // Profil Chrome neuf : OPFS vide au départ.

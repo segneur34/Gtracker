@@ -1,13 +1,13 @@
-// Banc de test : graphes repliables un par un (demandes du 16/10), en surf et en voile ; la course (ordre des onglets,
-// replis vitesse-altitude-FC, mode superposé, zones de pente, sortie à sprints) est retirée au lot 303.
+// Banc de test : graphes repliables un par un, en surf et en voile ; la course (ordre des onglets,
+// replis vitesse-altitude-FC, mode superposé, zones de pente, sortie à sprints) n'existe plus.
 // Usage : node graphes.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Dure environ 1 min. Le script :
 //  1. importe une session de surf avec la FC et une session de voile (`make-gpx.mjs`) avec la FC ;
-//  2. voile (lot 60) : le graphe de vitesse zoomé par un double-clic, graduations relevées, capture `graphes-zoom`,
-//     puis « Tout voir » ; lot 93 : un clic sur une graduation ne ramène pas le repère de la carte au premier point ;
+//  2. voile : le graphe de vitesse zoomé par un double-clic, graduations relevées, capture `graphes-zoom`,
+//     puis « Tout voir » ; un clic sur une graduation ne ramène pas le repère de la carte au premier point ;
 //  5. surf : replis Vitesse et FC ; voile : replis des trois graphes, titre gardé, état retenu ;
-//     lot 61 : noms des graphes de la voile (texte sans tenir compte de la casse, couleur et taille relevées), nom du
-//     vent ; survol de la vitesse en voile et en surf, curseur sur la FC ; lot 167 : courbe de la VMG ;
+//     noms des graphes de la voile (texte sans tenir compte de la casse, couleur et taille relevées), nom du
+//     vent ; survol de la vitesse en voile et en surf, curseur sur la FC ; courbe de la VMG ;
 //  6. à 390×844 : la voile sans débordement.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -145,11 +145,11 @@ for (const s of SESSIONS) {
   check(`${s.key} rangée`, Boolean(rec));
 }
 
-// --- 2. Voile : zoom de la vitesse (lot 60) et repère de la carte (lot 93) ; 3 et 4 (course) retirés au lot 303 ---
+// --- 2. Voile : zoom de la vitesse et repère de la carte ; les étapes 3 et 4 (course) n'existent plus ---
 await go(paths.voile, 8000);
 await clickTab('graphiques');
 await settle({ max: 2000 });
-// Graphe de vitesse zoomé (lot 60) : graduations relevées, à comparer avant et après un changement des graphes.
+// Graphe de vitesse zoomé : graduations relevées, à comparer avant et après un changement des graphes.
 const ticksBefore = await ticks('Graphiques', 0);
 console.log(`  graduations avant le zoom : ${ticksBefore}`);
 console.log('  double-clic sur la vitesse :', await doubleClick('Graphiques', 0, 0.5));
@@ -161,7 +161,7 @@ console.log('  Tout voir :', await clickZoomButton('Graphiques', 0, 'Tout voir')
 await settle({ max: 800 });
 check(`« Tout voir » : graduations rendues (${await ticks('Graphiques', 0)})`, (await ticks('Graphiques', 0)) === ticksBefore);
 
-// Lot 93 : un clic sur un graphe lui donne le focus, et la couche clavier de Recharts (accessibilityLayer) active alors
+// Un clic sur un graphe lui donne le focus, et la couche clavier de Recharts (accessibilityLayer) active alors
 // le premier point (curseur et point actif posés dessus) ; si la souris est hors du tracé (graduations, marges), le
 // moindre mouvement ramène le repère de la carte au premier point affiché. Le repère doit rester où le survol l'a
 // laissé, et le graphe ne doit ni prendre le focus ni afficher de curseur à l'insu de la souris.
@@ -238,7 +238,7 @@ await fold('Graphiques', 'Historique de Vitesse');
 await settle({ max: 800 });
 check(`voile : rouvert (${await chartsIn('Graphiques')})`, (await chartsIn('Graphiques')) === voileCharts);
 
-// --- 5 bis. Lot 61 : noms de la voile, curseur commun, pics gardés ---
+// --- 5 bis. Noms de la voile, curseur commun, pics gardés ---
 /** Boutons de repli du panneau tels qu'affichés, en minuscules (les noms suivent la règle commune : capitales), avec leur couleur et leur taille. */
 const foldLooks = (title) => evaluate(`(() => { const s = ${SCOPE(title)}; return s ? [...s.querySelectorAll('[data-chart-fold]')].map((b) => { const c = getComputedStyle(b); return b.innerText.trim().toLowerCase() + ' (' + c.color + ', ' + c.fontSize + ')'; }).join(' ; ') : '(absent)'; })()`);
 /** Curseurs de survol dessinés dans le n-ième graphe du panneau. */
@@ -259,7 +259,7 @@ const windTitle = await evaluate(`(() => { const e = [...document.querySelectorA
 console.log(`  voile, nom du vent : ${windTitle}`);
 check('voile : nom du vent, casse non comptée', windTitle.startsWith('évolution du vent ('));
 await clickTab('vent', true);
-// Lot 167 : courbe de la VMG dans son onglet, sous le tableau et les podiums, tracée, avec zéro dans son axe.
+// Courbe de la VMG dans son onglet, sous le tableau et les podiums, tracée, avec zéro dans son axe.
 console.log('  vmg :', await clickTab('vmg'));
 await settle({ max: 1500 });
 const vmgDrawn = await evaluate(`(() => { const s = ${SCOPE('Analyse VMG')}; const d = s?.querySelector('.recharts-line-curve')?.getAttribute('d') ?? ''; return { lines: s ? s.querySelectorAll('.recharts-line').length : -1, drawn: d.length > 0 }; })()`);

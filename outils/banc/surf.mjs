@@ -1,4 +1,4 @@
-// Banc de test : le surf (§10, point 97).
+// Banc de test : le surf.
 // Usage : node surf.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Le script écrit lui-même deux sessions synthétiques et les importe par la page,
 // dans un `File`. Il vérifie :
@@ -11,12 +11,12 @@
 //     rechargement, puis « Défaut » et « Annuler » ;
 //  4. une session de surf foil (un vol de trois vagues reliées en pompant, puis un vol court) : case Foil de la
 //     session, onglet « vols », plus long vol, ligne de la bibliothèque ;
-//  5. la vitesse max (lot 150) : celle de la page et celle de la fiche, une vague ; une rame sans vague n'en a pas (« — », 0 dans la fiche) ;
+//  5. la vitesse max : celle de la page et celle de la fiche, une vague ; une rame sans vague n'en a pas (« — », 0 dans la fiche) ;
 //  5 ter. le départ des vagues (sans foil) : deux vagues à vraie mise en vitesse, l'une depuis 1 km/h, l'autre après une rame plate
 //     à 4 km/h ; durée et heure de début avec le départ, vitesse max et nombre de vagues inchangés, carte (vague montrée seule),
 //     courbe (bandes et série orange) et les deux phrases d'aide ;
 //  6. la page à 390 × 844, sans débordement.
-// Verdicts (lot 159) : les chiffres attendus par construction des phases (MORNING, FOIL) sont contrôlés (`check`), le
+// Verdicts : les chiffres attendus par construction des phases (MORNING, FOIL) sont contrôlés (`check`), le
 // script finit par « Tout passe. » ou le nombre d'échecs, code 0 ou 1. Les heures des vagues (fuseau du poste) ne le sont pas.
 import { connect } from './lib/cdp.mjs';
 import { ONGLETS } from './lib/onglets.mjs';
@@ -129,7 +129,7 @@ check('barre du haut : Profil, Sessions, Planification, Statistiques, Réglages'
 await go('/parametres');
 await clickText('Activités', '[role=button]');
 await wait(400);
-// Familles repliées depuis le lot 2 des demandes du 15/10 : toutes ouvertes.
+// Les familles de Réglages sont repliées d'office : on les ouvre toutes.
 await evaluate(`document.querySelectorAll('.settings-activities__family-toggle[aria-expanded="false"]').forEach((b) => b.click()); 'ok'`);
 await wait(300);
 console.log('Réglages, familles :', await evaluate(`[...document.querySelectorAll('.settings-activities__family')].map((f) => f.textContent).join(', ')`));

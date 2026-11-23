@@ -1,4 +1,4 @@
-// Banc de test : fin d'un enregistrement (lot 313). À l'arrêt, la session se range seule et son analyse s'ouvre ;
+// Banc de test : fin d'un enregistrement. À l'arrêt, la session se range seule et son analyse s'ouvre ;
 // « Supprimer » est la dernière entrée du menu « … » de l'analyse, tenue une seconde puis confirmée, et ramène à la
 // bibliothèque de la famille. Ces aides prennent l'`evaluate` d'une connexion (`connect`, lib/cdp.mjs) et rendent
 // 'ok' ou ce qui a manqué, sans lever : le `check` ou le `console.log` du script le dit.

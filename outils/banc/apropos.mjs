@@ -1,7 +1,7 @@
-// Banc de test : le bloc « À propos » de Réglages et la liste des licences (lot 151).
+// Banc de test : le bloc « À propos » de Réglages et la liste des licences.
 // Usage : node apropos.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau, environ 30 s. `fetch` est remplacé avant le chargement par une liste synthétique,
-// sauf au point 7. Il vérifie :
+// sauf à l'étape 7. Il vérifie :
 //  1. le bloc, dernier de la page, replié au départ : aucune liste demandée au chargement ni à son ouverture ;
 //  2. ouvert : logo GONG complet suivi de « Gtracker », centré, version, paragraphe, filet, ligne « Licences… » repliée ;
 //  3. dépliée : les deux listes demandées, la phrase, les deux groupes, trois composants puis « Voir les N autres »,

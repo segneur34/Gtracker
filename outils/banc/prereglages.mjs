@@ -1,4 +1,4 @@
-// Banc de test : pré-réglages du bateau, du Wingfoil et du surf (demandes du 21/10, remis sur la voile et le surf au lot 330).
+// Banc de test : pré-réglages du bateau, du Wingfoil et du surf.
 // Usage : node prereglages.mjs <port> [<dossier des captures>]
 // Sur un profil neuf, sans réseau. Dure environ 1 min. Vérifie :
 //  1. une liste d'activités avec une activité sur Bateau (« Voilier »), le Wingfoil et le Surf de départ, sans aucun réglage ;

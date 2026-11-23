@@ -1,4 +1,4 @@
-// Banc de test : les traces synthétiques, au même endroit. Voile et surf seulement (deux familles, §règle 13).
+// Banc de test : les traces synthétiques, au même endroit. Voile et surf seulement (deux familles, règle 13).
 // Chaque fonction rend le texte d'un GPX (`<gpx>…</gpx>`) que `importGpx` de lib/cdp.mjs ou un `writeFileSync` posent
 // tel quel ; ni aléa (le bruit vient d'un générateur à graine), ni dépendance : un même appel donne les mêmes octets.
 // Les motifs viennent de `make-gpx.mjs` (voile, vent du nord) et de `surf.mjs` (phases à vitesse et cap constants) ;

@@ -1,8 +1,8 @@
-// Suite de session-save.mjs (24/09/2026, reprise sur la page Sessions le 29/10, n° 84), mais
+// Suite de session-save.mjs, mais
 // autonome : le lanceur donne un profil Chrome neuf à chaque script. Il importe lui-même la session de voile de
 // `lib/traces.mjs` (wingfoil), y enregistre un seuil de 15 nœuds, puis change l'activité de la session dans l'onglet
 // réglages (Wingfoil vers Kite : recalcul complet) ; ensuite son seuil est enregistré à 4 et 12 nœuds, et le résumé de
-// la fiche doit suivre. Pour finir (lot 313), un brouillon ouvert, la session est jetée depuis le menu « … » de son
+// la fiche doit suivre. Pour finir, un brouillon ouvert, la session est jetée depuis le menu « … » de son
 // analyse (« Supprimer » tenu une seconde, confirmé) : retour à la page Sessions, session absente de la mémoire.
 // Usage : node session-save-resume.mjs <port>
 import { connect } from './lib/cdp.mjs';
@@ -110,7 +110,7 @@ for (const seuil of ['4', '12']) {
   check(`le résumé de la fiche suit le seuil de ${seuil} nds`, now.movingTimeS !== JSON.parse(before).movingTimeS, `${JSON.parse(before).movingTimeS} → ${now.movingTimeS}`);
 }
 
-step('« Supprimer » depuis l\'analyse, un brouillon ouvert (lot 313) : page Sessions, session absente');
+step('« Supprimer » depuis l\'analyse, un brouillon ouvert : page Sessions, session absente');
 // L'analyse est rouverte.
 // La page Sessions, puis l'analyse : l'entrée sous l'analyse est la page Sessions, comme sur le téléphone.
 await go('/sessions', 3000);

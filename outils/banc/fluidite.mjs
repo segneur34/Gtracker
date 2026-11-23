@@ -452,7 +452,7 @@ if (MESURES.includes('seuil')) {
   await throttle(1);
   await go(longUrl, 30000);
   await waitFor(`document.querySelectorAll('.an-sheet__stats .an-sheet__stat-value').length >= 3`, { timeout: 60000, label: 'analyse' });
-  // Tous les onglets qui dépendent du seuil (manœuvres, vent, VMG, tops, graphiques) : le pire cas, celui du point 197.
+  // Tous les onglets qui dépendent du seuil (manœuvres, vent, VMG, tops, graphiques) ouverts : le pire cas.
   console.log('onglets ouverts       :', await openTabs(['général', 'tops', 'manœuvres', 'graphiques', 'vent', 'vmg', 'réglages']));
   const INPUT = `document.querySelector('input[aria-label="Seuil d\\'activité"]')`;
   const seuilDepart = await evaluate(`${INPUT}?.value ?? '(champ absent)'`);

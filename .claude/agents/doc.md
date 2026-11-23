@@ -19,4 +19,6 @@ Ce que tu écris, en français, dans le style des fichiers existants :
 - `docs/INVENTAIRE.md` : une ligne par fichier qui apparaît ou change de rôle, à sa place dans la carte ;
 - `docs/DECISIONS.md` seulement si une décision de l'utilisateur propre à un domaine a changé, dans sa section ; `CLAUDE.md` seulement pour une règle transverse ; dans les deux cas, dis-le dans ta réponse.
 
+ETAT, INVENTAIRE et les autres documents remis à l'acheteur (liste `DOCUMENTS` de `outils/docs-cites.mjs`) partent sans le journal ni les décisions : n'y écris aucun renvoi d'atelier, ni « point N », ni « lot N », ni « élément N », ni « essai N », ni nom d'un document d'atelier (HISTORIQUE, DECISIONS, BACKLOG, MODELES, `CLAUDE.md`), ni « décision de l'utilisateur ». Chaque phrase y tient seule : la raison s'écrit en clair. Ces renvois ne s'écrivent que dans HISTORIQUE et DECISIONS, ou entre une ligne `<!-- atelier -->` et une ligne `<!-- /atelier -->`.
+
 Réponse : la liste des fichiers modifiés avec, pour chacun, la section touchée et une phrase sur ce qui a été écrit ; le texte du point d'HISTORIQUE en entier ; ce que tu n'as pas su documenter et pourquoi.
