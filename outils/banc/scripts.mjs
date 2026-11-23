@@ -124,6 +124,8 @@ export const SCRIPTS = [
   // ralenti six fois (en s, change à chaque passage), et images identiques au premier lancement.
   { nom: 'vignettes-relance', args: ['{port}', '{travail}'], pages: ['sessions'], solo: true, sansCache: true },
   // Virages du surf par le gyroscope (lot 40) : case de Réglages, colonne des vagues, vague hors capture.
+  // Captures de l'onglet « manœuvres » et du tableau des tops de la voile, ordinateur et téléphone (à lire avant et après).
+  { nom: 'manoeuvres-vues', args: ['{port}', '{captures}'], pages: ['voile'] },
   { nom: 'virages', args: ['{port}', '{captures?}'], pages: ['surf', 'reglages', 'enregistrer'], dev: true },
   { nom: 'vides', args: ['{port}', '{captures?}'], pages: ['voile', 'surf', 'sessions', 'reglages'] },
   { nom: 'zoom-carte', args: ['{port}', '{captures?}'], pages: ['voile', 'surf'] },

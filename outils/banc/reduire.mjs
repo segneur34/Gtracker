@@ -34,7 +34,7 @@ await blockNetwork();
 const openAll = async () => {
   await evaluate(`(() => {
     const s = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}');
-    s.settings = { memoire: true, autorisations: true, activites: true, enregistrement: true, capteurs: true, cartes: true, pratiquant: true };
+    s.settings = { memoire: true, autorisations: true, activites: true, enregistrement: true, connexion: true, capteurs: true, cartes: true, pratiquant: true };
     s['settings-families'] = { voile: true, surf: true };
     s['settings-activity-parts'] = { affichage: true, analyse: true, enregistrement: true, itineraires: true, balises: true };
     localStorage.setItem('${CLES.sections}', JSON.stringify(s));

@@ -1,5 +1,5 @@
 // Banc de test : l'application du téléphone que le programme Windows emporte (carte « Application du téléphone » de
-// Réglages › Mémoire, fenêtre de première ouverture du Profil), face à un faux téléphone (un dossier local qui s'écrit).
+// Réglages › Connexion, fenêtre de première ouverture du Profil), face à un faux téléphone (un dossier local qui s'écrit).
 // Usage : node exe-application.mjs <Gtracker.exe> [<port de débogage>]
 // Hors registre (`scripts.mjs`) : le script lance lui-même le programme, en mode d'essai de la coquille
 // (`GTRACKER_BANC=1`), sur des dossiers temporaires du dossier temporaire du système : jamais le vrai Documents, jamais le
@@ -147,13 +147,13 @@ async function capturer(b, nom) {
   writeFileSync(join(CAPTURES, `${nom}.jpg`), Buffer.from(r.result.data, 'base64'));
 }
 
-// ---------- la carte de Réglages › Mémoire ----------
-/** Réglages › Mémoire ouverte, carte de l'application présente et son état lu (une phrase sous le titre). */
+// ---------- la carte de Réglages › Connexion ----------
+/** Réglages › Connexion ouverte, carte de l'application présente et son état lu (une phrase sous le titre). */
 async function ouvrirCarte(b) {
   await b.go('/parametres', 5000);
-  await b.waitFor(`[...document.querySelectorAll('[role=button]')].some((x) => x.textContent.trim() === 'Mémoire')`, { timeout: 8000, label: 'carte Mémoire' });
+  await b.waitFor(`[...document.querySelectorAll('[role=button]')].some((x) => x.textContent.trim() === 'Connexion')`, { timeout: 8000, label: 'bloc Connexion' });
   if (!(await b.evaluate(`Boolean(document.querySelector('.phone-app'))`))) {
-    await b.click(`[...document.querySelectorAll('[role=button]')].find((x) => x.textContent.trim() === 'Mémoire')`);
+    await b.click(`[...document.querySelectorAll('[role=button]')].find((x) => x.textContent.trim() === 'Connexion')`);
   }
   await b.waitFor(`Boolean(document.querySelector('.phone-app p'))`, { timeout: 8000, label: 'carte « Application du téléphone » lue' });
   await b.settle({ max: 1500 });
@@ -246,6 +246,8 @@ try {
       check(`b. la carte dit « ${PHRASE_VERSION} » (version de package.json : ${VERSION})`, c.phrases.includes(PHRASE_VERSION), JSON.stringify(c.phrases));
       check('b. les deux boutons : « Enregistrer l\'APK… » et « Installer par le câble »', JSON.stringify(c.boutons) === JSON.stringify(["Enregistrer l'APK…", 'Installer par le câble']), JSON.stringify(c.boutons));
       check('b. aucun résultat affiché avant un geste', c.resultat === null, c.resultat);
+      const contenu = await b.evaluate(`[...document.querySelectorAll('.wireless-card__title, .phone-app__title, .connection-settings__title')].map((x) => x.textContent.trim()).join(' > ')`);
+      check('b. le bloc Connexion : Téléphone, Application du téléphone, puis la ligne des ceintures, dans cet ordre', contenu === 'Téléphone > Application du téléphone > Ceintures et montres', contenu);
       // L'aide « ? » : dépliée, elle dit comment copier le fichier.
       const aide = await b.evaluate(`(() => { const t = document.querySelector('.phone-app [aria-expanded]'); if (!t) return 'absent'; t.click(); return 'ok'; })()`);
       await b.wait(400);
@@ -367,7 +369,7 @@ try {
       const f = await ouvrirProfil(b, { attendue: false });
       check('f1. relance du programme sur le même profil : pas de fenêtre', f === null, JSON.stringify(f));
       await ouvrirCarte(b);
-      check('f1. la carte de Réglages › Mémoire reste là, avec ses deux boutons', JSON.stringify((await carte(b)).boutons) === JSON.stringify(["Enregistrer l'APK…", 'Installer par le câble']));
+      check('f1. la carte de Réglages › Connexion reste là, avec ses deux boutons', JSON.stringify((await carte(b)).boutons) === JSON.stringify(["Enregistrer l'APK…", 'Installer par le câble']));
     });
     // Une version retenue plus ancienne : la fenêtre revient pour la nouvelle.
     writeFileSync(join(profil, 'application-proposee.json'), JSON.stringify({ version: '0.00.01' }));

@@ -36,7 +36,7 @@ await blockNetwork(['*://*.openstreetmap.org/*']);
 const openAll = async () => {
   await evaluate(`(() => {
     const s = JSON.parse(localStorage.getItem('${CLES.sections}') ?? '{}');
-    s.settings = { memoire: true, autorisations: true, activites: true, enregistrement: true, capteurs: true, cartes: true, pratiquant: true };
+    s.settings = { memoire: true, connexion: true, autorisations: true, activites: true, enregistrement: true, capteurs: true, cartes: true, pratiquant: true };
     s['settings-families'] = { voile: true, surf: true };
     s['settings-activity-parts'] = { affichage: true, analyse: true, enregistrement: true, itineraires: true, balises: true };
     localStorage.setItem('${CLES.sections}', JSON.stringify(s));
@@ -104,6 +104,17 @@ const block = await evaluate(`(async () => {
 })()`);
 check('bloc Activités : toujours ouvert après son « ? »', block?.open === true);
 check('bloc Activités : son aide seule, le seuil refermé', block?.texts.length === 1 && block.texts[0].includes("L'œil"), block?.texts.join(' | '));
+
+// Le « ? » du bloc Connexion : son aide dit ce que le bloc relie (aucun « ? » sur l'ancien bloc Capteurs).
+const connexion = await evaluate(`(async () => {
+  const b = document.querySelector('button.ui-help[aria-label="Aide : Connexion"]');
+  if (!b) return null;
+  if (b.getAttribute('aria-expanded') !== 'true') b.click();
+  await new Promise((r) => setTimeout(r, 50));
+  return [...document.querySelectorAll('.settings-help')].map((p) => p.textContent.trim());
+})()`);
+check('bloc Connexion : son « ? » déplie l\'aide du bloc', Array.isArray(connexion) && connexion.length === 1 && connexion[0].startsWith("Ce qui relie Gtracker à un autre appareil"), connexion === null ? '« ? » absent' : connexion?.join(' | '));
+check('plus de « ? » sur un bloc Capteurs', (await evaluate(`document.querySelector('button.ui-help[aria-label="Aide : Capteurs"]') === null`)) === true);
 
 // --- 4. Téléphone ---
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });

@@ -307,13 +307,16 @@ describe('canaux et mode d’essai', () => {
   it('les variables d’essai sont ignorées hors du mode d’essai', () => {
     const choisir = async () => null
     const dossiers = { profil, documents, maison }
-    const env = { GTRACKER_MEMOIRE: 'D:\\essai\\memoire', GTRACKER_DOCUMENTS: 'D:\\essai\\docs', GTRACKER_BANC_DOSSIER: 'D:\\essai\\choix' }
+    // Chemins bâtis par `path.join` : écrits à la mode de Windows (« D:\… »), ils ne se découpent pas en dossiers sur
+    // une machine qui n'est pas sous Windows, et le dossier parent attendu ne serait pas le bon.
+    const base = path.join(maison, 'essai')
+    const env = { GTRACKER_MEMOIRE: path.join(base, 'memoire'), GTRACKER_DOCUMENTS: path.join(base, 'docs'), GTRACKER_BANC_DOSSIER: path.join(base, 'choix') }
     const hors = optionsDepuisEnvironnement(env, dossiers, choisir)
     expect(hors).toMatchObject({ documents, maison, memoireEssai: null })
     expect(hors.choisirDossier).toBe(choisir)
 
     const essai = optionsDepuisEnvironnement({ ...env, GTRACKER_BANC: '1' }, dossiers, choisir)
-    expect(essai).toMatchObject({ documents: path.resolve('D:\\essai\\docs'), maison: path.resolve('D:\\essai'), memoireEssai: path.resolve('D:\\essai\\memoire') })
+    expect(essai).toMatchObject({ documents: path.join(base, 'docs'), maison: base, memoireEssai: path.join(base, 'memoire') })
   })
 
   it('en mode d’essai sans Documents donné, le vrai Documents n’est jamais proposé', () => {

@@ -160,11 +160,16 @@ const OPEN_ALL = `(async () => {
   for (let pass = 0; pass < 6; pass++) {
     const tabs = [...document.querySelectorAll('.an-carte-col .ui-tab')].filter((b) => b.getAttribute('aria-pressed') === 'false' && !b.classList.contains('an-tabs-advanced-toggle'));
     const folds = [...document.querySelectorAll('[aria-expanded="false"]')].filter((b) => !b.classList.contains('an-tabs-advanced-toggle') && !b.classList.contains('ui-help') && !b.hasAttribute('aria-haspopup') && !b.closest('.activity-select, .ui-more') && !b.closest('.shell-tabbar, .shell-topbar'));
-    // Titres de panneau repliés (\`PanelTitle\` : chevron sans rotation), cartes de Réglages comprises.
-    const titles = [...document.querySelectorAll('.ui-panel-title')].filter((t) => !/rotate/.test(t.querySelector('svg')?.style.transform ?? '') && !t.dataset.bancOuvert);
+    // Titres de panneau repliés (\`PanelTitle\`), cartes de Réglages comprises : \`aria-expanded\` du titre (il porte aussi
+    // la valeur « false » que \`folds\` relève déjà : un Set évite le double clic) ; sans cet attribut (version d'avant), le chevron sans rotation.
+    const titles = [...document.querySelectorAll('.ui-panel-title')].filter((t) => {
+      const a = t.getAttribute('aria-expanded');
+      const replie = a !== null ? a !== 'true' : !/rotate/.test(t.querySelector('svg')?.style.transform ?? '');
+      return replie && !t.dataset.bancOuvert;
+    });
     titles.forEach((t) => { t.dataset.bancOuvert = '1'; });
     if (!tabs.length && !folds.length && !titles.length) break;
-    for (const b of [...tabs, ...folds, ...titles]) b.click();
+    for (const b of new Set([...tabs, ...folds, ...titles])) b.click();
     await wait(500);
   }
   return 'ok';
@@ -280,6 +285,24 @@ for (let i = 0; i < statTabs; i++) {
   await collect('statistiques');
 }
 await visit('réglages (tout ouvert)', '/parametres', { open: true, helps: true, width: true });
+// Licences du complément versionné, traduites à l'affichage : la ligne Chromium (programme Windows seulement) et la
+// notice du logo GONG, lue après un clic sur sa ligne (une seule ligne reste ouverte à la fois).
+let licences = null;
+if (relever) {
+  await setSize(PC);
+  await waitFor(`document.querySelectorAll('.about-license__row').length > 0`, { timeout: 6000, label: 'lignes de licences' });
+  licences = await evaluate(`(async () => {
+    const rows = [...document.querySelectorAll('.about-license__row')];
+    const ligne = (n) => rows.find((r) => r.querySelector('.about-license__name')?.textContent.trim().startsWith(n));
+    const id = (r) => r?.querySelector('.about-license__id')?.textContent.trim() ?? null;
+    const logo = ligne('Logo GONG');
+    if (logo && logo.getAttribute('aria-expanded') !== 'true') logo.click();
+    await new Promise((r) => setTimeout(r, 500));
+    return { chromium: id(ligne('Chromium')), etiquette: id(logo), notice: logo?.closest('li')?.querySelector('.about-license__text')?.textContent.trim() ?? null };
+  })()`);
+  console.log('licences :', JSON.stringify(licences));
+  await collect('réglages (tout ouvert)');
+}
 await visit('test de FC repos', '/profil/fc-repos', { helps: true });
 await visit('tutoriels', '/tutoriels');
 const lessons = (await evaluate(`[...document.querySelectorAll('a[href^="/tutoriels/"]')].map((a) => a.getAttribute('href'))`)) ?? [];
@@ -337,6 +360,15 @@ exceptions.slice(0, 10).forEach((l) => console.log(l));
 const attendues = ['profil', 'sessions', 'analyse voile (avancé)', 'analyse surf (avancé)', 'planifier', 'statistiques', 'réglages (tout ouvert)', 'test de FC repos', 'tutoriels', 'enregistrer'];
 if (relever) check('le relevé reconnaît le français (clé, clé à variables, mots-outils)',
   Boolean(raison('Enregistrer la session') && raison('3 sessions ajoutées') && raison('Le vent est estimé pour cette session')), '');
+if (relever) {
+  const noticeAttendue = tr("Le logo GONG (symbole et mot) est une marque de son titulaire, montrée dans Gtracker pour une présentation à GONG. Ce n'est pas une licence libre : il ne se réutilise pas ailleurs sans l'accord du titulaire de la marque.");
+  check('licences : la notice du logo GONG est dans la langue choisie', Boolean(licences?.notice) && licences.notice === noticeAttendue && !licences.notice.startsWith('Le logo GONG'),licences?.notice ?? '(absente)');
+  check('licences : l\'étiquette « Marque de son titulaire » est traduite', licences?.etiquette === tr('Marque de son titulaire') && licences.etiquette !== 'Marque de son titulaire', licences?.etiquette ?? '(absente)');
+  // Ligne Chromium : sous le programme Windows seulement (absente dans le navigateur, sans contrôle).
+  if (licences?.chromium !== null && licences?.chromium !== undefined) {
+    check('licences : la ligne Chromium est traduite (« BSD-3-Clause and the licences… » / « …y las licencias… »)', licences.chromium === tr('BSD-3-Clause et licences de ses composants') && licences.chromium !== 'BSD-3-Clause et licences de ses composants', licences.chromium);
+  } else console.log('licences : pas de ligne Chromium (navigateur) : aucun contrôle');
+}
 check('chaque page est parcourue', attendues.every((p) => vus.has(p)), attendues.filter((p) => !vus.has(p)).join(', '));
 check('le rejeu démarre et s’arrête', started === 'ok' && vus.has('enregistrement terminé'), String(started));
 check('aucune exception de la page', exceptions.length === 0, exceptions.join(' | '));

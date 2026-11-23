@@ -9,7 +9,7 @@
 // (application d'avant l'écriture sans fil : lecture seule, il n'y écrit jamais) ; les cas 4 à 6 le jouent à jour (il
 // annonce qu'il écrit, comme le téléphone récent). Le code d'appairage se lit sur la page du programme, comme le ferait
 // l'utilisateur ; le disque se lit par Node : c'est lui qui prouve.
-// `BANC_CAPTURES=<dossier>` (facultatif) y dépose des captures JPEG : le bloc « Téléphone » de Réglages › Mémoire (éteint,
+// `BANC_CAPTURES=<dossier>` (facultatif) y dépose des captures JPEG : le bloc « Téléphone » de Réglages › Connexion (éteint,
 // fenêtre de liaison, téléphone relié, à jour, et le paragraphe « Par câble (avancé) » fermé puis ouvert) et la page entière
 // aux moments qui comptent (compte rendu d'un téléphone ancien, attente après une coupure, écran de départ, compte rendu,
 // question du garde-fou, « Aucun téléphone relié », « <nom> relié » dans la barre du haut, attente d'un téléphone).
@@ -66,7 +66,7 @@
 //     anglais (`BANC_LANGUE_PAGE`), autorisation d'essai en échec : la phrase et la raison venue de la coquille sortent traduites.
 //  8. (outil du câble imposé introuvable, `GTRACKER_BANC_TELEPHONE_ETAT=adbIntrouvable`) aucun téléphone jamais relié :
 //     « Synchroniser » dit « Aucun téléphone relié » avec « Relier mon téléphone », qui ferme la fenêtre, ouvre Réglages ›
-//     Mémoire et la fenêtre du code d'elle-même ; paragraphe « Par câble (avancé) » replié (l'outil de Google n'est dit que
+//     Connexion et la fenêtre du code d'elle-même ; paragraphe « Par câble (avancé) » replié (l'outil de Google n'est dit que
 //     dedans, jamais dans la fenêtre) ; le téléphone s'appaire : « <nom> relié » dans la barre ; il ferme la liaison : la
 //     barre le sait en quelques millisecondes (avis de départ du programme, journal « téléphone parti (raison) ») ;
 //     « Synchroniser » attend (sous-titre « relié pour la dernière fois à … », les trois choses à faire sur le téléphone,
@@ -272,12 +272,12 @@ function verifierRangees(quoi, memoire, telephone, attendues) {
 const telephoneIntact = (quoi, telephone, avant) => check(`${quoi} : téléphone factice intact (fichiers, tailles et dates)`, empreinte(telephone) === avant, `\n--- avant ---\n${avant}\n--- après ---\n${empreinte(telephone)}`);
 
 // ---------- la page ----------
-/** Réglages › Mémoire ouverte, bloc du sans-fil présent. */
+/** Réglages › Connexion ouvert, bloc du sans-fil présent (le nom de la fonction date du temps où le bloc était dans Mémoire). */
 async function ouvrirMemoire(b) {
   await b.go('/parametres', 5000);
-  await b.waitFor(`[...document.querySelectorAll('[role=button]')].some((x) => x.textContent.trim() === 'Mémoire')`, { timeout: 8000, label: 'carte Mémoire' });
+  await b.waitFor(`[...document.querySelectorAll('[role=button]')].some((x) => x.textContent.trim() === 'Connexion')`, { timeout: 8000, label: 'bloc Connexion' });
   if (!(await b.evaluate(`Boolean(document.querySelector('.wireless-card'))`))) {
-    await b.click(`[...document.querySelectorAll('[role=button]')].find((x) => x.textContent.trim() === 'Mémoire')`);
+    await b.click(`[...document.querySelectorAll('[role=button]')].find((x) => x.textContent.trim() === 'Connexion')`);
   }
   await b.waitFor(`Boolean(document.querySelector('.wireless-card'))`, { timeout: 8000, label: 'bloc Téléphone' });
   await b.settle({ max: 1500 });
@@ -575,6 +575,8 @@ try {
       let c = await carte(b);
       console.log(`  bloc, éteint : ${JSON.stringify(c.texte)}`);
       check('1a. le bloc « Téléphone » est là (plus « Téléphone sans câble »), case décochée', c.titre === 'Téléphone' && c.coche === false, JSON.stringify({ titre: c.titre, coche: c.coche }));
+      const contenuConnexion = await b.evaluate(`[...document.querySelectorAll('.wireless-card__title, .phone-app__title, .connection-settings__title')].map((x) => x.textContent.trim()).join(' > ')`);
+      check('1a. le bloc Connexion : Téléphone, Application du téléphone, puis la ligne des ceintures (« Sur l\'application Android seulement. »), dans cet ordre', contenuConnexion === 'Téléphone > Application du téléphone > Ceintures et montres' && /Sur l'application Android seulement\./.test(await b.evaluate(`document.querySelector('.connection-settings__title')?.parentElement?.innerText ?? ''`)), contenuConnexion);
       check('1a. le paragraphe replié « Par câble (avancé) » est là, fermé, et dit le débogage USB comme une possibilité', c.cable !== null && c.cable.resume === 'Par câble (avancé)' && c.cable.ouvert === false && /Débogage USB/.test(c.cable.texte) && !/Débogage USB/.test(c.texte), JSON.stringify(c.cable));
       check('1a. la phrase d\'état dit que le sans-fil est éteint', c.statut === 'Le sans-fil est éteint : le téléphone ne peut pas se présenter à cet ordinateur.', c.statut);
       check('1a. la phrase prévient que Windows va demander de confirmer (et que l\'autorisation vaut sur les réseaux publics)', c.texte.includes(ALLUMAGE), c.texte);
@@ -606,7 +608,7 @@ try {
       check('1c. l\'adresse est celle du PC et le port, « 127.0.0.1:<port> »', ad !== null && ad.hote === '127.0.0.1' && ad.port > 1023, c.adresse);
       check('1c. le code est de 6 chiffres', /^\d{6}$/.test(c.code ?? ''), c.code);
       check('1c. le temps restant est de 2 minutes au plus et plus d\'1 min 30', secondes(c.decompte) !== null && secondes(c.decompte) <= 120 && secondes(c.decompte) >= 90, c.decompte);
-      check('1c. la phrase dit d\'ouvrir Gtracker sur le téléphone, Réglages, Mémoire', /Sur le téléphone, ouvrez Gtracker, puis Réglages, Mémoire/.test(c.texte), c.texte);
+      check('1c. la phrase dit d\'ouvrir Gtracker sur le téléphone, Réglages, Connexion', /Sur le téléphone, ouvrez Gtracker, puis Réglages, Connexion/.test(c.texte), c.texte);
       const avantDecompte = secondes(c.decompte);
       await capturer(b, 'sansfil-2-fenetre-de-liaison');
       await b.wait(2500);
@@ -1303,8 +1305,8 @@ try {
     // 7g. page en anglais : l'erreur de la coquille (écrite en français, détail de l'autorisation d'essai en échec) sort traduite
     await avecProgramme(dossier('p7g-profil'), dossier('p7g-memoire'), { GTRACKER_BANC_SANSFIL_ACTIF: '1', GTRACKER_BANC_SANSFIL_PAREFEU: 'bloque', GTRACKER_BANC_SANSFIL_AUTORISATION: 'echec', BANC_LANGUE_PAGE: 'en-GB' }, '7g', async (b, p) => {
       await b.go('/parametres', 5000);
-      await b.waitFor(`[...document.querySelectorAll('[role=button]')].some((x) => x.textContent.trim() === 'Storage')`, { timeout: 8000, label: 'carte Storage' });
-      if (!(await b.evaluate(`Boolean(document.querySelector('.wireless-card'))`))) await b.click(`[...document.querySelectorAll('[role=button]')].find((x) => x.textContent.trim() === 'Storage')`);
+      await b.waitFor(`[...document.querySelectorAll('[role=button]')].some((x) => x.textContent.trim() === 'Connection')`, { timeout: 8000, label: 'bloc Connection' });
+      if (!(await b.evaluate(`Boolean(document.querySelector('.wireless-card'))`))) await b.click(`[...document.querySelectorAll('[role=button]')].find((x) => x.textContent.trim() === 'Connection')`);
       await messageVu(b);
       let c = await carte(b);
       check('7g. page en anglais : la phrase du blocage est traduite', c.pareFeuPhrases[0] === 'Windows is not letting your phone through on this network.', JSON.stringify(c.pareFeuPhrases));
@@ -1340,9 +1342,9 @@ try {
       check('8a. clic « Relier mon téléphone »', (await b.clickText('Relier mon téléphone', '.phone-sync__actions button')) === 'ok');
       await b.waitFor(`/^\\d{6}$/.test(document.querySelector('.wireless-card__code')?.textContent.trim() ?? '')`, { timeout: 15000, label: 'fenêtre du code ouverte d\'elle-même' });
       const href = await b.evaluate('location.pathname + location.search + location.hash');
-      check('8a. la fenêtre se ferme, Réglages › Mémoire s\'ouvre et la fenêtre du code est ouverte d\'elle-même (adresse et code)', (await fenetre(b)) === null && /parametres/.test(href) && /relier/.test(href), href);
+      check('8a. la fenêtre se ferme, Réglages › Connexion s\'ouvre et la fenêtre du code est ouverte d\'elle-même (adresse et code)', (await fenetre(b)) === null && /parametres/.test(href) && /relier/.test(href), href);
       let c = await carte(b);
-      console.log(`  Réglages › Mémoire : adresse ${c.adresse}, code ${c.code}, câble : ${JSON.stringify(c.cable?.resume)}`);
+      console.log(`  Réglages › Connexion : adresse ${c.adresse}, code ${c.code}, câble : ${JSON.stringify(c.cable?.resume)}`);
       check('8a. le paragraphe « Par câble (avancé) » est là, replié ; l\'outil de Google n\'est dit que dedans (l\'outil est imposé introuvable)', c.cable !== null && c.cable.resume === 'Par câble (avancé)' && c.cable.ouvert === false && /Platform-Tools/.test(c.cable.texte) && !/Platform-Tools|Débogage USB/.test(c.texte), JSON.stringify(c.cable));
       await capturer(b, 'sansfil-8-carte-par-cable-avance');
       await b.evaluate(`document.querySelector('details.wireless-card__cable').open = true`);

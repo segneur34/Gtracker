@@ -22,7 +22,7 @@
 // (il en garde le relevé). Aucun mot d'avant la remise à plat ne doit plus s'afficher (`MOTS_ANCIENS`), contrôlé à chaque issue.
 // Cas :
 //  a. chaque état imposé : absent et adbIntrouvable (l'outil du câble est traité comme absent : jamais une chose à faire) disent
-//     « Aucun téléphone relié » (« Fermer », « Relier mon téléphone » qui mène à Réglages › Mémoire, fenêtre du code) ;
+//     « Aucun téléphone relié » (« Fermer », « Relier mon téléphone » qui mène à Réglages › Connexion, fenêtre du code) ;
 //     autorisation, horsLigne et occupe mettent la fenêtre en attente (« Annuler » seul, ni « Réessayer », ni câble expliqué,
 //     ni dossier à recopier) ; rien de rangé, rien de copié, téléphone intact ;
 //  b. téléphone sans dossier Documents/Gtracker : « Gtracker n'a pas encore de mémoire sur ce téléphone… », « Recommencer » ;
@@ -182,7 +182,7 @@ async function fermer(p) {
 /** Le faux téléphone de chaque profil (jeton gardé d'un lancement à l'autre) et sa liaison en cours, en mode `--sansfil`. */
 const fauxParProfil = new Map();
 /**
- * Relie le faux téléphone à l'instance : première fois, par le code lu sur la page (Réglages › Mémoire, « Relier un
+ * Relie le faux téléphone à l'instance : première fois, par le code lu sur la page (Réglages › Connexion, « Relier un
  * téléphone ») ; ensuite, par son jeton, sur le port fixe du serveur. `stockage` : le dossier qui joue le `/sdcard` du câble ;
  * le faux téléphone joue son `Documents/Gtracker`.
  */
@@ -196,9 +196,9 @@ async function relierFaux(b, profil, stockage) {
   }
   const faux = new FauxTelephone({ dossier: racineTel(stockage), delaiMs: 20000 });
   await b.go('/parametres', 5000);
-  await b.waitFor(`[...document.querySelectorAll('[role=button]')].some((x) => x.textContent.trim() === 'Mémoire')`, { timeout: 8000, label: 'carte Mémoire' });
+  await b.waitFor(`[...document.querySelectorAll('[role=button]')].some((x) => x.textContent.trim() === 'Connexion')`, { timeout: 8000, label: 'bloc Connexion' });
   if (!(await b.evaluate(`Boolean(document.querySelector('.wireless-card'))`))) {
-    await b.click(`[...document.querySelectorAll('[role=button]')].find((x) => x.textContent.trim() === 'Mémoire')`);
+    await b.click(`[...document.querySelectorAll('[role=button]')].find((x) => x.textContent.trim() === 'Connexion')`);
   }
   await b.waitFor(`/Gtracker attend votre téléphone/.test(document.querySelector('.wireless-card__status')?.textContent ?? '')`, { timeout: 10000, label: 'écoute du sans-fil' });
   check('sans-fil : « Relier un téléphone »', (await b.clickText('Relier un téléphone', '.wireless-card button')) === 'ok');
@@ -610,11 +610,11 @@ try {
         await b.wait(500);
         check(`a. ${etat} : la fenêtre est fermée`, (await releve(b)) === null);
       } else if (etat === 'absent') {
-        // « Relier mon téléphone » mène à Réglages › Mémoire, fenêtre du code ouverte (adresse ?bloc=relier).
+        // « Relier mon téléphone » mène à Réglages › Connexion, fenêtre du code ouverte (adresse ?bloc=relier).
         check('a. absent : « Relier mon téléphone »', (await b.clickText('Relier mon téléphone', '.phone-sync__actions button')) === 'ok');
         await b.wait(1200);
         const adresse = await b.evaluate('location.pathname + location.search');
-        check('a. absent : la page est Réglages › Mémoire, fenêtre du code (…/parametres?bloc=relier) et la fenêtre de synchronisation est fermée', /\/parametres\?bloc=relier/.test(adresse) && (await releve(b)) === null, adresse);
+        check('a. absent : la page est Réglages › Connexion, fenêtre du code (…/parametres?bloc=relier) et la fenêtre de synchronisation est fermée', /\/parametres\?bloc=relier/.test(adresse) && (await releve(b)) === null, adresse);
       } else {
         check(`a. ${etat} : « Fermer » ferme la fenêtre`, (await b.clickText('Fermer', '.phone-sync__actions button')) === 'ok');
         await b.wait(400);
