@@ -50,7 +50,7 @@ Patron commun aux modules d'analyse (voile, surf) et à tout sport à venir. La 
 |---|---|
 | `components/AnalysisShell.tsx` | Squelette de la page d'analyse, commun aux deux modules : page, en-tête, barre du brouillon, alertes, rangée de la carte et colonne d'onglets ; rendu pur, différences passées en paramètres (HISTORIQUE, point 206) |
 | `components/AnalysisMap.tsx` | Carte, légende donnée par le module posée dessus, outil posé dessus (`overlay`), plein écran au toucher ou piloté par le module |
-| `components/BaseTileLayer.tsx` | Fond de la carte (plan ou satellite) de la famille, et son choix sous le + et le − |
+| `components/BaseTileLayer.tsx` | Fond de la carte de la famille (le plan seul dans cette version) ; le choix du fond sous le + et le − ne se monte qu'à partir de deux fonds, donc n'apparaît pas |
 | `components/GeneralStats.tsx` | Chiffres de « général » |
 | `components/EmptyTabPanel.tsx` | Onglet ouvert sans rien à montrer : pourquoi, et de quoi y remédier |
 | `pages/analysisMobile.css` | Disposition téléphone (classes `an-*`) |
