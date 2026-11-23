@@ -30,17 +30,20 @@ let listeners: (() => void)[] = [];
 let removed: string[] = [];
 let removeRefused = false;
 let reads = 0;
-/** Témoins de lecture posés chez le téléphone, qui survivent à un lancement comme la file. */
-const witnesses = new Set<string>();
+/** Témoins de lecture posés chez le téléphone, avec leur compte de lectures commencées ; ils survivent à un lancement comme la file. */
+const witnesses = new Map<string, number>();
 let markRefused = false;
 /** Gestes de la page sur la file, dans l'ordre : `mark <id> <vrai|faux>`, `read <id>`. */
 let steps: string[] = [];
+/** Compte du témoin au moment de chaque lecture. */
+let triesAtRead: number[] = [];
 
 const fakePort: IncomingFilesPort = {
-  list: async () => [...queue.entries()].map(([id, { name, refusal }]) => ({ id, name, size: 1, refusal, trying: witnesses.has(id) })),
+  list: async () => [...queue.entries()].map(([id, { name, refusal }]) => ({ id, name, size: 1, refusal, tries: witnesses.get(id) ?? 0 })),
   read: async (id) => {
     reads += 1;
     steps.push(`read ${id}`);
+    triesAtRead.push(witnesses.get(id) ?? 0);
     const content = queue.get(id)?.content ?? null;
     return typeof content === 'string' ? new TextEncoder().encode(content) : content;
   },
@@ -53,7 +56,7 @@ const fakePort: IncomingFilesPort = {
   mark: async (id, trying) => {
     if (markRefused) throw new Error('témoin refusé');
     steps.push(`mark ${id} ${trying}`);
-    if (trying && queue.has(id)) witnesses.add(id);
+    if (trying && queue.has(id)) witnesses.set(id, (witnesses.get(id) ?? 0) + 1);
     else witnesses.delete(id);
   },
   subscribe: (listener) => {
@@ -117,6 +120,7 @@ beforeEach(() => {
   witnesses.clear();
   markRefused = false;
   steps = [];
+  triesAtRead = [];
   stopTimers = trackTestTimers();
 });
 afterEach(() => {
@@ -451,18 +455,32 @@ describe('fichiers reçus d\'une autre application', () => {
     expect(notices()[0].route).toBe('Tour du lac (2)');
   });
 
-  it('témoin de lecture posé avant de lire, parti avec la copie', async () => {
+  it('témoin de lecture posé avant de lire, à une lecture commencée, parti avec la copie', async () => {
     const id = receive('sortie.gpx', gpxAt(2));
     await launch();
     expect(steps[0]).toBe(`mark ${id} true`);
     expect(steps[1]).toBe(`read ${id}`);
+    expect(triesAtRead[0]).toBe(1);
     expect(removed).toEqual([id]);
     expect(witnesses.size).toBe(0);
   });
 
-  it('Gtracker arrêté pendant la lecture : au lancement suivant, refusé et dit, copie retirée, sans rien lire', async () => {
+  it('Gtracker arrêté une première fois pendant la lecture : relu au lancement suivant, compté, rangé, témoin retiré', async () => {
+    const id = receive('grosse-sortie.gpx', gpxAt(2));
+    witnesses.set(id, 1);
+    const { notices } = await launch();
+    expect(steps[0]).toBe(`mark ${id} true`);
+    expect(triesAtRead[0]).toBe(2);
+    expect(sessionGpx()).toHaveLength(1);
+    expect(removed).toEqual([id]);
+    expect(witnesses.size).toBe(0);
+    expect(notices()).toEqual([expect.objectContaining({ id, text: '« grosse-sortie.gpx » est rangé dans la mémoire.', trouble: false })]);
+  });
+
+  it('Gtracker arrêté une seconde fois pendant la lecture : au lancement suivant, refusé et dit, copie retirée, sans rien lire', async () => {
     const id = receive('piege.gpx', gpxAt(2));
-    witnesses.add(id);
+    // Deux lectures commencées, aucune finie : le plafond de la page.
+    witnesses.set(id, 2);
     const { notices } = await launch();
     expect(reads).toBe(0);
     expect(steps).toEqual([]);
@@ -534,5 +552,17 @@ describe('fichiers reçus d\'une autre application', () => {
     await expect(incomingFiles.remove('x')).resolves.toBeUndefined();
     await expect(incomingFiles.mark('x', true)).resolves.toBeUndefined();
     expect(() => incomingFiles.subscribe(() => undefined)).not.toThrow();
+  });
+
+  it("compte du greffon : `tries` d'abord ; un greffon qui ne rend que `trying` ne comptait pas, son témoin vaut refus", async () => {
+    const { triesOf } = await import('../../platform/incomingFile');
+    const { MAX_INCOMING_TRIES } = await import('./incoming');
+    expect(MAX_INCOMING_TRIES).toBe(2);
+    expect(triesOf(0, undefined)).toBe(0);
+    expect(triesOf(1, true)).toBe(1);
+    expect(triesOf(3, undefined)).toBe(3);
+    expect(triesOf(undefined, undefined)).toBe(0);
+    expect(triesOf(undefined, false)).toBe(0);
+    expect(triesOf(undefined, true)).toBeGreaterThanOrEqual(MAX_INCOMING_TRIES);
   });
 });

@@ -28,6 +28,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -59,11 +60,12 @@ import org.json.JSONObject;
  * du refus (fichier vide, gardé jusqu'à ce que la page l'ait dit). Une copie en cours porte `<id>.tmp`,
  * effacée au lancement suivant : un fichier listé est toujours entier.
  *
- * Témoin de lecture (`mark`) : un fichier vide `<nom du fichier reçu>.essai`, posé par la page avant de lire une copie,
- * retiré avec elle ou quand la page la garde pour un autre essai. Un fichier sur disque survit à un processus tué :
- * listé avec son témoin (`trying`), le fichier reçu a arrêté Gtracker pendant sa lecture, et la page le refuse au lieu
- * de le relire. Seule une copie `ok` en porte un, et une copie `ok` finit par `.gpx` ou `.fit` : un refus dont le nom
- * d'origine finit par `.essai` n'est pas pris pour un témoin.
+ * Témoin de lecture (`mark`) : un fichier `<nom du fichier reçu>.essai` qui compte, en chiffres, les lectures commencées
+ * par la page ; chaque `mark` l'augmente avant une lecture, et il est retiré avec la copie ou quand la page la garde pour
+ * un autre essai. Un fichier sur disque survit à un processus tué : listé avec son compte (`tries`), le fichier reçu a
+ * vu Gtracker s'arrêter pendant autant de lectures, et la page décide de le relire ou de le refuser. Seule une copie `ok`
+ * en porte un, et une copie `ok` finit par `.gpx` ou `.fit` : un refus dont le nom d'origine finit par `.essai` n'est pas
+ * pris pour un témoin.
  */
 @CapacitorPlugin(name = "IncomingFile")
 public class IncomingFilePlugin extends Plugin {
@@ -77,6 +79,8 @@ public class IncomingFilePlugin extends Plugin {
     private static final String DIR = "recus";
     private static final String TMP_SUFFIX = ".tmp";
     private static final String TRYING_SUFFIX = ".essai";
+    /** Chiffres lus au plus dans un témoin : un compte tient en bien moins. */
+    private static final int TRIES_CHARS = 9;
     private static final String SEPARATOR = "__";
     private static final String STATE_OK = "ok";
     private static final String REFUSED_FORMAT = "format";
@@ -190,6 +194,41 @@ public class IncomingFilePlugin extends Plugin {
 
     private static File witnessOf(File entry) {
         return new File(entry.getParentFile(), entry.getName() + TRYING_SUFFIX);
+    }
+
+    /**
+     * Lectures commencées que compte un témoin : 0 sans témoin. Un témoin présent en compte au moins une, même vide ou
+     * illisible : vide, il vient d'une version qui ne comptait pas, ou d'un compte pas encore écrit.
+     */
+    private static int triesOf(File witness) {
+        if (!witness.isFile()) return 0;
+        byte[] head = new byte[TRIES_CHARS];
+        int length = 0;
+        try (InputStream in = new FileInputStream(witness)) {
+            int n;
+            while (length < head.length && (n = in.read(head, length, head.length - length)) > 0) length += n;
+        } catch (IOException | RuntimeException e) {
+            Log.w(TAG, "Témoin de lecture illisible : " + witness.getName(), e);
+            return 1;
+        }
+        try {
+            return Math.max(1, Integer.parseInt(new String(head, 0, length, StandardCharsets.US_ASCII).trim()));
+        } catch (NumberFormatException e) {
+            return 1;
+        }
+    }
+
+    /**
+     * Écrit le compte d'un témoin par-dessus l'ancien, sans le vider d'abord : un compte ne fait que grandir, donc un
+     * processus tué pendant l'écriture laisse l'ancien compte ou le nouveau, jamais un témoin vide.
+     */
+    private static void writeTries(File witness, int tries) throws IOException {
+        byte[] digits = Integer.toString(tries).getBytes(StandardCharsets.US_ASCII);
+        try (RandomAccessFile out = new RandomAccessFile(witness, "rw")) {
+            out.seek(0);
+            out.write(digits);
+            out.setLength(digits.length);
+        }
     }
 
     /**
@@ -337,7 +376,7 @@ public class IncomingFilePlugin extends Plugin {
                         entry.put("name", parts[2]);
                         entry.put("size", file.length());
                         entry.put("refusal", STATE_OK.equals(parts[1]) ? JSONObject.NULL : parts[1]);
-                        entry.put("trying", names.contains(file.getName() + TRYING_SUFFIX));
+                        entry.put("tries", names.contains(file.getName() + TRYING_SUFFIX) ? triesOf(witnessOf(file)) : 0);
                         entries.put(entry);
                     }
                 }
@@ -410,9 +449,9 @@ public class IncomingFilePlugin extends Plugin {
     }
 
     /**
-     * Pose (`trying` vrai) ou retire le témoin de lecture d'un fichier reçu, sur le fil de la file : après toute copie,
-     * avant toute lecture demandée ensuite. Rien à protéger si la copie n'existe plus, ni pour un refus, que la page ne
-     * lit pas : aucun témoin posé.
+     * Compte une lecture de plus (`trying` vrai) ou retire le témoin de lecture d'un fichier reçu, sur le fil de la
+     * file : après toute copie, avant toute lecture demandée ensuite. Rien à protéger si la copie n'existe plus, ni pour
+     * un refus, que la page ne lit pas : aucun témoin posé.
      */
     @PluginMethod
     public void mark(PluginCall call) {
@@ -425,9 +464,9 @@ public class IncomingFilePlugin extends Plugin {
                     return;
                 }
                 File witness = witnessOf(file);
-                boolean done = trying
-                    ? !file.isFile() || !isWitness(witness.getName()) || witness.exists() || witness.createNewFile()
-                    : !witness.exists() || witness.delete();
+                boolean done = true;
+                if (!trying) done = !witness.exists() || witness.delete();
+                else if (file.isFile() && isWitness(witness.getName())) writeTries(witness, triesOf(witness) + 1);
                 if (done) call.resolve();
                 else call.reject("Témoin de lecture non changé");
             } catch (IOException | RuntimeException e) {

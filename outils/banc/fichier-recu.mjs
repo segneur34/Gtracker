@@ -59,9 +59,11 @@ const plugQueue = () => evaluate(`(async () => {
   };
   window.__fauxEnregistrement = false;
   const port = {
-    list: async () => [...queue.entries()].map(([id, f]) => ({ id, name: f.name, size: f.text.length, refusal: f.refusal })),
+    list: async () => [...queue.entries()].map(([id, f]) => ({ id, name: f.name, size: f.text.length, refusal: f.refusal, tries: 0 })),
     read: async (id) => (queue.has(id) ? new TextEncoder().encode(queue.get(id).text) : null),
     remove: async (id) => { queue.delete(id); window.__fauxRecus.removed.push(id); },
+    // Aucun arrêt de Gtracker à simuler ici : le compte des lectures commencées reste à 0.
+    mark: async () => {},
     subscribe: (listener) => { listeners.push(listener); },
   };
   await library.startIncomingFiles(() => window.__fauxEnregistrement, (listener) => recorderListeners.push(listener), port);

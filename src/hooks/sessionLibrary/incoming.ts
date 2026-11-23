@@ -24,15 +24,23 @@ import { runInWorker } from '../../library/trackWorkerClient';
  *
  * Pendant un enregistrement, la copie native se fait, et la page ne touche à rien : la file reprend à l'arrêt.
  *
- * Verrou contre le rejeu : avant de lire un fichier, la page pose son témoin de lecture chez le téléphone (`mark`), qui
- * survit à un arrêt net de Gtracker ; il part avec la copie, ou est retiré quand la copie est gardée pour un autre
- * essai. Un fichier listé avec son témoin a donc arrêté Gtracker pendant sa lecture, peut-être en le figeant : il est
- * refusé, dit et retiré sans être relu, au lieu de figer chaque lancement.
+ * Verrou contre le rejeu : avant chaque lecture d'un fichier, la page augmente son témoin de lecture chez le téléphone
+ * (`mark`), qui survit à un arrêt net de Gtracker ; il part avec la copie, ou est retiré quand la copie est gardée pour
+ * un autre essai. Un fichier listé avec un témoin a donc vu Gtracker s'arrêter pendant sa lecture, peut-être en le
+ * figeant, peut-être par un arrêt ordinaire d'Android : sous `MAX_INCOMING_TRIES` lectures commencées il est relu, au
+ * plafond il est refusé, dit et retiré sans être relu, au lieu de figer chaque lancement.
  *
  * Un GPX qui est un itinéraire (fiche d'un itinéraire de Gtracker, ou tracé sans aucun point daté,
  * `isRouteGpx`, tranché hors du fil de l'affichage) est rangé dans `itineraires/` au lieu des sessions
  * (`routeArrival`) ; tout autre fichier suit l'import.
  */
+
+/**
+ * Lectures commencées au plus pour un fichier reçu. Android arrête parfois Gtracker pendant la lecture d'un gros fichier
+ * honnête (application passée en arrière-plan, mémoire reprise) : le fichier a droit à un second essai. Un fichier
+ * pendant la lecture duquel Gtracker s'est arrêté deux fois est refusé, plutôt que relu à chaque lancement.
+ */
+export const MAX_INCOMING_TRIES = 2;
 
 /** Verdict d'un fichier passé par `importEntries` : `retry` garde la copie, les autres la retirent. */
 type IncomingVerdict =
@@ -118,7 +126,7 @@ const notify = (notice: IncomingNotice): void => {
   setState({ incomingNotices: [...libraryState().incomingNotices, notice] });
 };
 
-/** Pose ou retire le témoin de lecture ; un échec est noté, sans plus : le fichier se range quand même. */
+/** Compte une lecture de plus, ou retire le témoin de lecture ; un échec est noté, sans plus : le fichier se range quand même. */
 const markTrying = async (file: IncomingFile, trying: boolean): Promise<void> => {
   try {
     await port.mark(file.id, trying);
@@ -209,7 +217,7 @@ const handle = async (file: IncomingFile): Promise<void> => {
     await forget(file);
     return;
   }
-  if (file.trying) {
+  if (file.tries >= MAX_INCOMING_TRIES) {
     notify({
       id,
       text: t("{quoted} n'a pas été rangé : Gtracker s'est arrêté pendant sa lecture. S'il est bon, ouvrez-le de nouveau.", { quoted: quoted(name) }),

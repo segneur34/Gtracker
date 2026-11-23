@@ -4,8 +4,9 @@ import { isNativeApp } from './runtime';
 
 /**
  * « Ouvrir avec Gtracker » et « Partager vers Gtracker » : seul passage vers
- * `android/…/IncomingFilePlugin.java`, qui copie aussitôt le fichier reçu dans une file privée. Dans le navigateur,
- * sans effet : la file reste vide. La file côté page est dans `hooks/sessionLibrary/incoming.ts`.
+ * `android/…/IncomingFilePlugin.java`, qui copie aussitôt le fichier reçu dans une file privée. Dans le navigateur et
+ * le programme Windows, sans effet : la file reste vide, donc rien n'y est relu et aucun témoin de lecture n'y est
+ * tenu. La file côté page est dans `hooks/sessionLibrary/incoming.ts`.
  */
 
 /** Refus du greffon, à la réception : ni GPX ni FIT, plus de 30 Mo, ou fichier qu'il n'a pas pu copier. */
@@ -19,10 +20,10 @@ export interface IncomingFile {
   /** Refusé à la réception : aucune copie, juste de quoi le dire. */
   refusal: IncomingRefusal | null;
   /**
-   * La page avait commencé à le lire (`mark`) et n'a rendu aucun verdict : Gtracker s'est arrêté pendant sa lecture,
-   * peut-être à cause de lui. Il n'est pas relu.
+   * Lectures commencées par la page (`mark`) sans verdict rendu : autant de fois où Gtracker s'est arrêté pendant sa
+   * lecture, peut-être à cause de lui. 0 pour un fichier jamais lu.
    */
-  trying: boolean;
+  tries: number;
 }
 
 /** Ce que la file attend de la plateforme ; une autre réalisation sert aux tests et au banc. */
@@ -34,8 +35,8 @@ export interface IncomingFilesPort {
   /** Retire le fichier, et son témoin de lecture. */
   remove(id: string): Promise<void>;
   /**
-   * Pose (`trying`) ou retire le témoin de lecture d'un fichier, gardé par le téléphone même si Gtracker est arrêté
-   * net : posé avant de le lire, retiré quand le fichier est gardé pour un autre essai.
+   * Compte une lecture de plus (`trying`) ou retire le témoin de lecture d'un fichier, gardé par le téléphone même si
+   * Gtracker est arrêté net : augmenté avant chaque lecture, retiré quand le fichier est gardé pour un autre essai.
    */
   mark(id: string, trying: boolean): Promise<void>;
   /** Appelé à chaque fichier reçu pendant que la page vit ; ceux d'avant se lisent par `list`. */
@@ -43,7 +44,7 @@ export interface IncomingFilesPort {
 }
 
 interface IncomingFilePlugin {
-  list(): Promise<{ files: { id: string; name: string; size: number; refusal: string | null; trying?: boolean }[] }>;
+  list(): Promise<{ files: { id: string; name: string; size: number; refusal: string | null; tries?: number; trying?: boolean }[] }>;
   read(options: { id: string }): Promise<{ data: string | null }>;
   remove(options: { id: string }): Promise<void>;
   mark(options: { id: string; trying: boolean }): Promise<void>;
@@ -58,11 +59,21 @@ const refusalOf = (code: string | null): IncomingRefusal | null => {
   return code === 'format' || code === 'trop-gros' ? code : 'illisible';
 };
 
+/**
+ * Lectures commencées d'après le greffon. Un greffon qui ne rend que `trying` (témoin posé, sans compte) ne compte pas
+ * non plus ses lectures : relu, le fichier serait relu à chaque lancement s'il arrête Gtracker. Son témoin vaut donc le
+ * plafond, `Infinity`, et le fichier est refusé comme ce greffon le prévoyait.
+ */
+export const triesOf = (tries: number | undefined, trying: boolean | undefined): number => {
+  if (typeof tries === 'number' && Number.isFinite(tries)) return Math.max(0, Math.floor(tries));
+  return trying === true ? Infinity : 0;
+};
+
 export const incomingFiles: IncomingFilesPort = {
   list: async () => {
     if (!isNativeApp()) return [];
     const { files } = await plugin.list();
-    return files.map((file) => ({ ...file, refusal: refusalOf(file.refusal), trying: file.trying === true }));
+    return files.map(({ id, name, size, refusal, tries, trying }) => ({ id, name, size, refusal: refusalOf(refusal), tries: triesOf(tries, trying) }));
   },
   read: async (id) => {
     if (!isNativeApp()) return null;

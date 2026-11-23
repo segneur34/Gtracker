@@ -54,6 +54,7 @@ const BRIDGE_ACTIVITY = packageSource('@capacitor/android/capacitor/src/main/jav
 const WEBVIEW_LISTENER = packageSource('@capacitor/android/capacitor/src/main/java/com/getcapacitor/WebViewListener.java');
 const MAIN_ACTIVITY = appJava('MainActivity.java');
 const INCOMING_PLUGIN = appJava('IncomingFilePlugin.java');
+const INCOMING_PORT = fs.readFileSync(new URL('./incomingFile.ts', import.meta.url), 'utf8');
 const LOCATION_TS = fs.readFileSync(new URL('./location.ts', import.meta.url), 'utf8');
 const RECORDING_SERVICE = appJava('RecordingService.java');
 const RECORDING_PLUGIN = appJava('RecordingPlugin.java');
@@ -321,9 +322,12 @@ describe('fichiers reçus d\'une autre application', () => {
     expect(between(INCOMING_PLUGIN, 'private static void runOnWorker', 'public void load()')).toContain('catch (Exception | OutOfMemoryError e)');
   });
 
-  it('le témoin de lecture que la page pose (`mark`) sur le fil de la file, et que `list` rend par `trying`', () => {
-    expect(between(INCOMING_PLUGIN, 'public void mark(PluginCall call)', 'witness.createNewFile()')).toContain('runOnWorker(() -> {');
-    expect(between(INCOMING_PLUGIN, 'public void list(PluginCall call)', 'public void read(PluginCall call)')).toMatch(/isWitness\(file\.getName\(\)\)\) continue;[\s\S]*entry\.put\("trying", /);
+  it('le témoin de lecture que la page augmente (`mark`) sur le fil de la file, et dont `list` rend le compte par `tries`', () => {
+    expect(between(INCOMING_PLUGIN, 'public void mark(PluginCall call)', 'writeTries(witness, triesOf(witness) + 1)')).toContain('runOnWorker(() -> {');
+    expect(between(INCOMING_PLUGIN, 'public void mark(PluginCall call)', 'writeTries(witness')).toContain('call.getBoolean("trying", false)');
+    expect(between(INCOMING_PLUGIN, 'public void list(PluginCall call)', 'public void read(PluginCall call)')).toMatch(/isWitness\(file\.getName\(\)\)\) continue;[\s\S]*entry\.put\("tries", /);
+    expect(INCOMING_PORT).toMatch(/tries\?: number/);
+    expect(INCOMING_PORT).toContain('plugin.mark({ id, trying })');
   });
 });
 
