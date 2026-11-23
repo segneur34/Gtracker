@@ -94,7 +94,7 @@ export const WINDOW_SCAN_START: WindowScan = { next: 0, j: 1, best: null };
  * `bestWindowSpeedMs` d'une trace entière, en balayage repris : les cumuls
  * `cum` sont ceux de la trace (ou d'un passage, ses cumuls repartant de 0),
  * `holes[offset + k]` le nombre de trous parmi les pas qui mènent à ses
- * points 1 à k (`extendHoleCounts`, décalé de `offset` pour un passage).
+ * points d'indice 1 à k (`extendHoleCounts`, décalé de `offset` pour un passage).
  * Le balayage part de `from` ; rend la meilleure vitesse et l'état qui suit
  * la dernière fenêtre finie avant le point `frozenBefore` : sur une trace
  * prolongée dont ces points ne changent pas, il reprend de là les mêmes
@@ -145,7 +145,7 @@ export const extendHoleCounts = (track: readonly TrackPoint[], holes: number[], 
 };
 
 /**
- * Nombre de trous parmi les pas qui mènent aux points 1 à k : la fenêtre
+ * Nombre de trous parmi les pas qui mènent aux points d'indice 1 à k : la fenêtre
  * [i, j] en contient un si `gapCount[j] > gapCount[i]`.
  */
 const holeCounts = (track: TrackPoint[]): Int32Array => {

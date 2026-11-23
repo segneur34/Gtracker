@@ -45,6 +45,7 @@ export const ATELIER = [
   'docs/DECISIONS.md',
   'outils/backlog.mjs',
   'outils/backlog.test.mjs',
+  'outils/docs-atelier.json',
   'outils/fin-de-lot.mjs',
   'outils/fin-de-lot.test.mjs',
   'outils/lancer-gtracker.bat',
@@ -113,6 +114,35 @@ export const AVERTISSEMENTS = [
   { nom: 'point N', re: /\b[Pp]oints? \d+/ },
   { nom: '.claude/worktrees', re: /\.claude[\\/]+worktrees/ },
 ]
+
+/**
+ * Exceptions connues du vocabulaire d'atelier : un avertissement (par son nom) permis dans ces fichiers, avec la raison.
+ * Elles sont comptées au relevé, jamais détaillées. Une exception qui ne trouve plus rien se retire.
+ */
+export const EXCEPTIONS_VOCABULAIRE = [
+  {
+    nom: 'MODELES',
+    fichiers: ['outils/banc/exe-sansfil.mjs', 'outils/banc/exe-synchroniser.mjs'],
+    raison: 'variable des scripts (les sessions modèles copiées dans chaque mémoire), pas le document',
+  },
+  {
+    nom: '.claude/worktrees',
+    fichiers: ['.gitignore', '.oxlintrc.json', 'vite.config.ts', 'outils/verif.mjs', 'outils/banc/passe.mjs'],
+    raison: 'chemin des copies de travail, ignoré quand il existe ; sans effet dans le dépôt remis',
+  },
+]
+
+/**
+ * Relevé du vocabulaire d'atelier : `avertissements`, les trouvailles hors exceptions (`[{ nom, trouvailles }]`, motifs
+ * sans trouvaille compris) ; `exceptions`, le nombre de lignes retenues par les exceptions connues.
+ */
+export function releveVocabulaire(fichiers, { avertissements = AVERTISSEMENTS, exceptions = EXCEPTIONS_VOCABULAIRE } = {}) {
+  const exemptes = (nom) => exceptions.filter((e) => e.nom === nom).flatMap((e) => e.fichiers)
+  const bruts = rechercher(fichiers, avertissements, { binaires: false })
+  const nets = rechercher(fichiers, avertissements.map((m) => ({ ...m, exemptes: [...(m.exemptes ?? []), ...exemptes(m.nom)] })), { binaires: false })
+  const compte = (r) => r.reduce((n, x) => n + x.trouvailles.length, 0)
+  return { avertissements: nets, exceptions: compte(bruts) - compte(nets) }
+}
 
 /** Refus avant tout geste (usage, configuration, dossier de sortie, document mal balisé) : message imprimé tel quel. */
 export class ErreurLivraison extends Error {}
@@ -650,8 +680,11 @@ export function principal(argv, { racine = process.cwd(), ecrire = console.log, 
       ecrire(`${c.ok ? 'passé' : 'ÉCHEC'} : ${c.nom}`)
       for (const d of c.ok && c.nom.startsWith('vérification') ? c.details : c.ok ? [] : c.details) ecrire(`  ${d}`)
     }
-    for (const r of rechercher(fichiers, AVERTISSEMENTS, { binaires: false })) {
-      if (r.trouvailles.length) ecrire(`avertissement « ${r.nom} » : ${r.trouvailles.length} dans ${new Set(r.trouvailles.map((t) => t.chemin)).size} fichiers : ${groupe([...new Set(r.trouvailles.map((t) => t.chemin))])}`)
+    const vocabulaire = releveVocabulaire(fichiers)
+    const restants = vocabulaire.avertissements.filter((r) => r.trouvailles.length)
+    if (!restants.length) ecrire(`vocabulaire d'atelier : aucun avertissement (${vocabulaire.exceptions} ligne${vocabulaire.exceptions > 1 ? 's' : ''} d'exceptions connues, \`EXCEPTIONS_VOCABULAIRE\`)`)
+    for (const r of restants) {
+      ecrire(`avertissement « ${r.nom} » : ${r.trouvailles.length} dans ${new Set(r.trouvailles.map((t) => t.chemin)).size} fichiers : ${groupe([...new Set(r.trouvailles.map((t) => t.chemin))])}`)
     }
     const echecs = controles.filter((c) => !c.ok)
     if (echecs.length) {

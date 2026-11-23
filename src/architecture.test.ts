@@ -293,29 +293,21 @@ describe('aucun nom de calcul en dur hors de ses tables (capacités du profil)',
 });
 
 /**
- * Aucun renvoi d'atelier dans `src/`, tests compris : un lecteur de `src/` n'a ni le reste à faire, ni l'historique. Refusés :
- * un numéro de lot, une question « Qnn », un « n° N » du reste à faire, une section du journal et son nom. Une règle de
- * `ARCHITECTURE.md` (« règle n°2 ») et une section de `DECISIONS` (« DECISIONS §10 ») restent permises. Les dates ne sont pas gardées
- * (formats et exemples du métier). Les exceptions sont des faux amis, en « fichier  texte trouvé » : la liste ne fait que diminuer.
+ * Aucun renvoi d'atelier dans `src/`, tests compris : un lecteur de `src/` n'a pas les documents de suivi du projet, qui
+ * ne partent pas avec le code. Refusés : un numéro de lot ou de point, une question « Qnn », un « n° N », une section du
+ * journal et son nom. Une règle de `ARCHITECTURE.md` (« règle n°2 ») reste permise ; l'indice d'un point d'une trace
+ * s'écrit « point d'indice N ». Les dates ne sont pas gardées (formats et exemples du métier). Les exceptions sont des
+ * faux amis, en « fichier  texte trouvé » : la liste ne fait que diminuer.
  */
-const WORKSHOP_REFS = /\blots? [0-9]+|\bQ[0-9]{1,3}\b|(?<!règle )n° ?[0-9]+|\bpoints? [0-9]+|(?<!DECISIONS )§ ?10\b|HISTORIQ[U]E/;
-const WORKSHOP_EXCEPTIONS: readonly string[] = (
-  [
-    // L'indice d'un point d'une trace, pas un renvoi : fichier, mot, numéro.
-    ['core/kinematics.test.ts', 'point', 10],
-    ['core/sessionStats.test.ts', 'point', 65],
-    ['core/topSegments.ts', 'points', 1],
-    ['sailing/sailingAnalytics.ts', 'points', 0],
-    ['test/gpx/corpus.ts', 'points', 0],
-  ] as const
-).map(([file, word, n]) => `${file}  ${word} ${n}`);
+const WORKSHOP_REFS = /\b[Ll]ots? [0-9]+|\bQ[0-9]{1,3}\b|(?<!règle )n° ?[0-9]+|\b[Pp]oints? [0-9]+|§ ?10\b|HISTORIQ[U]E/;
+const WORKSHOP_EXCEPTIONS: readonly string[] = [];
 
 describe("aucun renvoi d'atelier dans src/", () => {
   const found = matchesIn(everyFile(), WORKSHOP_REFS);
 
   it('le motif attrape les renvois, pas les règles ni les sections de décisions', () => {
-    for (const text of ['lot ' + '12', 'lots ' + '12 et 13', 'Q' + '32', 'n° ' + '27', '§' + '10', 'HISTORI' + 'QUE', 'point ' + '104']) expect(WORKSHOP_REFS.test(text), text).toBe(true);
-    for (const text of ['règle n°2', 'DECISIONS §10', 'un lot de points', 'le point A']) expect(WORKSHOP_REFS.test(text), text).toBe(false);
+    for (const text of ['lot ' + '12', 'lots ' + '12 et 13', 'Lot ' + '81 :', 'Q' + '32', 'n° ' + '27', '§' + '10', 'HISTORI' + 'QUE', 'point ' + '104', 'Points ' + '3 et 4']) expect(WORKSHOP_REFS.test(text), text).toBe(true);
+    for (const text of ['règle n°2', 'un lot de points', 'le point A', "le point d'indice 10"]) expect(WORKSHOP_REFS.test(text), text).toBe(false);
   });
 
   it('aucun renvoi, hors des faux amis nommés', () => {
@@ -331,7 +323,7 @@ describe("aucun renvoi d'atelier dans src/", () => {
 /**
  * Règle 13 d'`ARCHITECTURE.md`, seconde phrase : aucune donnée d'une autre application n'est relue, sauf par la porte d'import
  * (`library/legacyImport`). Seuls ces fichiers de `src/` l'importent (code, tests compris) : la liste ne fait que diminuer.
- * Le nom de l'ancienne application, lui, est gardé par `heritage.test.ts`.
+ * Le nom de l'ancienne application, lui, n'est pas l'objet de cette garde.
  */
 const IMPORT_DOOR_USERS: readonly string[] = [
   'hooks/sessionLibrary/importer.ts',

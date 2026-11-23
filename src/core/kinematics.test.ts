@@ -138,7 +138,7 @@ describe('computeKinematics', () => {
     points[10] = { ...points[10], lon: points[10].lon + 500 / metersPerDegLon };
 
     const track = computeKinematics(points);
-    // Sans écrêtage, le point 10 afficherait plus de 500 m/s.
+    // Sans écrêtage, le point d'indice 10 afficherait plus de 500 m/s.
     expect(track[10].speedMs).toBeLessThan(20);
     expect(Math.max(...track.map((p) => p.smoothedSpeedMs))).toBeLessThan(20);
   });

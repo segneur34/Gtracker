@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 import {
   ATELIER,
   AVERTISSEMENTS,
+  EXCEPTIONS_VOCABULAIRE,
   ErreurLivraison,
   FICHIERS_NOMMES,
   MOTIFS_BLOQUANTS,
@@ -23,6 +24,7 @@ import {
   planifier,
   principal,
   rechercher,
+  releveVocabulaire,
   resumerTrouvailles,
   retirerBlocsAtelier,
   retirerScripts,
@@ -67,7 +69,7 @@ describe('plan : ce qui part et ce qui reste', () => {
   })
 
   it('l\'atelier couvre ses fichiers propres, et l\'outil lui-même', () => {
-    for (const c of ['CLAUDE.md', 'docs/BACKLOG.md', 'docs/MODELES.md', 'docs/HISTORIQUE.md', 'docs/DECISIONS.md', 'outils/livraison.mjs', 'outils/livraison.test.mjs', 'src/heritage.test.ts', 'src/landWords.test.ts', 'outils/heritage.json']) {
+    for (const c of ['CLAUDE.md', 'docs/BACKLOG.md', 'docs/MODELES.md', 'docs/HISTORIQUE.md', 'docs/DECISIONS.md', 'outils/livraison.mjs', 'outils/livraison.test.mjs', 'src/heritage.test.ts', 'src/landWords.test.ts', 'outils/heritage.json', 'outils/docs-atelier.json']) {
       expect(ATELIER, c).toContain(c)
     }
   })
@@ -171,6 +173,29 @@ describe('recherches', () => {
     expect([...FICHIERS_NOMMES, 'src/heritage.test.ts'].sort()).toEqual(nommes.sort())
     const montres = /const SHOWN_NAME[\s\S]*?\];/.exec(garde)[0].match(/fichier: '[^']+'/g).map((s) => s.slice(10, -1))
     expect(NOM_MONTRE.map((n) => n.fichier).sort()).toEqual(montres.sort())
+  })
+
+  it('vocabulaire d\'atelier : les exceptions connues sont comptées à part, le reste est un avertissement', () => {
+    const fichiers = [
+      fichier('outils/banc/exe-sansfil.mjs', 'let MODELES = []'),
+      fichier('outils/banc/autre.mjs', 'let MODELES = []'),
+      fichier('.gitignore', '.claude/worktrees/'),
+      fichier('README.md', 'voir le lot ' + '123'),
+    ]
+    const r = releveVocabulaire(fichiers)
+    expect(r.exceptions).toBe(2)
+    const trouves = Object.fromEntries(r.avertissements.filter((a) => a.trouvailles.length).map((a) => [a.nom, a.trouvailles.map((t) => t.chemin)]))
+    expect(trouves).toEqual({ MODELES: ['outils/banc/autre.mjs'], 'lot N': ['README.md'] })
+    expect(releveVocabulaire([fichier('vite.config.ts', 'ignorer .claude/worktrees/**')])).toEqual({ avertissements: AVERTISSEMENTS.map((m) => ({ nom: m.nom, trouvailles: [] })), exceptions: 1 })
+  })
+
+  it('chaque exception du vocabulaire nomme un avertissement, des fichiers et sa raison', () => {
+    const noms = new Set(AVERTISSEMENTS.map((m) => m.nom))
+    for (const e of EXCEPTIONS_VOCABULAIRE) {
+      expect(noms.has(e.nom), e.nom).toBe(true)
+      expect(e.fichiers.length, e.nom).toBeGreaterThan(0)
+      expect(e.raison.length, e.nom).toBeGreaterThan(10)
+    }
   })
 
   it('aucun motif n\'a le drapeau g (test garderait sa position)', () => {

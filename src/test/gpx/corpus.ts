@@ -295,7 +295,7 @@ const FOREIGN = { name: 'Session du matin', type: 'sailing' };
 const SAIL = { name: 'Wing du soir', type: 'wingfoil' };
 const N = BASE_POINT_COUNT;
 
-/** Retire l'heure d'un point sur six (les points 0, 6, 12…). */
+/** Retire l'heure d'un point sur six (indices 0, 6, 12…). */
 const someWithoutTime = (points: CorpusPoint[]): CorpusPoint[] => points.map((p, i) => (i % 6 === 0 ? { ...p, time: undefined } : p));
 const WITHOUT_TIME = Math.ceil(N / 6);
 

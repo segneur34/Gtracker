@@ -22,7 +22,7 @@ export default defineConfig({
     pool: 'forks',
     // Des tests lourds (corpus GPX, vent à tous les seuils) dépassaient les 5 s par défaut dès que le poste était occupé, un test différent à chaque fois.
     testTimeout: 30_000,
-    // Copies de travail des lots menés en parallèle (`/chaine`) : jamais testées depuis le dépôt principal.
+    // Copies de travail menées en parallèle : jamais testées depuis le dépôt principal.
     exclude: [...configDefaults.exclude, '.claude/worktrees/**'],
   },
   build: {

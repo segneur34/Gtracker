@@ -1,4 +1,4 @@
-// Icônes de l'application à partir du symbole GONG, `src/assets/logo/gong-symbol.svg` (lot 310) : symbole noir
+// Icônes de l'application à partir du symbole GONG, `src/assets/logo/gong-symbol.svg` : symbole noir
 // centré sur fond blanc, jamais une autre couleur (brief du DA de GONG, § 5 : marge d'environ 22 %, noir ou blanc
 // seulement). Sortent : icône Android (classique carrée arrondie, ronde, avant-plan de l'icône adaptative),
 // `public/favicon.png` (repli des navigateurs sans SVG ; `public/favicon.svg` est la copie du favicon GONG) et
@@ -7,7 +7,7 @@
 // Règles de taille : le symbole fait 56 % de la largeur d'une icône classique ou ronde (donc 22 % de marge de
 // chaque côté), et 37 % de la couche adaptative de 108 dp, soit 56 % du cercle visible de 72 dp. Le fond de
 // l'icône adaptative est la couleur de `values/ic_launcher_background.xml` ; `mipmap-anydpi-v26/` reste celui de
-// Capacitor. `assets/logo.png` ne sert plus qu'à l'écran de démarrage (lot 311).
+// Capacitor. `assets/logo.png` ne sert plus qu'à l'écran de démarrage.
 //
 // Les icônes : `node <chemin>/icones-android.mjs <racine du dépôt>`.
 //

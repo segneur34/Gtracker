@@ -125,7 +125,7 @@ describe('activeRuns', () => {
 
   it('trouve les suites du masque, et seul le masque décide : un trou de la trace ne coupe pas par sa durée', () => {
     expect(activeRuns(track, mask)).toEqual([{ start: 10, end: 30 }, { start: 50, end: 80 }]);
-    // Pas de 3 s au point 65 : actif dans le masque, il reste dans la suite ; inactif (trou immobile), il la coupe.
+    // Pas de 3 s au point d'indice 65 : actif dans le masque, il reste dans la suite ; inactif (trou immobile), il la coupe.
     const gapped = track.map((p, i) => (i >= 65 ? { ...p, timeMs: p.timeMs + 2000 } : p));
     expect(activeRuns(gapped, mask)).toEqual([{ start: 10, end: 30 }, { start: 50, end: 80 }]);
     const still = mask.map((m, i) => m && i !== 65);

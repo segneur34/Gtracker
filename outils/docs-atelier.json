@@ -1,0 +1,6 @@
+{
+  "documents": ["CLAUDE.md", "docs/DECISIONS.md", "docs/MODELES.md", "docs/BACKLOG.md"],
+  "journal": "docs/HISTORIQUE.md",
+  "sansNoms": ["docs/MODELES.md"],
+  "assistant": "Claude"
+}

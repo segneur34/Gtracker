@@ -439,7 +439,7 @@ const ligne = (n) => vaguesDepart.match(new RegExp(`(^|/ )${n}\\t(\\d\\d):(\\d\\
 const [l1, l2] = [ligne(1), ligne(2)];
 check('départ : deux vagues, comme les glisses (le départ ne fait pas compter une vague)', depart?.summary?.waveCount === 2 && l1 !== null && l2 !== null, `${depart?.summary?.waveCount} / ${vaguesDepart.slice(0, 200)}`);
 // Vague 1 : départ de 8 s (t = 96 à 104 s) puis 14 s de vague (104 à 118 s) : 22 s, 73 m dont 12 m de départ (somme des vitesses
-// des points 97 à 118 s), moyenne 12,0 km/h ; vague 2 : départ de 2 s (t = 219 à 221 s) puis 17 s (221 à 238 s) : 19 s, 89 m dont 4 m
+// de t = 97 à 118 s), moyenne 12,0 km/h ; vague 2 : départ de 2 s (t = 219 à 221 s) puis 17 s (221 à 238 s) : 19 s, 89 m dont 4 m
 // de départ. Sans départ : 14 s et 62 m, 17 s et 85 m.
 check('départ, vague 1 : durée 22 s à une seconde près (départ de 8 s compris), 73 m à 2 m près (62 m sans le départ)',
   l1 !== null && Math.abs(Number(l1[4]) - 22) <= 1 && Math.abs(Number(l1[5]) - 73) <= 2, `${l1?.[4]} s ${l1?.[5]} m`);

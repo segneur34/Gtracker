@@ -554,7 +554,7 @@ const vmgSums = (trackData: PointData[], wind: WindReference, minSpeedKn: number
   const cumSpeedDt = new Float64Array(n);
   const cumVmgDt = new Float64Array(n);
   const cumStbdDt = new Float64Array(n);
-  // Nombre de points sous le minimum parmi les points 0..k.
+  // Nombre de points sous le minimum parmi les points d'indice 0 à k.
   const cumBelow = new Int32Array(n);
   // Nombre d'intervalles en manœuvre, et d'intervalles plus longs que `maxGapS`, parmi les intervalles 1..k.
   const cumManeuver = new Int32Array(n);

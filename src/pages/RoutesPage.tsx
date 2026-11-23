@@ -32,7 +32,7 @@ import { STORAGE_KEYS } from '../core/appIdentity';
  * ouvre l'itinéraire, ou part dessus (« Partir »). Ceux d'une activité
  * cachée dans Réglages n'y sont pas.
  *
- * Lot 194 : « Partager le GPX » envoie le GPX d'un itinéraire, sa fiche en extension,
+ * « Partager le GPX » envoie le GPX d'un itinéraire, sa fiche en extension,
  * vers une autre application ; « Importer un itinéraire » range celui d'un GPX
  * choisi dans les fichiers, souligné dans la liste. « Partager l'image » ouvre
  * l'image de partage de l'itinéraire (`RouteImageShare`).

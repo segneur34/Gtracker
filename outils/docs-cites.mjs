@@ -1,17 +1,19 @@
 // Renvois des documents vivants : chaque fichier ou nom de code cité entre accents graves existe-t-il ?
 //
 //   node outils/docs-cites.mjs [document.md …]     sans argument : les documents remis, puis ceux de l'atelier
-//                                                  qui existent (listes ci-dessous)
+//                                                  quand sa configuration existe (ci-dessous)
 //
 // Un chemin (« core/units.ts », « outils/banc/ ») doit désigner un fichier ou un dossier du dépôt ; un nom seul
-// (« formatDecimal ») doit apparaître dans le code. `docs/HISTORIQUE.md` et `docs/backlog/` ne sont pas vérifiés :
-// ils citent légitimement des fichiers disparus. Un « point N » cité doit exister dans `docs/HISTORIQUE.md` dès que N
-// atteint le premier point du journal. Tout trouvé : une ligne ; sinon les renvois faux, code 1.
-// Sans dépendance.
+// (« formatDecimal ») doit apparaître dans le code. Les documents remis ne portent, hors de leurs blocs d'atelier,
+// aucun renvoi d'atelier (`vocabulaire.mjs`). Dans le dépôt de travail, la configuration de l'atelier
+// (`vocabulaire.mjs`, `lireAtelier`) ajoute ses documents et son journal : le journal n'est pas vérifié (il cite
+// légitimement des fichiers disparus), mais un « point N » cité doit y exister dès que N atteint son premier point.
+// Tout trouvé : une ligne ; sinon les renvois faux, code 1. Sans dépendance.
 
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { lignesHorsAtelier, lireAtelier, motsAtelier, renvois } from './vocabulaire.mjs'
 
 const racine = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 // Documents remis avec le dépôt : obligatoires, un document absent est un renvoi faux.
@@ -29,10 +31,11 @@ const DOCUMENTS = [
   'outils/banc/LISEZMOI.md',
   'outils/banc/SCRIPTS.md',
 ]
-// Documents de l'atelier, qui ne partent pas avec le dépôt remis (`outils/livraison.mjs`) : obligatoires dans le dépôt de
-// travail, reconnu à son journal (`docs/HISTORIQUE.md`) ; ailleurs, vérifiés seulement s'ils existent, pour que la
-// vérification passe aussi dans le dépôt remis.
-const DOCUMENTS_ATELIER = ['CLAUDE.md', 'docs/DECISIONS.md', 'docs/MODELES.md', 'docs/BACKLOG.md']
+// Documents de l'atelier, qui ne partent pas avec le dépôt remis : obligatoires quand sa configuration existe (dépôt de
+// travail) ; sans elle, rien, pour que la vérification passe aussi dans le dépôt remis.
+const atelier = lireAtelier(racine)
+const DOCUMENTS_ATELIER = atelier?.documents ?? []
+const MOTS_ATELIER = motsAtelier(atelier)
 // Fichiers générés par la construction et ignorés par git : jamais parcourus, pour voir ici ce que voit un clone neuf
 // (vérification sur GitHub ; `licences.json` n'était trouvé que dans la copie Android, sur ce seul poste).
 const GENERES = ['android/app/src/main/assets', 'android/capacitor-cordova-android-plugins']
@@ -44,8 +47,8 @@ const HORS_DEPOT = new Set([
   'node_modules/', 'gradlew', 'JAVA_HOME', 'ANDROID_HOME', 'MEMORY.md', '/', 'itineraires/', 'N-titre.md', 'docs/backlog/N-titre.md', 'Explore',
   'licences.json', 'fc-repos.json',
 ])
-// Documents dont les noms seuls viennent de Claude Code (modèles, options), pas du code : seuls leurs chemins comptent.
-const SANS_NOMS = new Set(['docs/MODELES.md'])
+// Documents dont les noms seuls viennent de l'outil de l'assistant (modèles, options), pas du code : seuls leurs chemins comptent.
+const SANS_NOMS = new Set(atelier?.sansNoms ?? [])
 const norm = (p) => p.split(path.sep).join('/')
 
 const fichiers = []
@@ -69,16 +72,14 @@ const vuDansLeCode = (nom) => {
   return code.some((s) => re.test(s))
 }
 
-// Points d'HISTORIQUE : le journal commence à son premier point (les précédents sont hors dépôt, voir son en-tête) ;
-// tout « point N » cité à partir de celui-là doit y exister.
-const JOURNAL = path.join(racine, 'docs/HISTORIQUE.md')
-const points = new Set(fs.existsSync(JOURNAL) ? [...fs.readFileSync(JOURNAL, 'utf8').matchAll(/^(\d+)\. /gm)].map((m) => Number(m[1])) : [])
+// Points du journal : il commence à son premier point (les précédents sont hors dépôt, voir son en-tête) ; tout
+// « point N » cité à partir de celui-là doit y exister.
+const JOURNAL = atelier?.journal ? path.join(racine, atelier.journal) : null
+const points = new Set(JOURNAL && fs.existsSync(JOURNAL) ? [...fs.readFileSync(JOURNAL, 'utf8').matchAll(/^(\d+)\. /gm)].map((m) => Number(m[1])) : [])
 const premierPoint = points.size > 0 ? Math.min(...points) : Infinity
 
-const documents =
-  process.argv.length > 2
-    ? process.argv.slice(2)
-    : [...DOCUMENTS, ...(fs.existsSync(JOURNAL) ? DOCUMENTS_ATELIER : DOCUMENTS_ATELIER.filter((d) => fs.existsSync(path.resolve(racine, d))))]
+const documents = process.argv.length > 2 ? process.argv.slice(2) : [...DOCUMENTS, ...DOCUMENTS_ATELIER]
+const remis = new Set(DOCUMENTS)
 const problemes = []
 for (const doc of documents) {
   const chemin = path.resolve(racine, doc)
@@ -87,14 +88,18 @@ for (const doc of documents) {
     continue
   }
   const vus = new Map()
-  fs.readFileSync(chemin, 'utf8').split('\n').forEach((ligne, i) => {
+  const texte = fs.readFileSync(chemin, 'utf8')
+  if (remis.has(doc)) {
+    for (const r of renvois(lignesHorsAtelier(texte), { mots: MOTS_ATELIER })) problemes.push(`${doc}:${r.ligne}  renvoi d'atelier (${r.nom}) : ${r.trouve}`)
+  }
+  texte.split('\n').forEach((ligne, i) => {
     for (const m of ligne.matchAll(/`([^`]+)`/g)) {
       const t = m[1].trim()
       if (!vus.has(t)) vus.set(t, i + 1)
     }
     for (const m of ligne.matchAll(/\bpoints? (\d+(?:(?:, | et | à )\d+)*)/g)) {
       for (const n of m[1].match(/\d+/g).map(Number)) {
-        if (n >= premierPoint && !points.has(n)) problemes.push(`${doc}:${i + 1}  point absent d'HISTORIQUE : ${n}`)
+        if (n >= premierPoint && !points.has(n)) problemes.push(`${doc}:${i + 1}  point absent du journal : ${n}`)
       }
     }
   })

@@ -188,7 +188,7 @@ describe('jeu d\'essai de la porte d\'import : le paquet de session', () => {
     const bundle = unbundleSessionGpx(LEGACY_WING_BUNDLE);
     expect(bundle.motion).not.toBeNull();
     expect(bundle.motion).toEqual(WING_IMU);
-    // Lot 321 : l'en-tête de l'ancienne application, tel qu'écrit, ne se lit qu'une fois converti par la porte d'import.
+    // L'en-tête de l'ancienne application, tel qu'écrit, ne se lit qu'une fois converti par la porte d'import.
     expect(imuHeaderJson(WING_IMU)).toMatchObject({ format: 'tracker-capteurs', setup: { placement: 'poitrine', foil: true, jumps: true, cadence: false } });
     expect(decodeImuHeader(WING_IMU)).toBeNull();
     const upgraded = upgradeImportedImu(WING_IMU);
@@ -362,7 +362,7 @@ describe('porte d\'import : la bibliothèque range les sessions de l\'ancienne a
   });
 });
 
-// --- Lot 321 : la porte lit l'ancien format et le convertit en entrant ---
+// --- La porte lit l'ancien format et le convertit en entrant ---
 
 describe('porte d\'import : lecture de l\'ancien format (fonctions pures)', () => {
   it('une fiche de l\'ancienne application se lit, sans les champs que Gtracker ne lit pas', () => {

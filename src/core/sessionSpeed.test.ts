@@ -236,7 +236,7 @@ describe('dates lues une fois, tri par indices', () => {
 
   it('samplingIntervalS : identique à la version gelée, avec et sans rawTimeMs (dates tronquées à 5 Hz exceptées)', () => {
     for (const [name, points] of cases()) {
-      // Lot 81 : les dates égales sont réparties ; 5 Hz tronqué donne 0,2 s, la copie gelée 1 s.
+      // Les dates égales sont réparties ; 5 Hz tronqué donne 0,2 s, la copie gelée 1 s.
       const want = name === '0.2 s, tronquées' ? 0.2 : frozenSamplingIntervalS(points);
       if (name === '0.2 s, tronquées') {
         expect(frozenSamplingIntervalS(points)).toBe(1);

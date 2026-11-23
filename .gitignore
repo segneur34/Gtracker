@@ -26,7 +26,7 @@ dist-ssr
 # Sorties de vitest 5 (reporters)
 .vitest/
 
-# Copies de travail des lots menés en parallèle (/chaine)
+# Copies de travail menées en parallèle
 .claude/worktrees/
 
 # Liste des fichiers du lot en cours, écrite par l'orchestrateur (crochet de l'agent lot)

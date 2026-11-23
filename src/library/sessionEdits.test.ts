@@ -259,7 +259,7 @@ describe('matériel enregistré dans le brouillon', () => {
 });
 
 /*
- * Lot 80 : copies gelées des fonctions d'avant la table des réglages
+ * Copies gelées des fonctions d'avant la table des réglages
  * (`ANALYSIS_FIELDS`), comparées aux nouvelles, valeur et ordre des clés compris.
  */
 const OLD_NOTE_FIELDS = Object.keys(EMPTY_NOTES) as (keyof SailingSessionNotes)[];
