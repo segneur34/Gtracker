@@ -255,7 +255,7 @@ try {
     await b.click(`[...document.querySelectorAll('[role=button]')].find((x) => x.textContent.trim() === 'Mémoire')`);
     await b.waitFor(`[...document.querySelectorAll('button')].some((x) => x.textContent.trim() === 'Mettre à jour')`, { timeout: 8000, label: 'Mettre à jour' });
     const reglages = await texte(b);
-    check('Réglages › Mémoire montre le chemin complet du dossier (« Emplacement : … sur ce PC. »)', reglages.includes(`Emplacement : ${propose}, sur ce PC.`), ligne(reglages, /Emplacement/));
+    check('Réglages › Mémoire montre le chemin complet du dossier (« … sur ce PC. », sous le titre « Emplacement »)', reglages.includes(`${propose}, sur ce PC.`), ligne(reglages, /Emplacement/));
     // Deux autres temporaires déposés programme ouvert : c'est « Mettre à jour » qui relit le dossier et les répare.
     writeFileSync(join(dossierSessions, 'notes-bis.txt.gtracker-tmp'), 'seconde reprise');
     writeFileSync(join(dossierSessions, 'brouillon-bis.txt.gtracker-new'), 'seconde ecriture');

@@ -288,7 +288,7 @@ const carte = (b) => b.evaluate(`(() => {
   if (!c) return null;
   const tx = (s) => c.querySelector(s)?.textContent.trim() ?? null;
   return {
-    titre: tx('.wireless-card__title'),
+    titre: tx('.settings-section__title'),
     coche: c.querySelector('.wireless-card__toggle')?.checked ?? null,
     statut: tx('.wireless-card__status'),
     avertissement: tx('.wireless-card__warning'),
@@ -575,8 +575,8 @@ try {
       let c = await carte(b);
       console.log(`  bloc, éteint : ${JSON.stringify(c.texte)}`);
       check('1a. le bloc « Téléphone » est là (plus « Téléphone sans câble »), case décochée', c.titre === 'Téléphone' && c.coche === false, JSON.stringify({ titre: c.titre, coche: c.coche }));
-      const contenuConnexion = await b.evaluate(`[...document.querySelectorAll('.wireless-card__title, .phone-app__title, .connection-settings__title')].map((x) => x.textContent.trim()).join(' > ')`);
-      check('1a. le bloc Connexion : Téléphone, Application du téléphone, puis la ligne des ceintures (« Sur l\'application Android seulement. »), dans cet ordre', contenuConnexion === 'Téléphone > Application du téléphone > Ceintures et montres' && /Sur l'application Android seulement\./.test(await b.evaluate(`document.querySelector('.connection-settings__title')?.parentElement?.innerText ?? ''`)), contenuConnexion);
+      const contenuConnexion = await b.evaluate(`[...document.querySelectorAll('.settings-block__body .settings-section__title')].map((x) => x.textContent.trim()).join(' > ')`);
+      check('1a. le bloc Connexion : Téléphone, Application du téléphone, puis la ligne des ceintures (« Sur l\'application Android seulement. »), dans cet ordre', contenuConnexion === 'Téléphone > Application du téléphone > Ceintures et montres' && /Sur l'application Android seulement\./.test(await b.evaluate(`[...document.querySelectorAll('.settings-section__title')].find((x) => x.textContent.trim() === 'Ceintures et montres')?.closest('.settings-section')?.innerText ?? ''`)), contenuConnexion);
       check('1a. le paragraphe replié « Par câble (avancé) » est là, fermé, et dit le débogage USB comme une possibilité', c.cable !== null && c.cable.resume === 'Par câble (avancé)' && c.cable.ouvert === false && /Débogage USB/.test(c.cable.texte) && !/Débogage USB/.test(c.texte), JSON.stringify(c.cable));
       check('1a. la phrase d\'état dit que le sans-fil est éteint', c.statut === 'Le sans-fil est éteint : le téléphone ne peut pas se présenter à cet ordinateur.', c.statut);
       check('1a. la phrase prévient que Windows va demander de confirmer (et que l\'autorisation vaut sur les réseaux publics)', c.texte.includes(ALLUMAGE), c.texte);

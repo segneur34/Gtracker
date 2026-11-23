@@ -87,23 +87,36 @@ check('blocs : plus de bloc « Capteurs »', (await evaluate(`![...document.quer
 const corps = (nom) => `${titreBloc(nom)}?.parentElement.querySelector('.settings-block__body')`;
 await evaluate(`${titreBloc('Connexion')}?.click(), 'ok'`);
 await waitFor(`Boolean(${corps('Connexion')})`, { timeout: 2000, label: 'bloc Connexion' });
-const connexion = await evaluate(`(() => { const c = ${corps('Connexion')}; return { texte: c.innerText.replace(/\\n+/g, ' | '), titre: c.querySelector('.connection-settings__title')?.textContent.trim() ?? null, cartes: c.querySelectorAll('.wireless-card, .phone-app, .computer-link__title').length }; })()`);
-// Sous le programme Windows, le bloc porte aussi le Téléphone et l'Application du téléphone, dans cet ordre ; dans le navigateur, la seule ligne des ceintures.
+// Les titres des parties d'un bloc, dans l'ordre de la page : les `strong.settings-section__title` et les titres repliables (« Remise à zéro »).
+// `nom` : le bloc à lire ; sans lui, toute la page (« Mémoire » n'a pas de corps à part, les autres blocs étant repliés).
+const titresParties = (nom) => evaluate(`[...(${nom ? corps(nom) : 'document'}).querySelectorAll('.settings-section__title, .settings-section strong[role=button]')].map((x) => x.textContent.trim()).join(' > ')`);
+const connexion = await evaluate(`(() => { const c = ${corps('Connexion')}; return { texte: c.innerText.replace(/\\n+/g, ' | '), cartes: c.querySelectorAll('.wireless-card, .phone-app, .computer-link').length }; })()`);
+// Sous le programme Windows, le bloc porte aussi le Téléphone et l'Application du téléphone, dans cet ordre ; dans le navigateur, la seule partie des ceintures.
 const ordinateur = await evaluate(`Boolean(document.querySelector('.wireless-card'))`);
-console.log(ordinateur ? 'Connexion (programme Windows) :' : 'Connexion (navigateur) :', ordinateur ? await evaluate(`[...document.querySelectorAll('.wireless-card__title, .phone-app__title, .connection-settings__title')].map((x) => x.textContent.trim()).join(' > ')`) : connexion.texte);
+const titresConnexion = await titresParties('Connexion');
+console.log(ordinateur ? 'Connexion (programme Windows) :' : 'Connexion (navigateur) :', ordinateur ? titresConnexion : connexion.texte);
 if (ordinateur) {
-  const titres = await evaluate(`[...document.querySelectorAll('.wireless-card__title, .phone-app__title, .connection-settings__title')].map((x) => x.textContent.trim()).join(' > ')`);
-  check('Connexion, programme Windows : Téléphone, Application du téléphone, puis la ligne des ceintures', titres === 'Téléphone > Application du téléphone > Ceintures et montres' && connexion.texte.includes("Sur l'application Android seulement."), titres);
+  check('Connexion, programme Windows : Téléphone, Application du téléphone, puis Ceintures et montres', titresConnexion === 'Téléphone > Application du téléphone > Ceintures et montres' && connexion.texte.includes("Sur l'application Android seulement."), titresConnexion);
 } else {
-  check('Connexion, navigateur : la seule ligne des ceintures (titre et phrase)', connexion.titre === 'Ceintures et montres' && connexion.texte.includes("Sur l'application Android seulement.") && connexion.cartes === 0, connexion.texte);
+  check('Connexion, navigateur : la seule partie des ceintures (titre et phrase)', titresConnexion === 'Ceintures et montres' && connexion.texte.includes("Sur l'application Android seulement.") && connexion.cartes === 0, connexion.texte);
 }
 await evaluate(`${titreBloc('Connexion')}?.click(), 'ok'`);
 console.log('carte Mémoire :', await openMemory());
 await wait(300);
+const titresMemoire = await titresParties();
+console.log('Mémoire, parties :', titresMemoire);
+check('Mémoire (navigateur) : parties dans l\'ordre, titres du même style', titresMemoire === 'Mise à jour > Emplacement > Réglages > Lieu des sessions > Remise à zéro', titresMemoire);
 // Connexion est refermé : aucune carte de liaison ne doit rester sur la page, Mémoire ouvert.
-const liaison = await evaluate(`document.querySelectorAll('.wireless-card, .phone-app, .computer-link__title').length`);
+const liaison = await evaluate(`document.querySelectorAll('.wireless-card, .phone-app, .computer-link').length`);
 check('Mémoire ouvert : plus aucune carte de liaison', liaison === 0, liaison);
 await evaluate(`${titreBloc('Mémoire')}?.click(), 'ok'`);
+await wait(300);
+await evaluate(`${titreBloc('Pratiquant')}?.click(), 'ok'`);
+await waitFor(`Boolean(${corps('Pratiquant')})`, { timeout: 2000, label: 'bloc Pratiquant' });
+const titresPratiquant = await titresParties('Pratiquant');
+console.log('Pratiquant, parties :', titresPratiquant);
+check('Pratiquant : « Écran Profil » puis « Corps et cœur »', titresPratiquant === 'Écran Profil > Corps et cœur', titresPratiquant);
+await evaluate(`${titreBloc('Pratiquant')}?.click(), 'ok'`);
 await wait(300);
 
 step('3. Le fichier de Léa, déposé dans reglages/');

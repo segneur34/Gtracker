@@ -163,7 +163,7 @@ const carte = (b) => b.evaluate(`(() => {
   const c = document.querySelector('.phone-app');
   if (!c) return null;
   return {
-    titre: c.querySelector('.phone-app__title')?.textContent.trim() ?? null,
+    titre: c.querySelector('.settings-section__title')?.textContent.trim() ?? null,
     phrases: [...c.querySelectorAll('p')].map((p) => p.textContent.trim()),
     boutons: [...c.querySelectorAll('button:not([aria-expanded])')].map((x) => x.textContent.trim()),
     resultat: c.querySelector('.phone-app__outcome')?.textContent.trim() ?? null,
@@ -246,7 +246,7 @@ try {
       check(`b. la carte dit « ${PHRASE_VERSION} » (version de package.json : ${VERSION})`, c.phrases.includes(PHRASE_VERSION), JSON.stringify(c.phrases));
       check('b. les deux boutons : « Enregistrer l\'APK… » et « Installer par le câble »', JSON.stringify(c.boutons) === JSON.stringify(["Enregistrer l'APK…", 'Installer par le câble']), JSON.stringify(c.boutons));
       check('b. aucun résultat affiché avant un geste', c.resultat === null, c.resultat);
-      const contenu = await b.evaluate(`[...document.querySelectorAll('.wireless-card__title, .phone-app__title, .connection-settings__title')].map((x) => x.textContent.trim()).join(' > ')`);
+      const contenu = await b.evaluate(`[...document.querySelectorAll('.settings-block__body .settings-section__title')].map((x) => x.textContent.trim()).join(' > ')`);
       check('b. le bloc Connexion : Téléphone, Application du téléphone, puis la ligne des ceintures, dans cet ordre', contenu === 'Téléphone > Application du téléphone > Ceintures et montres', contenu);
       // L'aide « ? » : dépliée, elle dit comment copier le fichier.
       const aide = await b.evaluate(`(() => { const t = document.querySelector('.phone-app [aria-expanded]'); if (!t) return 'absent'; t.click(); return 'ok'; })()`);
