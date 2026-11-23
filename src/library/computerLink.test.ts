@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ComputerLinkError, ComputerLinkStatus } from '../platform/computerLink';
 import {
-  EXCHANGE_SCREEN_ON_MS, addressFieldShown, addressWellFormed, cleanCode, codeComplete, describeLink, elapsedText, exchangeScreenOnUntil,
+  CODE_LENGTH, EXCHANGE_SCREEN_ON_MS, addressFieldShown, addressWellFormed, cleanCode, codeComplete, describeLink, elapsedText, exchangeScreenOnUntil,
   linkErrorText, linkSettled, refusalText, shouldAutoConnect, shownLinkStatus,
 } from './computerLink';
 
@@ -27,6 +27,12 @@ describe('saisie du code et de l\'adresse', () => {
     for (const bad of ['', '192.168.1', '192.168.1.256', '192.168.1.20:0', '192.168.1.20:65536', '192.168.1.20:', 'pc-salon:48217', '192.168.1.20:48217:1']) {
       expect(addressWellFormed(bad), bad).toBe(false);
     }
+  });
+
+  it('les phrases qui disent la longueur du code suivent `CODE_LENGTH`', () => {
+    // Les clés de traduction gardent le nombre écrit en toutes lettres : ce test les fait relire si la longueur change.
+    expect(linkErrorText('code')).toContain(`${CODE_LENGTH} chiffres`);
+    expect(refusalText('code')).toContain(`${CODE_LENGTH} chiffres`);
   });
 });
 

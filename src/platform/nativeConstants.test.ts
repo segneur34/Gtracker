@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FILE_FORMATS, FORMAT_ID } from '../core/appIdentity';
+import { CODE_LENGTH } from '../library/computerLink';
 import { MAX_LISTED_FILE_BYTES } from '../library/reconcile';
 import { NATIVE_LOG_VERSION, parseNativeLog } from '../recording/nativeLog';
 
@@ -319,6 +320,11 @@ describe('fichiers reçus d\'une autre application', () => {
     expect(entry.indexOf('receive(context, uri, refusalWithoutFile);')).toBeGreaterThan(entry.indexOf('runOnWorker(() -> {'));
     expect(between(INCOMING_PLUGIN, 'private static void runOnWorker', 'public void load()')).toContain('catch (Exception | OutOfMemoryError e)');
   });
+
+  it('le témoin de lecture que la page pose (`mark`) sur le fil de la file, et que `list` rend par `trying`', () => {
+    expect(between(INCOMING_PLUGIN, 'public void mark(PluginCall call)', 'witness.createNewFile()')).toContain('runOnWorker(() -> {');
+    expect(between(INCOMING_PLUGIN, 'public void list(PluginCall call)', 'public void read(PluginCall call)')).toMatch(/isWitness\(file\.getName\(\)\)\) continue;[\s\S]*entry\.put\("trying", /);
+  });
 });
 
 /**
@@ -369,6 +375,7 @@ describe('liaison sans fil : mêmes constantes au PC et au téléphone', () => {
     expect(javaConst('NAME_MAX')).toBe(tsConst(TRAMES, 'NOM_MAX'));
     expect(javaConst('MESSAGE_MAX')).toBe(tsConst(TRAMES, 'MESSAGE_MAX'));
     expect(javaConst('CODE_DIGITS')).toBe(tsConst(APPAIRAGE, 'CHIFFRES_CODE'));
+    expect(CODE_LENGTH).toBe(tsConst(APPAIRAGE, 'CHIFFRES_CODE'));
     expect(javaConst('PC_NAME_MAX_BYTES')).toBe(tsConst(SONDE, 'NOM_PC_MAX_OCTETS'));
   });
 

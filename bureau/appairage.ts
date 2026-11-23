@@ -41,7 +41,7 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { ErreurDisque } from './disque'
 import type { RaisonRefus } from './trames'
-import { nomAdmis } from './trames'
+import { TAILLE_EMPREINTE, TAILLE_IDENTIFIANT, TAILLE_JETON, TAILLE_NONCE, TAILLE_PREUVE, nomAdmis } from './trames'
 
 /** Source d'octets aléatoires ; `randomBytes` de Node hors des tests. */
 export type Alea = (taille: number) => Uint8Array
@@ -65,14 +65,8 @@ export const ECHECS_MAX = 3
  */
 export const TENTATIVES_MAX = 10
 
-/** Taille d'un nonce, du jeton, d'une empreinte de certificat et d'une preuve, en octets. */
-export const TAILLE_NONCE = 32
-export const TAILLE_JETON = 32
-export const TAILLE_EMPREINTE = 32
-export const TAILLE_PREUVE = 32
-
-/** Taille de l'identifiant d'un PC ou d'un téléphone appairé, en octets. */
-export const TAILLE_IDENTIFIANT = 16
+/** Tailles des octets de l'appairage, tenues par `trames.ts` qui lit les messages. */
+export { TAILLE_EMPREINTE, TAILLE_IDENTIFIANT, TAILLE_JETON, TAILLE_NONCE, TAILLE_PREUVE }
 
 /** Étiquettes qui séparent la preuve du téléphone de celle du PC : l'une ne peut pas servir pour l'autre. */
 export const ETIQUETTE_TELEPHONE = 'gtracker-appairage-telephone'

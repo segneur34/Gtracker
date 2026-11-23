@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { WirelessPhone, WirelessState } from '../platform/wirelessPhone';
 import {
   authorizationNoticeText, authorizationOutcomeText, countdownText, describePhoneSeen, describeWireless, firewallNotice, pairingAddress, pairingDeadline, pairingStatus, remainingMs,
+  wrongCodesText,
 } from './wirelessPhone';
 
 const state = (patch: Partial<WirelessState> = {}): WirelessState => ({
@@ -109,5 +110,14 @@ describe('ligne d\'un téléphone relié', () => {
     expect(seen).toMatch(/^vu pour la dernière fois le .*2026/);
     // Jamais revenu depuis la liaison : la date de la liaison.
     expect(describePhoneSeen(phone({ ajouteLe: Date.UTC(2026, 10, 18, 9, 5) }))).toMatch(/2026/);
+  });
+});
+
+describe('codes faux de la fenêtre de liaison', () => {
+  it('dit combien, et l’adresse d’où venait le dernier ; rien sans code faux ni d’une coquille plus ancienne', () => {
+    expect(wrongCodesText(state({ codesFaux: { nombre: 1, adresse: '192.168.1.37' } }))).toBe("Code faux reçu de l'appareil 192.168.1.37.");
+    expect(wrongCodesText(state({ codesFaux: { nombre: 3, adresse: '192.168.1.37' } }))).toBe("3 codes faux reçus, le dernier de l'appareil 192.168.1.37.");
+    expect(wrongCodesText(state({ codesFaux: null }))).toBeNull();
+    expect(wrongCodesText(state())).toBeNull();
   });
 });

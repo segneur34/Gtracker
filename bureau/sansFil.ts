@@ -93,6 +93,8 @@ import {
   LIMITES_ACCUEIL,
   PROTOCOLE_SANS_FIL,
   PORT_SANS_FIL,
+  TAILLE_NONCE,
+  TAILLE_PREUVE,
   blocsDEcriture,
   blocsDeLecture,
   capacitesDe,
@@ -115,7 +117,12 @@ export type { PareFeu }
 export type Delais = {
   /** Pour la poignée de main TLS. */
   poignee: number
-  /** Pour chaque message de l'accueil (présentation, preuve). */
+  /**
+   * Pour le premier message d'un inconnu (`appairer` ou `bonjour`), qu'un téléphone envoie dès la poignée faite : court,
+   * pour qu'une connexion muette ne garde pas longtemps une place d'inconnu.
+   */
+  presentation: number
+  /** Pour chaque message suivant de l'accueil (preuve). */
   accueil: number
   /** Pour la réponse à `lister` ou à un `lire` d'un bloc. */
   commande: number
@@ -136,6 +143,7 @@ export type Delais = {
 
 export const DELAIS: Readonly<Delais> = Object.freeze({
   poignee: 10_000,
+  presentation: 3_000,
   accueil: 10_000,
   commande: 30_000,
   intervallePing: 15_000,
@@ -145,14 +153,26 @@ export const DELAIS: Readonly<Delais> = Object.freeze({
   nouveauRelevePareFeu: 15_000,
 })
 
-/** Liaisons pas encore reconnues gardées ensemble ; au-delà, une connexion de plus est coupée aussitôt. */
-const INCONNUES_MAX = 8
+/** Liaisons pas encore reconnues gardées ensemble, toutes adresses confondues ; au-delà, une de plus est coupée aussitôt. */
+const INCONNUES_MAX = 16
+
+/**
+ * Connexions pas encore reconnues venues d'une même adresse, poignée TLS comprise ; au-delà, une de plus est coupée
+ * aussitôt : un hôte du réseau ne prend pas à lui seul les places des inconnus, et le téléphone garde la sienne.
+ */
+const INCONNUES_PAR_ADRESSE = 2
 
 /** Connexions ouvertes ensemble sur un serveur, reconnues ou non. */
 const CONNEXIONS_MAX = 32
 
-/** Réponses de découverte envoyées par seconde, au plus : un hôte bavard du réseau n'en obtient pas davantage. */
-const REPONSES_SONDE_PAR_SECONDE = 20
+/**
+ * Réponses de découverte envoyées par seconde, au plus, toutes adresses confondues. En UDP, l'adresse source se
+ * falsifie : au-delà de ce plafond, le téléphone joint encore le PC par sa dernière adresse connue ou par l'adresse tapée.
+ */
+const REPONSES_SONDE_PAR_SECONDE = 200
+
+/** Réponses de découverte envoyées par seconde à une même adresse : un hôte bavard n'en obtient pas davantage. */
+const REPONSES_SONDE_PAR_ADRESSE = 3
 
 /** Attente de la fin propre d'une liaison refusée avant de la couper. */
 const ATTENTE_FIN_MS = 2_000
@@ -542,6 +562,9 @@ export type AppairageOuvert = {
   restantMs: number
 }
 
+/** Codes faux reçus pendant la dernière fenêtre d'appairage : combien, et l'adresse d'où venait le dernier. */
+export type CodesFaux = { nombre: number; adresse: string }
+
 /** Un téléphone relié en ce moment. */
 export type TelephoneRelie = { id: string; nom: string }
 
@@ -561,6 +584,11 @@ export type EtatSansFil = {
   erreur: string | null
   /** Fenêtre d'appairage ouverte, `null` s'il n'y en a pas. */
   appairage: AppairageOuvert | null
+  /**
+   * Codes faux de la dernière fenêtre ouverte, gardés après sa fermeture (trois la ferment) jusqu'à la suivante ;
+   * `null` s'il n'y en a pas eu.
+   */
+  codesFaux: CodesFaux | null
   /** Téléphones reliés, le dernier arrivé en dernier. */
   relies: TelephoneRelie[]
 }
@@ -719,10 +747,14 @@ export class ServeurSansFil {
   private preparation: Promise<ReleveAvantEcoute | null> | null = null
   private demandeEnCours: Promise<ResultatAutorisation> | null = null
   private sonde: dgram.Socket | null = null
-  private reponsesSonde = { seconde: 0, nombre: 0 }
+  /** Réponses de découverte de la seconde en cours, en tout et par adresse (au plus `REPONSES_SONDE_PAR_SECONDE` adresses). */
+  private reponsesSonde = { seconde: 0, nombre: 0, parAdresse: new Map<string, number>() }
   private releve: NodeJS.Timeout | null = null
   private fenetre: FenetreAppairage | null = null
+  private codesFaux: CodesFaux | null = null
   private readonly inconnues = new Set<Liaison>()
+  /** Connexions pas encore reconnues, par adresse source : chacune sous sa clé « adresse:port ». */
+  private readonly enAttente = new Map<string, Set<string>>()
   /** Téléphones reliés, dans l'ordre d'arrivée. */
   private readonly relies = new Map<string, Relie>()
   /** Dernier départ de chaque téléphone parti depuis le lancement, oublié à son retour ou à son retrait. */
@@ -822,6 +854,7 @@ export class ServeurSansFil {
       }
       this.fenetre?.fermer()
       this.fenetre = new FenetreAppairage({ empreinte: certificat.empreinte, horloge: this.horloge, alea: this.alea, dureeMs: this.dureeFenetreMs })
+      this.codesFaux = null
       this.journal(`fenêtre d'appairage ouverte, port ${this.port}`, `fenêtre d'appairage ouverte sur ${this.adresses[0].adresse}:${this.port}`)
       return this.appairageVisible() as AppairageOuvert
     })
@@ -1154,6 +1187,7 @@ export class ServeurSansFil {
     this.releve = null
     this.fenetre?.fermer()
     this.fenetre = null
+    this.codesFaux = null
     for (const r of this.relies.values()) r.liaison.fermer(SANS_FIL_ETEINT)
     for (const l of this.inconnues) l.fermer(SANS_FIL_ETEINT)
     await Promise.all([...this.serveurs.values()].map(fermerServeur))
@@ -1180,6 +1214,7 @@ export class ServeurSansFil {
       )
       serveur.maxConnections = CONNEXIONS_MAX
       suivreConnexions(serveur)
+      serveur.on('connection', (socket: Socket) => this.compterArrivee(socket))
       // Poignée de main ratée (inconnu, client qui n'est pas en TLS) : la socket est déjà détruite par Node.
       serveur.on('tlsClientError', () => undefined)
       const echec = (e: Error) => {
@@ -1317,44 +1352,76 @@ export class ServeurSansFil {
     if (!question || this.port === null) return
     if (!this.adresses.some((a) => memeReseau(source.address, a.adresse, a.masque))) return
     const seconde = Math.floor(this.horloge() / 1000)
-    if (seconde !== this.reponsesSonde.seconde) this.reponsesSonde = { seconde, nombre: 0 }
-    if (++this.reponsesSonde.nombre > REPONSES_SONDE_PAR_SECONDE) return
-    const reponse = encoderReponse({ nonce: question.nonce, port: this.port, identifiant: Buffer.from(this.identifiantPc, 'hex'), nom: nomPcPourSonde(this.nomPc) })
+    if (seconde !== this.reponsesSonde.seconde) this.reponsesSonde = { seconde, nombre: 0, parAdresse: new Map() }
+    const compte = this.reponsesSonde
+    const deLAdresse = (compte.parAdresse.get(source.address) ?? 0) + 1
+    if (deLAdresse > REPONSES_SONDE_PAR_ADRESSE || compte.nombre >= REPONSES_SONDE_PAR_SECONDE) return
+    compte.parAdresse.set(source.address, deLAdresse)
+    compte.nombre++
+    // Nom vide : le téléphone ne s'en sert pas, et le nom de Windows n'a pas à partir chez tout hôte qui le demande.
+    const reponse = encoderReponse({ nonce: question.nonce, port: this.port, identifiant: Buffer.from(this.identifiantPc, 'hex'), nom: '' })
     sonde.send(reponse, source.port, source.address, () => undefined)
   }
 
   // ---------- accueil d'un téléphone ----------
+
+  /**
+   * Compte une connexion qui arrive, poignée TLS comprise, sous son adresse source, jusqu'à ce qu'elle soit reconnue
+   * ou fermée ; une de trop pour son adresse (`INCONNUES_PAR_ADRESSE`) est coupée aussitôt.
+   */
+  private compterArrivee(socket: Socket): void {
+    const origine = origineDe(socket)
+    const deLAdresse = this.enAttente.get(origine.adresse) ?? new Set<string>()
+    if (deLAdresse.size >= INCONNUES_PAR_ADRESSE) {
+      socket.destroy()
+      return
+    }
+    deLAdresse.add(origine.cle)
+    this.enAttente.set(origine.adresse, deLAdresse)
+    socket.once('close', () => this.oublierArrivee(origine))
+  }
+
+  /** Retire une connexion du compte de son adresse : reconnue, ou fermée. */
+  private oublierArrivee(origine: Origine): void {
+    const deLAdresse = this.enAttente.get(origine.adresse)
+    if (!deLAdresse) return
+    deLAdresse.delete(origine.cle)
+    if (deLAdresse.size === 0) this.enAttente.delete(origine.adresse)
+  }
 
   private accueillir(socket: tls.TLSSocket): void {
     if (!this.enService || this.inconnues.size >= INCONNUES_MAX) {
       socket.destroy()
       return
     }
+    const origine = origineDe(socket)
     const liaison = new Liaison(socket)
     this.inconnues.add(liaison)
     liaison.surFermeture(() => this.inconnues.delete(liaison))
-    void this.accueil(liaison).catch((e) => liaison.fermer((e as Error).message))
+    void this.accueil(liaison, origine).catch((e) => liaison.fermer((e as Error).message))
   }
 
-  private async accueil(liaison: Liaison): Promise<void> {
-    const premier = await liaison.prochain(this.delais.accueil)
-    if (premier.type === 'appairer') await this.appairer(liaison, premier)
-    else if (premier.type === 'bonjour') await this.bonjour(liaison, premier)
+  private async accueil(liaison: Liaison, origine: Origine): Promise<void> {
+    const premier = await liaison.prochain(this.delais.presentation)
+    if (premier.type === 'appairer') await this.appairer(liaison, origine, premier)
+    else if (premier.type === 'bonjour') await this.bonjour(liaison, origine, premier)
     else liaison.fermer(`message inattendu à l'accueil (« ${premier.type} »).`)
   }
 
-  private async appairer(liaison: Liaison, m: MessageAppairer): Promise<void> {
+  private async appairer(liaison: Liaison, origine: Origine, m: MessageAppairer): Promise<void> {
     if (m.version !== PROTOCOLE_SANS_FIL) return liaison.refuser('version')
     const fenetre = this.fenetre
     if (!fenetre) return liaison.refuser('fenetre')
-    const tentative = fenetre.commencer(depuisHex(m.nonceTelephone, 32) as Uint8Array)
+    const tentative = fenetre.commencer(depuisHex(m.nonceTelephone, TAILLE_NONCE) as Uint8Array)
     if (!tentative.ok) return liaison.refuser(tentative.raison)
     liaison.envoyer({ type: 'defi', noncePc: enHex(tentative.noncePc) })
     const r = await liaison.prochain(this.delais.accueil)
     if (r.type !== 'preuve') return liaison.fermer(`message inattendu pendant l'appairage (« ${r.type} »).`)
-    const conclusion = tentative.conclure(depuisHex(r.preuve, 32) as Uint8Array)
+    const conclusion = tentative.conclure(depuisHex(r.preuve, TAILLE_PREUVE) as Uint8Array)
     if (!conclusion.ok) {
-      this.journal(`appairage refusé : ${conclusion.raison}`)
+      // L'origine d'un code faux est montrée sur le PC : l'utilisateur voit si elle vient d'un autre appareil que le sien.
+      if (conclusion.raison === 'code' && this.fenetre === fenetre) this.codesFaux = { nombre: fenetre.echecs, adresse: origine.adresse }
+      this.journal(`appairage refusé : ${conclusion.raison}`, `appairage refusé (${origine.adresse}) : ${conclusion.raison}`)
       return liaison.refuser(conclusion.raison)
     }
     const maintenant = this.horloge()
@@ -1365,10 +1432,10 @@ export class ServeurSansFil {
     await this.sauverRegistre()
     if (!this.admissibleApresAttente(liaison, telephone.id)) return
     liaison.envoyer({ type: 'appaire', preuve: enHex(conclusion.preuvePc), jeton: enHex(conclusion.jeton), identifiantPc: this.identifiantPc, nomPc: this.nomPc })
-    this.reconnaitre(liaison, telephone, true, capacitesDe(m))
+    this.reconnaitre(liaison, origine, telephone, true, capacitesDe(m))
   }
 
-  private async bonjour(liaison: Liaison, m: MessageBonjour): Promise<void> {
+  private async bonjour(liaison: Liaison, origine: Origine, m: MessageBonjour): Promise<void> {
     if (m.version !== PROTOCOLE_SANS_FIL) return liaison.refuser('version')
     const telephone = this.registre.verifier(m.jeton)
     if (!telephone) {
@@ -1379,7 +1446,7 @@ export class ServeurSansFil {
     await this.sauverRegistre()
     if (!this.admissibleApresAttente(liaison, telephone.id)) return
     liaison.envoyer({ type: 'bienvenue', identifiantPc: this.identifiantPc, nomPc: this.nomPc })
-    this.reconnaitre(liaison, telephone, false, capacitesDe(m))
+    this.reconnaitre(liaison, origine, telephone, false, capacitesDe(m))
   }
 
   /**
@@ -1400,8 +1467,9 @@ export class ServeurSansFil {
     return true
   }
 
-  private reconnaitre(liaison: Liaison, telephone: TelephoneVisible, nouveau: boolean, capacites: readonly Capacite[]): void {
+  private reconnaitre(liaison: Liaison, origine: Origine, telephone: TelephoneVisible, nouveau: boolean, capacites: readonly Capacite[]): void {
     this.inconnues.delete(liaison)
+    this.oublierArrivee(origine)
     liaison.elargir()
     const relie: Relie = { id: telephone.id, nom: telephone.nom, liaison, commandes: new Commandes(liaison), capacites }
     this.relies.get(telephone.id)?.liaison.fermer(LIAISON_REMPLACEE)
@@ -1443,9 +1511,18 @@ export class ServeurSansFil {
       pareFeuReparable: this.port !== null && this.pareFeu === 'bloque' && this.pareFeuReparable && this.autoriserSysteme !== null,
       erreur: this.actif ? this.erreur : null,
       appairage: this.appairageVisible(),
-      relies: [...this.relies.values()].map(({ id, nom }) => ({ id, nom })),
+      codesFaux: this.codesFaux,
+      relies:[...this.relies.values()].map(({ id, nom }) => ({ id, nom })),
     }
   }
+}
+
+/** D'où vient une connexion : son adresse source, et sa clé « adresse:port », la même sur la socket et sur sa liaison TLS. */
+type Origine = { adresse: string; cle: string }
+
+function origineDe(socket: Socket): Origine {
+  const adresse = socket.remoteAddress ?? ''
+  return { adresse, cle: `${adresse}:${socket.remotePort ?? ''}` }
 }
 
 /** Sockets ouvertes de chaque serveur, poignées TLS en cours comprises. */

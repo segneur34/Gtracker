@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { t } from '../core/i18n';
 import { settingsBlockFromSearch } from '../core/parentPage';
 import { useWirelessPhones } from '../hooks/useWirelessPhones';
-import { authorizationNoticeText, countdownText, describePhoneSeen, describeWireless, firewallNotice, pairingAddress, remainingMs } from '../library/wirelessPhone';
+import { authorizationNoticeText, countdownText, describePhoneSeen, describeWireless, firewallNotice, pairingAddress, remainingMs, wrongCodesText } from '../library/wirelessPhone';
 import { phoneCableAvailable, phoneState } from '../platform/phoneCable';
 import Button from './ui/Button';
 import './WirelessPhoneCard.css';
@@ -80,6 +80,7 @@ function WirelessPhoneCard() {
   const active = state?.actif === true;
   const listening = status?.kind === 'listening';
   const waiting = pairing !== null && pairingStatus?.kind === 'waiting';
+  const wrongCodes = state !== null && pairing !== null ? wrongCodesText(state) : null;
 
   return (
     <div className="ui-stack-3 wireless-card" ref={cardRef}>
@@ -143,6 +144,7 @@ function WirelessPhoneCard() {
           {t("La fenêtre s'est fermée sans téléphone relié. Cliquez de nouveau sur « Relier un téléphone » et vérifiez le code tapé.")}
         </p>
       )}
+      {wrongCodes !== null && <p className="ui-text-s ui-m-0 wireless-card__wrong-codes" role="status">{wrongCodes}</p>}
 
       {(active || phones.length > 0) && (
         <div className="ui-stack-3 wireless-card__phones">

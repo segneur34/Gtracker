@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto'
+import dgram from 'node:dgram'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import net from 'node:net'
@@ -15,6 +16,7 @@ import type { Reponse } from './pont'
 import type { AvisArrivee, AvisDepart, Chiffreur, OptionsSansFil } from './sansFil'
 import {
   CANAUX_SANS_FIL,
+  DELAIS,
   classerDepart,
   FICHIER_CLE,
   FICHIER_REGLAGES,
@@ -27,6 +29,8 @@ import {
   pareFeuFactice,
   stockageDossier,
 } from './sansFil'
+import type { ReponseSonde } from './sonde'
+import { TAILLE_NONCE_SONDE, decoderReponse, encoderQuestion } from './sonde'
 import { dossierLocal, gestionnairesTelephone } from './telephone'
 import type { Commande, Message } from './trames'
 import { TAILLE_BLOC, encoderMessage, encoderTrame } from './trames'
@@ -75,10 +79,10 @@ async function quand(condition: () => boolean | Promise<boolean>): Promise<void>
   throw new Error('condition jamais remplie')
 }
 
-/** Une connexion TLS qui n'a rien d'un téléphone, poignée faite. */
-function connexionBrute(port: number): Promise<tls.TLSSocket> {
+/** Une connexion TLS qui n'a rien d'un téléphone, poignée faite, depuis l'adresse de boucle locale donnée. */
+function connexionBrute(port: number, adresseLocale = '127.0.0.1'): Promise<tls.TLSSocket> {
   return new Promise((resoudre, rejeter) => {
-    const socket = tls.connect({ host: '127.0.0.1', port, rejectUnauthorized: false })
+    const socket = tls.connect({ host: '127.0.0.1', port, localAddress: adresseLocale, rejectUnauthorized: false })
     socket.once('error', rejeter)
     socket.once('secureConnect', () => resoudre(socket))
   })
@@ -96,6 +100,27 @@ function fermeeDans(socket: net.Socket, ms: number): Promise<boolean> {
     })
     socket.resume()
   })
+}
+
+/** Vrai si une connexion TLS ouverte depuis `adresseLocale` est fermée par le serveur dans les `ms` données, poignée faite ou non. */
+function coupeeDans(port: number, adresseLocale: string, ms: number): Promise<boolean> {
+  const socket = tls.connect({ host: '127.0.0.1', port, localAddress: adresseLocale, rejectUnauthorized: false })
+  return fermeeDans(socket, ms).finally(() => socket.destroy())
+}
+
+/** Envoie `n` questions de découverte depuis `adresseLocale`, et rend les réponses reçues dans la demi-seconde qui suit. */
+async function questionner(portSonde: number, adresseLocale: string, n: number): Promise<ReponseSonde[]> {
+  const socket = dgram.createSocket('udp4')
+  const recues: ReponseSonde[] = []
+  socket.on('message', (paquet) => {
+    const reponse = decoderReponse(paquet)
+    if (reponse) recues.push(reponse)
+  })
+  await new Promise<void>((fin) => socket.bind(0, adresseLocale, () => fin()))
+  for (let k = 0; k < n; k++) socket.send(encoderQuestion(randomBytes(TAILLE_NONCE_SONDE)), portSonde, '127.0.0.1')
+  await attendre(500)
+  socket.close()
+  return recues
 }
 
 /** Appaire un faux téléphone au serveur, qui doit être activé. */
@@ -208,17 +233,23 @@ describe('serveur sans fil', () => {
     const { code } = await s.ouvrirAppairage()
     decalage = 121_000
     await expect(faux().appairer('127.0.0.1', port, code)).rejects.toMatchObject({ raison: 'fenetre' })
-    expect((await s.etat()).appairage).toBeNull()
+    expect(await s.etat()).toMatchObject({ appairage: null, codesFaux: null })
 
     decalage = 0
     const ouvert = await s.ouvrirAppairage()
     const faux1 = ouvert.code === '000000' ? '000001' : '000000'
     await expect(faux().appairer('127.0.0.1', port, faux1)).rejects.toBeInstanceOf(RefusPc)
+    // Le PC dit d'où vient chaque code faux, pour que l'utilisateur voie s'il vient d'un autre appareil que le sien.
+    expect((await s.etat()).codesFaux).toEqual({ nombre: 1, adresse: '127.0.0.1' })
     await expect(faux().appairer('127.0.0.1', port, faux1)).rejects.toMatchObject({ raison: 'code' })
     await expect(faux().appairer('127.0.0.1', port, faux1)).rejects.toMatchObject({ raison: 'code' })
-    // Trois échecs ferment la fenêtre : même le bon code ne passe plus.
+    // Trois échecs ferment la fenêtre : même le bon code ne passe plus, et l'origine reste dite.
     await expect(faux().appairer('127.0.0.1', port, ouvert.code)).rejects.toMatchObject({ raison: 'fenetre' })
+    expect(await s.etat()).toMatchObject({ appairage: null, codesFaux: { nombre: 3, adresse: '127.0.0.1' } })
     expect(await s.telephones()).toEqual([])
+    // Une fenêtre neuve repart sans code faux.
+    await s.ouvrirAppairage()
+    expect((await s.etat()).codesFaux).toBeNull()
   })
 
   it('refuse un jeton révoqué et coupe la liaison du téléphone retiré', async () => {
@@ -353,15 +384,27 @@ describe('serveur sans fil', () => {
     await expect(s.ouvrirAppairage()).rejects.toThrow(/réseau local/)
   })
 
-  it('répond à la découverte par son port et son identifiant', async () => {
+  it('répond à la découverte par son port et son identifiant, sans donner son nom', async () => {
     const s = serveur({ portSonde: 0, hoteSonde: '127.0.0.1' })
     await s.activer(true)
     const portSonde = s.portDecouverte() as number
     expect(portSonde).toBeGreaterThan(0)
     const trouve = await sonder('127.0.0.1', portSonde, 2_000)
-    expect(trouve).toMatchObject({ adresse: '127.0.0.1', port: (await s.etat()).port, nom: 'PC de test' })
+    expect(trouve).toMatchObject({ adresse: '127.0.0.1', port: (await s.etat()).port, nom: '' })
     const { f } = await appairer(s)
     expect(trouve?.identifiantPc).toBe(f.memoire?.identifiantPc)
+    // Le nom du PC ne part qu'au téléphone reconnu.
+    expect(f.memoire?.nomPc).toBe('PC de test')
+  })
+
+  it('répond trois fois par seconde au plus à une même adresse, sans priver les autres', async () => {
+    const fige = Date.now()
+    const s = serveur({ portSonde: 0, hoteSonde: '127.0.0.1', horloge: () => fige })
+    await s.activer(true)
+    const portSonde = s.portDecouverte() as number
+    expect(await questionner(portSonde, '127.0.0.1', 6)).toHaveLength(3)
+    expect(await questionner(portSonde, '127.0.0.2', 2)).toHaveLength(2)
+    expect(await questionner(portSonde, '127.0.0.1', 1)).toHaveLength(0)
   })
 })
 
@@ -382,17 +425,59 @@ describe('inconnus et téléphones hostiles', () => {
     expect((await s.etat()).relies).toEqual([])
   })
 
-  it('coupe aussitôt la neuvième connexion inconnue', async () => {
-    const s = serveur()
+  it('lâche un inconnu muet après le délai de présentation, plus court que celui de l’accueil', async () => {
+    expect(DELAIS.presentation).toBe(3_000)
+    expect(DELAIS.presentation).toBeLessThan(DELAIS.accueil)
+    const s = serveur({ delais: { presentation: 300 } })
     const port = (await s.activer(true)).port as number
-    const huit = await Promise.all(Array.from({ length: 8 }, () => connexionBrute(port)))
+    const muet = await connexionBrute(port)
+    expect(await fermeeDans(muet, 3_000)).toBe(true)
+  })
+
+  it('coupe aussitôt la troisième connexion inconnue d’une même adresse, pas celle d’une autre adresse', async () => {
+    // Sans l'essai d'auto-connexion, qui part de la même adresse de boucle locale et y prendrait une place.
+    const s = serveur({ delais: { presentation: 10_000 }, essaiPareFeu: false })
+    const port = (await s.activer(true)).port as number
+    const deux = await Promise.all([connexionBrute(port), connexionBrute(port)])
     try {
       await attendre(200)
-      const neuvieme = await connexionBrute(port)
-      expect(await fermeeDans(neuvieme, 3_000)).toBe(true)
-      expect(huit.every((socket) => !socket.closed)).toBe(true)
+      expect(await coupeeDans(port, '127.0.0.1', 3_000)).toBe(true)
+      const autre = await connexionBrute(port, '127.0.0.2')
+      expect(await fermeeDans(autre, 500)).toBe(false)
+      autre.destroy()
+      expect(deux.every((socket) => !socket.closed)).toBe(true)
     } finally {
-      for (const socket of huit) socket.destroy()
+      for (const socket of deux) socket.destroy()
+    }
+  })
+
+  it('garde seize connexions inconnues en tout, et coupe aussitôt la suivante', async () => {
+    const s = serveur({ delais: { presentation: 10_000 } })
+    const port = (await s.activer(true)).port as number
+    const adresses = Array.from({ length: 8 }, (_, k) => `127.0.0.${k + 2}`)
+    const seize = await Promise.all(adresses.flatMap((a) => [connexionBrute(port, a), connexionBrute(port, a)]))
+    try {
+      await attendre(200)
+      expect(await coupeeDans(port, '127.0.0.10', 3_000)).toBe(true)
+      expect(seize.every((socket) => !socket.closed)).toBe(true)
+    } finally {
+      for (const socket of seize) socket.destroy()
+    }
+  })
+
+  it('une connexion reconnue ne compte plus parmi les inconnues de son adresse', async () => {
+    const s = serveur({ delais: { presentation: 10_000 }, essaiPareFeu: false })
+    await s.activer(true)
+    const { liaison } = await appairer(s)
+    const port = (await s.etat()).port as number
+    const deux = await Promise.all([connexionBrute(port), connexionBrute(port)])
+    try {
+      await attendre(200)
+      expect(deux.every((socket) => !socket.closed)).toBe(true)
+      expect((await s.etat()).relies).toHaveLength(1)
+    } finally {
+      for (const socket of deux) socket.destroy()
+      liaison.fermer()
     }
   })
 

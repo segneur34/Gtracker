@@ -220,6 +220,8 @@ Résultat attendu : l'écran des licences dit vrai sur chaque appareil, cite le 
 
 Réponse de l'utilisateur du 23/11 : pas d'accord écrit de GONG, et l'application ne va qu'à GONG. La phrase « reproduit avec l'accord de GONG SUP » devient une mention neutre, qui n'affirme aucun accord et ne nomme pas de société (le titulaire exact de la marque n'est pas établi).
 
+Tranché par l'orchestrateur : C-24, pas de ligne Node.js propre (il fait partie d'Electron, dont LICENSES.chromium.html et la licence d'Electron couvrent la livraison). C-29, « le dire dans la politique » : il n'y a pas de politique de confidentialité dans le dépôt, la phrase ira dans la note de remise (lot 507).
+
 ### C-16 · Bibliothèque FFmpeg livrée sans lien vers son code source
 
 - Gravité : avant livraison ; effort : petit ; vérification : sourcé ; côté : vendeur avant la cession, à confirmer par un professionnel du droit.

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { t } from '../core/i18n';
 import { useComputerLink, type ComputerLinkView } from '../hooks/useComputerLink';
-import { addressFieldShown, addressWellFormed, cleanCode, codeComplete, describeLink, refusalText } from '../library/computerLink';
+import { CODE_LENGTH, addressFieldShown, addressWellFormed, cleanCode, codeComplete, describeLink, refusalText } from '../library/computerLink';
 import type { ComputerLinkStatus } from '../platform/computerLink';
 import Button from './ui/Button';
 import './ComputerLinkCard.css';
@@ -90,7 +90,7 @@ function PairForm({ view, status, headline, blocked, attempting }: PanelProps) {
       <div className="ui-stack-1">
         <label className="computer-link__label" htmlFor="computer-link-code">{t('Code')}</label>
         <input id="computer-link-code" className="ui-field num computer-link__code" inputMode="numeric" autoComplete="one-time-code"
-          maxLength={6} placeholder="000000" value={code} disabled={attempting}
+          maxLength={CODE_LENGTH} placeholder={'0'.repeat(CODE_LENGTH)} value={code} disabled={attempting}
           onChange={(e) => setCode(cleanCode(e.target.value))} />
       </div>
       {showAddress && (

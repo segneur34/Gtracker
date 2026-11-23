@@ -1,5 +1,5 @@
 import { dayMonthYearTime } from '../core/calendar';
-import { t } from '../core/i18n';
+import { t, tn } from '../core/i18n';
 import { formatMinSec } from '../core/units';
 import type { AuthorizationOutcome, WirelessPhone, WirelessPairing, WirelessState } from '../platform/wirelessPhone';
 
@@ -96,6 +96,16 @@ export const pairingStatus = (input: { deadlineMs: number; nowMs: number; open: 
   if (linked) return { kind: 'linked', name: linked.nom };
   if (!input.open || input.nowMs >= input.deadlineMs) return { kind: 'closed' };
   return { kind: 'waiting' };
+};
+
+/**
+ * Les codes faux reçus pendant la dernière fenêtre, avec l'adresse d'où venait le dernier : l'utilisateur voit si un
+ * autre appareil que son téléphone a tenté sa chance. `null` sans code faux, ou d'une coquille plus ancienne.
+ */
+export const wrongCodesText = (state: Pick<WirelessState, 'codesFaux'>): string | null => {
+  const wrong = state.codesFaux;
+  if (!wrong || wrong.nombre < 1) return null;
+  return tn(wrong.nombre, "Code faux reçu de l'appareil {address}.", "{n} codes faux reçus, le dernier de l'appareil {address}.", { address: wrong.adresse });
 };
 
 /** Ligne d'un téléphone relié : relié en ce moment, ou la dernière fois qu'il s'est présenté. */

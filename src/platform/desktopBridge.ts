@@ -228,6 +228,8 @@ export interface DesktopWirelessState {
   /** Pourquoi le PC n'écoute pas alors que le sans-fil est activé ; phrase de la coquille, en français. */
   erreur: string | null;
   appairage: DesktopWirelessPairing | null;
+  /** Codes faux de la dernière fenêtre de liaison, et l'adresse d'où venait le dernier ; absent d'une coquille plus ancienne. */
+  codesFaux?: { nombre: number; adresse: string } | null;
   /** Téléphones reliés en ce moment. */
   relies: { id: string; nom: string }[];
 }

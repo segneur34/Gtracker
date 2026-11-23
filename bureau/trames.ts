@@ -116,6 +116,18 @@ export const TAILLE_BLOC = 1_048_576
 /** Taille des deux longueurs qui ouvrent chaque trame. */
 export const TAILLE_PREFIXE = 8
 
+/**
+ * Taille d'un nonce, du jeton, d'une empreinte de certificat et d'une preuve, en octets. Tenues ici, où les messages
+ * les lisent, et reprises par `appairage.ts`, qui importe déjà ce module.
+ */
+export const TAILLE_NONCE = 32
+export const TAILLE_JETON = 32
+export const TAILLE_EMPREINTE = 32
+export const TAILLE_PREUVE = 32
+
+/** Taille de l'identifiant d'un PC ou d'un téléphone appairé, en octets. */
+export const TAILLE_IDENTIFIANT = 16
+
 /** Plus grand identifiant de commande, celui d'un entier signé sur 32 bits (le `int` du téléphone). */
 export const ID_MAX = 2_147_483_647
 
@@ -441,17 +453,23 @@ export function lireMessage(trame: Trame): Message {
   if (type !== 'bloc' && type !== 'ecrire' && corps.length > 0) throw invalide(type, 'corps')
   switch (type) {
     case 'appairer':
-      return { type, version: l.version(), nom: l.nom('nom'), nonceTelephone: l.hex('nonceTelephone', 32), ...l.capacites() }
+      return { type, version: l.version(), nom: l.nom('nom'), nonceTelephone: l.hex('nonceTelephone', TAILLE_NONCE), ...l.capacites() }
     case 'bonjour':
-      return { type, version: l.version(), nom: l.nom('nom'), jeton: l.hex('jeton', 32), ...l.capacites() }
+      return { type, version: l.version(), nom: l.nom('nom'), jeton: l.hex('jeton', TAILLE_JETON), ...l.capacites() }
     case 'defi':
-      return { type, noncePc: l.hex('noncePc', 32) }
+      return { type, noncePc: l.hex('noncePc', TAILLE_NONCE) }
     case 'preuve':
-      return { type, preuve: l.hex('preuve', 32) }
+      return { type, preuve: l.hex('preuve', TAILLE_PREUVE) }
     case 'appaire':
-      return { type, preuve: l.hex('preuve', 32), jeton: l.hex('jeton', 32), identifiantPc: l.hex('identifiantPc', 16), nomPc: l.nom('nomPc') }
+      return {
+        type,
+        preuve: l.hex('preuve', TAILLE_PREUVE),
+        jeton: l.hex('jeton', TAILLE_JETON),
+        identifiantPc: l.hex('identifiantPc', TAILLE_IDENTIFIANT),
+        nomPc: l.nom('nomPc'),
+      }
     case 'bienvenue':
-      return { type, identifiantPc: l.hex('identifiantPc', 16), nomPc: l.nom('nomPc') }
+      return { type, identifiantPc: l.hex('identifiantPc', TAILLE_IDENTIFIANT), nomPc: l.nom('nomPc') }
     case 'refus': {
       const raison = enTete.raison
       if (!(RAISONS_REFUS as readonly unknown[]).includes(raison)) throw invalide(type, 'raison')
