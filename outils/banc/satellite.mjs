@@ -40,7 +40,6 @@ const overflow = () => evaluate(`document.documentElement.scrollWidth - document
 const buttons = () => evaluate(`document.querySelectorAll('.map-base-switch, .map-base-switch__button').length`);
 const attribution = () => evaluate(`document.querySelector('.leaflet-control-attribution')?.textContent ?? ''`);
 const loadedTiles = () => evaluate(`[...document.querySelectorAll('.leaflet-tile-pane img.leaflet-tile')].filter((i) => i.complete && i.naturalWidth > 0).length`);
-const storedBases = () => evaluate(`JSON.parse(localStorage.getItem('${CLES.fondCarte}') ?? '{}')`);
 const cachedKeys = () => evaluate(`(async () => {
   const cache = await caches.open('${CACHES.tuiles}');
   return (await cache.keys()).map((r) => new URL(r.url).pathname).filter((p) => !p.endsWith('_index.json')).sort();
