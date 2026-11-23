@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { licenseGroup, mergeLicenseLists, parseLicenseList, type LicenseEntry } from '../core/licenses';
+import { licenseGroup, licensesForShell, mergeLicenseLists, parseLicenseList, type LicenseEntry } from '../core/licenses';
 import { t, tn } from '../core/i18n';
 import { fetchWithin } from '../planning/fetchJson';
+import { appShell } from '../platform/runtime';
 import { tRich } from './tRich';
 import GongLogo from './GongLogo';
 import Button from './ui/Button';
@@ -14,6 +15,8 @@ const LOAD_TIMEOUT_MS = 10_000;
 const UNAVAILABLE = t('Liste des licences indisponible.');
 /** Page du droit d'auteur d'OpenStreetMap, due avec la mention de ses données. */
 const OSM_COPYRIGHT_URL = 'https://www.openstreetmap.org/copyright';
+/** Code source de la bibliothèque FFmpeg que le programme Windows reçoit de Chromium (LGPL 2.1). */
+const FFMPEG_SOURCE_URL = 'https://chromium.googlesource.com/chromium/third_party/ffmpeg';
 
 /** Liste rendue par `file`, à côté de l'application ; `null` si elle n'existe pas ou ne se lit pas. */
 const loadList = (file: string, signal: AbortSignal): Promise<LicenseEntry[] | null> =>
@@ -91,7 +94,8 @@ function LicensesList() {
   }, []);
 
   if (!lists) return <p className="about-licenses__intro">{t('Chargement…')}</p>;
-  const entries = mergeLicenseLists(lists.built, lists.extra);
+  // Le code Android n'est pas dans le programme Windows, ni Electron dans l'application du téléphone.
+  const entries = licensesForShell(mergeLicenseLists(lists.built, lists.extra), appShell());
   if (entries.length === 0) return <p className="about-licenses__intro">{UNAVAILABLE}</p>;
   const toggle = (key: string) => setOpenKey((current) => (current === key ? null : key));
   return (
@@ -119,13 +123,20 @@ function AboutSettings() {
         {t('Vos sessions restent sur cet appareil et dans votre dossier mémoire, sans compte. Les fonds de carte et la recherche de lieux passent par des services en ligne.')}
       </p>
       <p className="about__text">
-        {t("Le lieu qui nomme une session est cherché par le service Photon de komoot : il reçoit le point de départ de la session arrondi à une centaine de mètres, la langue et le rayon de recherche, rien d'autre (Réglages › Mémoire pour s'en passer).")}
+        {t("Le lieu qui nomme une session est cherché par le service Photon de komoot : il reçoit le point de départ de la session et, si la sortie finit ailleurs, son point d'arrivée, arrondis à une centaine de mètres, la langue et le rayon de recherche, rien d'autre (Réglages › Mémoire pour s'en passer).")}
       </p>
       <p className="about__text">
         {tRich("Données des cartes et des lieux : © les contributeurs d'OpenStreetMap, sous licence ODbL (<a>openstreetmap.org/copyright</a>).", undefined, {
           a: (children) => <a href={OSM_COPYRIGHT_URL} target="_blank" rel="noreferrer">{children}</a>,
         })}
       </p>
+      {appShell() === 'ordinateur' && (
+        <p className="about__text">
+          {tRich('Ce programme utilise des bibliothèques du projet FFmpeg sous LGPL 2.1 (code source : <a>chromium.googlesource.com/chromium/third_party/ffmpeg</a>).', undefined, {
+            a: (children) => <a href={FFMPEG_SOURCE_URL} target="_blank" rel="noreferrer">{children}</a>,
+          })}
+        </p>
+      )}
       <SettingsPart label={t('Licences des composants utilisés')} open={licensesOpen} onToggle={() => setLicensesOpen((o) => !o)}>
         <LicensesList />
       </SettingsPart>

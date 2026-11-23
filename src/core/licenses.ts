@@ -8,7 +8,12 @@
  * fait échouer les tests, avant de partir dans une APK.
  */
 
-/** Une ligne de la liste. Les trois derniers champs ne viennent que du complément. */
+/** Appareil où tourne l'application (même vocabulaire que `AppShell`, `platform/runtime.ts`). */
+export type LicenseShell = 'navigateur' | 'telephone' | 'ordinateur';
+
+const LICENSE_SHELLS: readonly string[] = ['navigateur', 'telephone', 'ordinateur'];
+
+/** Une ligne de la liste. Les quatre derniers champs ne viennent que du complément. */
 export interface LicenseEntry {
   name: string;
   version: string;
@@ -22,6 +27,8 @@ export interface LicenseEntry {
   url?: string;
   /** Famille native : ses composants, `groupe:nom:version`. */
   components?: string[];
+  /** Appareils où le composant est livré ; absent, il l'est partout (code Android : le téléphone seulement). */
+  shells?: LicenseShell[];
 }
 
 export type LicenseGroup = 'permissive' | 'other';
@@ -86,7 +93,7 @@ const optionalString = (value: unknown): string | undefined => (typeof value ===
 
 const toEntry = (raw: unknown): LicenseEntry | null => {
   if (typeof raw !== 'object' || raw === null) return null;
-  const { name, version, identifier, text, notice, url, components } = raw as Record<string, unknown>;
+  const { name, version, identifier, text, notice, url, components, shells } = raw as Record<string, unknown>;
   if (typeof name !== 'string' || name === '' || typeof version !== 'string') return null;
   return {
     name,
@@ -97,8 +104,13 @@ const toEntry = (raw: unknown): LicenseEntry | null => {
     ...(optionalString(notice) ? { notice: notice as string } : {}),
     ...(optionalString(url) ? { url: url as string } : {}),
     ...(Array.isArray(components) ? { components: components.filter((c): c is string => typeof c === 'string') } : {}),
+    ...(Array.isArray(shells) ? { shells: shells.filter((s): s is LicenseShell => typeof s === 'string' && LICENSE_SHELLS.includes(s)) } : {}),
   };
 };
+
+/** Lignes qui valent pour `shell` : celles sans `shells`, et celles qui le citent. */
+export const licensesForShell = (entries: readonly LicenseEntry[], shell: LicenseShell): LicenseEntry[] =>
+  entries.filter((entry) => entry.shells === undefined || entry.shells.includes(shell));
 
 /**
  * Corps d'une réponse en liste de licences, `null` s'il n'en est pas une. Sous `npm run dev`, `licences.json` n'existe

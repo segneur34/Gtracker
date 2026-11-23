@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ALLOWED_LICENSES, LICENSE_EXCEPTIONS, licenseGroup, licenseTerms, mergeLicenseLists, parseLicenseList, productionPackages, refusedLicenses, uselessExceptions,
+  ALLOWED_LICENSES, LICENSE_EXCEPTIONS, licenseGroup, licenseTerms, licensesForShell, mergeLicenseLists, parseLicenseList, productionPackages, refusedLicenses, uselessExceptions,
   type LicenseEntry, type LockedPackage,
 } from './licenses';
 
@@ -120,8 +120,23 @@ describe('parseLicenseList', () => {
   });
 
   it('garde notice, adresse et composants', () => {
-    const row = { name: 'a', version: '1', identifier: 'MIT', text: 'T', notice: 'N', url: 'https://exemple.fr', components: ['g:n:1'] };
+    const row = { name: 'a', version: '1', identifier: 'MIT', text: 'T', notice: 'N', url: 'https://exemple.fr', components: ['g:n:1'], shells: ['telephone'] };
     expect(parseLicenseList(JSON.stringify([row]))).toEqual([row]);
+  });
+
+  it('ne garde des appareils que ceux que l\'application connaît', () => {
+    const rows = parseLicenseList(JSON.stringify([{ name: 'a', version: '1', shells: ['ordinateur', 'montre', 3] }]));
+    expect(rows?.[0].shells).toEqual(['ordinateur']);
+  });
+});
+
+describe('licensesForShell', () => {
+  const rows = [entry('partout', 'MIT'), entry('android', 'MIT', { shells: ['telephone'] }), entry('electron', 'MIT', { shells: ['ordinateur'] })];
+
+  it('garde les lignes sans appareil et celles qui citent le bon', () => {
+    expect(licensesForShell(rows, 'telephone').map((e) => e.name)).toEqual(['partout', 'android']);
+    expect(licensesForShell(rows, 'ordinateur').map((e) => e.name)).toEqual(['partout', 'electron']);
+    expect(licensesForShell(rows, 'navigateur').map((e) => e.name)).toEqual(['partout']);
   });
 });
 
@@ -162,6 +177,46 @@ describe('complément hors JS (public/licences-hors-js.json)', () => {
     const npm = rows.filter((r) => r.name.startsWith('@'));
     expect(npm.map((r) => r.name)).toEqual(['@fontsource/inter', '@capacitor/android']);
     for (const row of npm) expect(row.version, row.name).toBe(lockVersion(row.name));
+  });
+
+  const named = (name: string) => rows.find((r) => r.name === name);
+
+  it('code Android : le téléphone seulement ; ce que livre le programme Windows : l\'ordinateur seulement', () => {
+    for (const row of rows.filter((r) => r.components || r.name === '@capacitor/android')) expect(row.shells, row.name).toEqual(['telephone']);
+    for (const name of ['Electron', 'Chromium', 'FFmpeg', 'NSIS']) expect(named(name)?.shells, name).toEqual(['ordinateur']);
+    const onDesktop = licensesForShell(rows, 'ordinateur').map((r) => r.name);
+    expect(onDesktop).toEqual(expect.arrayContaining(['@fontsource/inter', 'Logo GONG', 'Feather (icônes)', 'Electron', 'Chromium', 'FFmpeg', 'NSIS']));
+    expect(onDesktop).not.toContain('AndroidX');
+    expect(onDesktop).not.toContain('Apache Cordova');
+  });
+
+  it('Electron : la version du dossier bureau/', () => {
+    const bureau = JSON.parse(repoFile('bureau/package.json')) as { devDependencies: Record<string, string> };
+    expect(named('Electron')?.version).toBe(bureau.devDependencies.electron);
+  });
+
+  it('FFmpeg : sa licence et où prendre son code source ; Cordova : sa notice', () => {
+    expect(named('FFmpeg')?.identifier).toBe('LGPL-2.1');
+    expect(named('FFmpeg')?.text).toContain('bibliothèques du projet FFmpeg sous LGPL 2.1');
+    expect(named('FFmpeg')?.text).toContain('https://chromium.googlesource.com/chromium/third_party/ffmpeg');
+    expect(named('Apache Cordova')?.url).toContain('cordova-android');
+  });
+
+  it('NSIS : le texte de son fichier COPYING, avec sa version', () => {
+    expect(named('NSIS')?.version).toMatch(/^\d+\.\d+/);
+    expect(named('NSIS')?.text).toContain('ZLIB/LIBPNG LICENSE');
+  });
+
+  it('icônes Feather : licence MIT, son auteur et l\'adresse de son fichier officiel', () => {
+    expect(named('Feather (icônes)')?.identifier).toBe('MIT');
+    expect(named('Feather (icônes)')?.text).toContain('Cole Bemis');
+    expect(named('Feather (icônes)')?.text).toContain('https://github.com/feathericons/feather');
+  });
+
+  it('logo GONG : ni accord affirmé ni société nommée', () => {
+    const logo = named('Logo GONG');
+    expect(logo?.text).not.toMatch(/accord de GONG|GONG SUP|GALAXY/i);
+    expect(logo?.identifier).not.toMatch(/GONG SUP/);
   });
 
   it.each([

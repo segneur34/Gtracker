@@ -25,6 +25,12 @@ export const PHOTON_REVERSE_URL = 'https://photon.komoot.io/reverse';
  */
 export const REVERSE_COORD_DECIMALS = 3;
 
+/**
+ * Décimales gardées du centre de la carte envoyé à la recherche d'un lieu par son nom : deux, environ un
+ * kilomètre. Il ne sert qu'à faire passer les lieux proches devant leurs homonymes, pas à situer l'utilisateur.
+ */
+export const NEAR_COORD_DECIMALS = 2;
+
 /** Délai accordé à la recherche, en millisecondes : au-delà, elle échoue, et l'on peut relancer. */
 export const PHOTON_TIMEOUT_MS = 20_000;
 
@@ -42,8 +48,8 @@ export interface Place extends Waypoint {
 export const photonUrl = (query: string, near?: Waypoint, limit = 6): string => {
   const params = new URLSearchParams({ q: query, limit: String(limit), lang: placesLang() });
   if (near) {
-    params.set('lat', near.lat.toFixed(4));
-    params.set('lon', near.lon.toFixed(4));
+    params.set('lat', near.lat.toFixed(NEAR_COORD_DECIMALS));
+    params.set('lon', near.lon.toFixed(NEAR_COORD_DECIMALS));
   }
   return `${PHOTON_URL}?${params.toString()}`;
 };

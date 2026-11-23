@@ -46,6 +46,8 @@ const SORTIE = join(BUREAU, 'sortie')
 const ATELIER_INSTALLEUR = join(SORTIE, 'installeur')
 const DIST = join(RACINE, 'dist')
 const ICONE = join(RACINE, 'outils', 'icone-gtracker.ico')
+// Rangé dans `resources\` du programme : où trouver le code source de FFmpeg (LGPL 2.1).
+const MENTIONS_FFMPEG = join(RACINE, 'outils', 'MENTIONS-FFMPEG.txt')
 /** Programme Electron téléchargé à l'installation de `bureau/` (sauté si les scripts d'installation sont coupés). */
 const ELECTRON = join(BUREAU, 'node_modules', 'electron', 'dist', 'electron.exe')
 /** Dossier des APK de publication fabriquées par Gradle (`assembleRelease`). */
@@ -403,7 +405,7 @@ async function emballer(version, { source = COMPILE, sortie = SORTIE, ressources
     prune: false,
     overwrite: true,
     quiet: true,
-    extraResource: [DIST, ...ressources],
+    extraResource: [DIST, MENTIONS_FFMPEG, ...ressources],
     win32metadata: { CompanyName: 'Gtracker', FileDescription: 'Gtracker', ProductName: 'Gtracker', InternalName: 'Gtracker', OriginalFilename: 'Gtracker.exe' },
   })
   const exe = join(dossier, 'Gtracker.exe')

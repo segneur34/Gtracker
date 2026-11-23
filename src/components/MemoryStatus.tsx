@@ -393,7 +393,7 @@ function PlaceSearchSetting() {
         <span>{t('Chercher le lieu des sessions')}</span>
       </label>
       <p style={mutedStyle}>
-        {t("Le lieu d'une session est cherché en ligne d'après son point de départ, arrondi à une centaine de mètres : un départ de chez vous en dit le quartier. Case décochée, rien n'est envoyé et le nom d'une session est son activité seule.")}
+        {t("Le lieu d'une session est cherché en ligne d'après son point de départ et, si la sortie finit ailleurs, son point d'arrivée, arrondis à une centaine de mètres : un départ de chez vous en dit le quartier. Case décochée, rien n'est envoyé et le nom d'une session est son activité seule.")}
       </p>
     </div>
   );

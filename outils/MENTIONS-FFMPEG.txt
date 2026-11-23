@@ -1,0 +1,24 @@
+Gtracker, programme Windows : bibliothèque FFmpeg
+
+Ce programme utilise des bibliothèques du projet FFmpeg sous LGPL 2.1.
+
+La bibliothèque est celle de Chromium, embarquée par Electron : c'est le fichier
+ffmpeg.dll du dossier du programme (à côté de Gtracker.exe).
+
+Code source
+  Dépôt FFmpeg de Chromium :
+    https://chromium.googlesource.com/chromium/third_party/ffmpeg
+  La révision utilisée est celle qu'indique le fichier DEPS de la version de
+  Chromium qu'embarque la version d'Electron de ce programme (la version
+  d'Electron est donnée par le fichier « version » à côté de Gtracker.exe).
+  Projet FFmpeg :
+    https://ffmpeg.org/download.html
+
+Licence
+  GNU Lesser General Public License, version 2.1 :
+    https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+  Son texte et celui des licences des autres composants de Chromium sont aussi
+  dans le fichier LICENSES.chromium.html du dossier du programme.
+
+La liste complète des composants livrés se lit dans Gtracker :
+Réglages, À propos, Licences des composants utilisés.

@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parsePhoton, parsePhotonFeatures, photonReverseUrl, photonUrl, reversePlaces, roundedPoint, searchPlaces } from './geocoding';
 
 describe('Photon', () => {
-  it('cherche en français, près du centre de la carte', () => {
+  it('cherche en français, près du centre de la carte arrondi à environ un kilomètre', () => {
     const url = photonUrl('pic saint loup', { lat: 43.61234, lon: 3.87654 });
-    expect(url).toBe('https://photon.komoot.io/api/?q=pic+saint+loup&limit=6&lang=fr&lat=43.6123&lon=3.8765');
+    expect(url).toBe('https://photon.komoot.io/api/?q=pic+saint+loup&limit=6&lang=fr&lat=43.61&lon=3.88');
   });
 
   it('lit nom, situation et position des lieux', () => {

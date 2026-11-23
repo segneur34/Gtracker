@@ -157,7 +157,7 @@ function HeartRateBeltSettings() {
   return (
     <>
       <SettingRow label={t('Ceintures et montres')} helpKey="capteurs:ceinture"
-        help={t("Ceinture ou montre qui diffuse sa fréquence cardiaque en Bluetooth Smart, sans appairage ni application de sa marque : portez-la, électrodes humidifiées, puis « Ajouter ». L'application s'en souvient de plusieurs et n'en lit qu'une à la fois, celle « utilisée au prochain départ » : « Utiliser » la change ici, « Changer » à la page Enregistrer. Elle est proposée à l'enregistrement des activités où « Ceinture cardio » est cochée.")}>
+        help={t("Ceinture ou montre qui diffuse sa fréquence cardiaque en Bluetooth (basse consommation), sans appairage ni application de sa marque : portez-la, électrodes humidifiées, puis « Ajouter ». L'application s'en souvient de plusieurs et n'en lit qu'une à la fois, celle « utilisée au prochain départ » : « Utiliser » la change ici, « Changer » à la page Enregistrer. Elle est proposée à l'enregistrement des activités où « Ceinture cardio » est cochée.")}>
         {belts.length === 0 && <span className="settings-sports__mark">{t('aucune')}</span>}
       </SettingRow>
       {belts.map((b, i) => {
