@@ -679,6 +679,17 @@ describe('empreinte des champs légers du cache', () => {
   });
 });
 
+describe('instants de saisie de la fiche', () => {
+  it('se relisent, les entrées mal formées écartées ; absents s’il n’en reste aucune ; gardés par le cache', () => {
+    const dated = record({ editedAt: { name: 1_800_000_000_000, 'notes.comment': 5 } });
+    expect(parseRecord(serializeRecord(dated))!.editedAt).toEqual({ name: 1_800_000_000_000, 'notes.comment': 5 });
+    const raw = { ...JSON.parse(serializeRecord(record())), editedAt: { name: 'hier', marks: -1, place: 7 } };
+    expect(parseRecord(JSON.stringify(raw))!.editedAt).toEqual({ place: 7 });
+    expect('editedAt' in parseRecord(JSON.stringify({ ...raw, editedAt: { name: null } }))!).toBe(false);
+    expect(lightRecord(dated).editedAt).toEqual(dated.editedAt);
+  });
+});
+
 describe("fiche d'une version future relue puis réécrite (A1)", () => {
   const jumps: SessionJumps = {
     version: 1, computedAt: '2026-10-08T14:00:00.000Z',

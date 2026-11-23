@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { STORAGE_KEYS } from '../core/appIdentity';
+import { markerText } from '../library/folderLayout';
 import { buildSettingsFile, serializeSettingsFile } from '../library/settingsFile';
+import { markerTextWithId, readMarkerId } from '../library/syncBase';
 import type { MemoryFolder } from '../platform/memoryFolder';
 import { gpxAt, settle, trackTestTimers } from '../test/library.fixture';
 import { createFakeFolder } from '../test/memoryFolder.fixture';
@@ -23,7 +25,34 @@ const designation = vi.hoisted(() => ({ closed: false }));
 const shell = vi.hoisted(() => ({ desktop: false, none: false, browserCopy: null as MemoryFolder | null }));
 const reloads: string[] = [];
 
-const folder: MemoryFolder = createFakeFolder(files, log, {
+/** Chemin dont l'écriture échoue, `null` : aucun. */
+let failingWrite: string | null = null;
+
+/**
+ * Faux dossier qui refuse les écritures pendant la suspension, comme les vrais (`memoryFolder.ts`). Le module de
+ * stockage est relu à chaque appel : `vi.resetModules` en donne un neuf à chaque ouverture.
+ */
+const guardedFolder = (contents: Map<string, string>, entries: string[], overrides: Partial<MemoryFolder> = {}): MemoryFolder => {
+  const base = createFakeFolder(contents, entries, overrides);
+  const refuse = async (path: string): Promise<void> => {
+    const { writesSuspended } = await import('../platform/storage');
+    if (writesSuspended()) throw new Error('Remise à zéro en cours : rien ne s\'écrit.');
+    if (path === failingWrite) throw new Error('écriture refusée');
+  };
+  return {
+    ...base,
+    writeText: async (path, text) => {
+      await refuse(path);
+      await base.writeText(path, text);
+    },
+    writeBytes: async (path, bytes) => {
+      await refuse(path);
+      await base.writeBytes(path, bytes);
+    },
+  };
+};
+
+const folder: MemoryFolder = guardedFolder(files, log, {
   remove: async (path) => {
     if (path === failingRemove) throw new Error('accès retiré');
     log.push(`remove ${path}`);
@@ -105,6 +134,7 @@ beforeEach(() => {
   stored.clear();
   reloads.length = 0;
   failingRemove = null;
+  failingWrite = null;
   cleared.count = 0;
   designation.closed = false;
   shell.desktop = false;
@@ -172,12 +202,46 @@ describe('tout supprimer', () => {
     expect(progress.length).toBeGreaterThan(0);
   });
 
+  it('après une synchronisation (marqueur avec identifiant) : plus rien de l\'application, rechargement', async () => {
+    usedDevice();
+    files.set('gtracker.json', markerTextWithId(markerText(), 'dossier-0001') as string);
+    const library = await openFresh();
+    stubWindow();
+    expect(await library.eraseEverything()).toBeNull();
+    expect(reloads).toEqual(['/']);
+    expect([...files.keys()].sort()).toEqual(['a-moi.txt', 'sessions/notes.txt']);
+    expect(log).toContain('write gtracker.json');
+    expect(cleared.count).toBe(1);
+    // Le faux dossier suit bien la suspension de l'application, levée seulement au rechargement.
+    await expect(folder.writeText('x.json', '{}')).rejects.toThrow(/rien ne s'écrit/);
+  });
+
+  it('un marqueur qui ne perd pas son identifiant : rien n\'est effacé, mémoire relue, compte rendu dit', async () => {
+    usedDevice();
+    files.set('gtracker.json', markerTextWithId(markerText(), 'dossier-0001') as string);
+    const library = await openFresh();
+    const keysBefore = [...stored.keys()].sort();
+    const filesBefore = [...files.keys()].sort();
+    failingWrite = 'gtracker.json';
+    stubWindow();
+    const message = await library.eraseEverything();
+    expect(message).toMatch(/^Remise à zéro interrompue \(.*écriture refusée.*\) : 0 session effacée sur 0/);
+    expect(reloads).toEqual([]);
+    expect(cleared.count).toBe(0);
+    expect(log.some((l) => l.startsWith('remove'))).toBe(false);
+    expect([...stored.keys()].sort()).toEqual(keysBefore);
+    expect([...files.keys()].sort()).toEqual(filesBefore);
+    expect(readMarkerId(files.get('gtracker.json') ?? null)).toBe('dossier-0001');
+    await settle(library);
+    expect(library.readLibraryState().sessions).toHaveLength(2);
+  });
+
   it('sans dossier retenu, la mémoire du navigateur part dans le programme Windows, jamais dans le navigateur', async () => {
     for (const desktop of [false, true]) {
       const browserFiles = new Map([['gtracker.json', '{"format":"gtracker-memoire","version":1}'], ['sessions/2026-10-27_10-00-00_kite.gpx', gpxAt(0)]]);
       shell.desktop = desktop;
       shell.none = true;
-      shell.browserCopy = createFakeFolder(browserFiles, []);
+      shell.browserCopy = guardedFolder(browserFiles, []);
       // Sans `window` au chargement des modules, comme dans les autres essais de ce fichier.
       vi.stubGlobal('window', undefined);
       const library = await openFresh();

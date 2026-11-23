@@ -66,15 +66,26 @@ describe('listage et paire', () => {
 
   it('première rencontre tant que la base ne vaut pas pour ces deux dossiers, à ce chemin', () => {
     const base = { ...emptySyncBase('ordinateur-0001', 'telephone-0001', 'Documents/Gtracker') };
-    expect(syncPair(null, null, null, null)).toEqual({ first: 'noComputerId', base: null, newId: { computer: true, phone: true } });
-    expect(syncPair('ordinateur-0001', null, null, base)).toEqual({ first: 'noPhoneId', base: null, newId: { computer: false, phone: true } });
-    expect(syncPair('ordinateur-0001', 'ordinateur-0001', null, base)).toEqual({ first: 'sameId', base: null, newId: { computer: false, phone: true } });
-    expect(syncPair('ordinateur-0001', 'telephone-0001', null, null)).toMatchObject({ first: 'noBase', newId: { computer: false, phone: false } });
-    expect(syncPair('ordinateur-0002', 'telephone-0001', null, base)).toMatchObject({ first: 'otherComputer', base: null });
-    expect(syncPair('ordinateur-0001', 'telephone-0001', 'Download/Gtracker', base)).toMatchObject({ first: 'otherPath', base: null });
+    expect(syncPair(null, null, null, null, null)).toEqual({ first: 'noComputerId', base: null, newId: { computer: true, phone: true } });
+    expect(syncPair('ordinateur-0001', null, null, base, null)).toEqual({ first: 'noPhoneId', base: null, newId: { computer: false, phone: true } });
+    expect(syncPair('ordinateur-0001', 'ordinateur-0001', null, base, null)).toEqual({ first: 'sameId', base: null, newId: { computer: false, phone: true } });
+    expect(syncPair('ordinateur-0001', 'telephone-0001', null, null, null)).toMatchObject({ first: 'noBase', newId: { computer: false, phone: false } });
+    expect(syncPair('ordinateur-0002', 'telephone-0001', null, base, null)).toMatchObject({ first: 'otherComputer', base: null });
+    expect(syncPair('ordinateur-0001', 'telephone-0001', 'Download/Gtracker', base, null)).toMatchObject({ first: 'otherPath', base: null });
     // Un chemin inconnu d'un côté ou de l'autre ne prouve rien.
-    expect(syncPair('ordinateur-0001', 'telephone-0001', null, base)).toEqual({ first: null, base, newId: { computer: false, phone: false } });
-    expect(syncPair('ordinateur-0001', 'telephone-0001', 'Documents/Gtracker', base).first).toBeNull();
+    expect(syncPair('ordinateur-0001', 'telephone-0001', null, base, null)).toEqual({ first: null, base, newId: { computer: false, phone: false } });
+    expect(syncPair('ordinateur-0001', 'telephone-0001', 'Documents/Gtracker', base, null).first).toBeNull();
+  });
+
+  it('copie plus ancienne : un passage plus petit que celui de la base, ou aucun, en fait une première rencontre', () => {
+    const base = { ...emptySyncBase('ordinateur-0001', 'telephone-0001', 'Documents/Gtracker'), phonePass: 7 };
+    const older = { first: 'olderCopy', base: null, newId: { computer: false, phone: true } };
+    expect(syncPair('ordinateur-0001', 'telephone-0001', null, base, 6)).toEqual(older);
+    expect(syncPair('ordinateur-0001', 'telephone-0001', null, base, null)).toEqual(older);
+    expect(syncPair('ordinateur-0001', 'telephone-0001', null, base, 7)).toEqual({ first: null, base, newId: { computer: false, phone: false } });
+    expect(syncPair('ordinateur-0001', 'telephone-0001', null, base, 9).first).toBeNull();
+    // Base d'une version qui ne posait pas de passage : le contrôle ne joue pas.
+    expect(syncPair('ordinateur-0001', 'telephone-0001', null, { ...base, phonePass: null }, null).first).toBeNull();
   });
 });
 
@@ -824,8 +835,10 @@ describe('plan restreint à une moitié', () => {
     expect(await syncSessionFiles(pair.computer)).toEqual([fileOf(0), fileOf(2), fileOf(3), fileOf(10), fileOf(11)].sort());
     expect(readSyncRecord(pair.computer, fileOf(3))).toMatchObject({ name: 'Ordinateur', notes: { comment: 'du téléphone' } });
     expect(trashFiles(pair).filter((p) => p.endsWith('.gpx'))).toHaveLength(1);
-    // Ce qui est fait des deux côtés entre dans la base ; le reste garde sa ligne telle quelle, ou n'en a pas encore.
-    expect(baseStarts(pair)).toEqual([at(0), at(1), at(2), at(3), at(10)]);
+    // La base ne change pas : une ligne posée sans que le téléphone reçoive un passage neuf échapperait à la
+    // reconnaissance d'une copie de son dossier. Chaque session garde sa ligne telle quelle, ou n'en a pas encore.
+    expect(baseStarts(pair)).toEqual([at(0), at(1), at(2), at(3)]);
+    expect(run.plan?.saveBase).toBe(false);
     expect(run.plan?.items.filter((item) => item.left === 'outOfScope').map((item) => item.startMs)).toEqual([at(1), at(2), at(3), at(11)]);
     expect(itemAt(run, 3)?.base).toEqual({ kind: 'keep' });
 
@@ -859,7 +872,7 @@ describe('plan restreint à une moitié', () => {
         computer: { gpx: { name: 'a.gpx', size: 10, mtimeMs: 1 }, record: { name: 'a.json', size: 5, mtimeMs: 1 }, imu: null },
         phone: { gpx: { name: 'a.gpx', size: 10, mtimeMs: 2 }, record: { name: 'a.json', size: 5, mtimeMs: 2 }, imu: null },
       }],
-    });
+    }, null);
     const computer = syncListing([{ name: 'a.gpx', kind: 'file', size: 10, mtimeMs: 1 }, { name: 'a.json', kind: 'file', size: 5, mtimeMs: 1 }]);
     expect(syncRecordsToRead(computer, pair.base, 'computer', () => true)).toEqual([]);
     // La copie gardée de ce côté manque : la fiche est lue, pour être fondue sans ancêtre.

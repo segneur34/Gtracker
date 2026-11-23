@@ -5,7 +5,8 @@ import { isCompleteGpxText } from '../library/pendingTemps';
 import { imuFileName, recordFileName, serializeRecord, type SessionRecord } from '../library/record';
 import { REPLACE_SUFFIX, phoneVisibleNames, tempNameFor, type VisibleName } from '../library/remoteTemps';
 import {
-  SYNC_DIR, SYNC_SIDES, emptySyncBase, markerTextWithId, otherSyncSide, parseSyncBase, readMarkerId, serializeSyncBase, syncAncestorPath,
+  SYNC_DIR, SYNC_SIDES, emptySyncBase, markerTextWithId, otherSyncSide, parseSyncBase, readMarkerId, readMarkerPass, serializeSyncBase,
+  syncAncestorPath,
   syncBaseLine, syncBasePath, syncRefusal, withSyncDone, withSyncHeld, withSyncLine, withoutSyncLine,
   type SyncBase, type SyncFiles, type SyncRefusal, type SyncSideName, type SyncStamp,
 } from '../library/syncBase';
@@ -327,7 +328,7 @@ export const runFixtureSync = async (computer: SyncFolder, phone: SyncFolder, op
     const ids = { computer: readMarkerId(markers.computer), phone: readMarkerId(markers.phone) };
     const read = ids.phone ? parseSyncBase(await computer.readText(syncBasePath(ids.phone))) : { state: 'absent' as const };
     if (read.state === 'newer') return { ...run, refusal: 'newerBase' };
-    const pair = syncPair(ids.computer, ids.phone, options.phonePath ?? null, read.state === 'ok' ? read.base : null);
+    const pair = syncPair(ids.computer, ids.phone, options.phonePath ?? null, read.state === 'ok' ? read.base : null, readMarkerPass(markers.phone));
     for (const side of SYNC_SIDES) {
       if (!pair.newId[side] || !scope[side]) continue;
       ids[side] = nextSyncId();

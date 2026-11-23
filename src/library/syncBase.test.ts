@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { MEMORY_VERSION, markerText } from './folderLayout';
 import {
-  SYNC_BASE_FORMAT, SYNC_BASE_VERSION, emptySyncBase, hasRouteMemory, hasSyncMemory, isSyncId, markerTextWithId, markerTextWithSync,
-  markerTextWithoutId, parseSyncBase, readMarkerId, readMarkerSync, serializeSyncBase,
+  SYNC_BASE_FORMAT, SYNC_BASE_VERSION, emptySyncBase, hasRouteMemory, hasSyncMemory, isSyncId, markerTextWithDevice, markerTextWithId,
+  markerTextWithPass, markerTextWithSync, markerTextWithoutId, parseSyncBase, readMarkerDevice, readMarkerId, readMarkerPass, readMarkerSync,
+  serializeSyncBase,
   syncAncestorPath, syncBaseLine, syncBasePath, syncRefusal, syncRouteBaseLine, withRouteHeld, withRouteLine, withSyncDone, withSyncHeld, withSyncLine,
   withoutRouteLine, withoutRouteMemory, withoutSyncLine, withoutSyncMemory,
   type SyncBaseRoute, type SyncBaseSession, type SyncFiles,
@@ -17,6 +18,24 @@ const files = (name: string, mtimeMs = 1000): SyncFiles => ({
 const line = (startMs: number): SyncBaseSession => ({ startMs, computer: files(`pc-${startMs}`), phone: files(`tel-${startMs}`, 5000) });
 
 const base = () => ({ ...emptySyncBase('ordinateur-0001', 'telephone-0001', 'Documents/Gtracker'), sessions: [line(10), line(20)] });
+
+describe('identifiant de l’appareil dans le marqueur de sa mémoire', () => {
+  it('posé sans rien retirer, lu ensuite ; rien à réécrire quand il y est déjà', () => {
+    expect(readMarkerDevice(markerText())).toBeNull();
+    const text = markerTextWithDevice(JSON.stringify({ format: 'gtracker-memoire', version: 1, id: 'abcdef-123456', passage: 3, futur: 1 }), 'appareil-1');
+    expect(JSON.parse(text as string)).toEqual({ format: 'gtracker-memoire', version: 1, id: 'abcdef-123456', passage: 3, futur: 1, appareil: 'appareil-1' });
+    expect(readMarkerDevice(text)).toBe('appareil-1');
+    expect(markerTextWithDevice(text, 'appareil-1')).toBeNull();
+    expect(readMarkerDevice(markerTextWithDevice(text, 'appareil-2'))).toBe('appareil-2');
+  });
+
+  it('jamais posé sur ce qui n’est pas un marqueur, ni sur un marqueur d’une version plus récente', () => {
+    expect(markerTextWithDevice('{ cassé', 'appareil-1')).toBeNull();
+    expect(markerTextWithDevice(null, 'appareil-1')).toBeNull();
+    expect(markerTextWithDevice(JSON.stringify({ format: 'gtracker-memoire', version: MEMORY_VERSION + 1 }), 'appareil-1')).toBeNull();
+    expect(readMarkerDevice(JSON.stringify({ format: 'gtracker-memoire', version: 1, appareil: 12 }))).toBeNull();
+  });
+});
 
 describe('identifiant du dossier dans son marqueur', () => {
   it('un marqueur tel que l’application l’écrit n’a pas d’identifiant', () => {
@@ -46,6 +65,19 @@ describe('identifiant du dossier dans son marqueur', () => {
     // Même milliseconde qu'à la synchronisation précédente : l'instant change quand même.
     expect(readMarkerSync(markerTextWithSync(text, 5000))).toBe(5001);
     expect(readMarkerSync(markerTextWithSync(text, 9000))).toBe(9000);
+  });
+
+  it('le passage s’ajoute sans rien retirer, l’instant compris ; mal formé, il vaut absent', () => {
+    const before = JSON.stringify({ format: 'gtracker-memoire', version: 1, id: 'abcdef-123456', synchro: 7, futur: [1, 2] });
+    expect(readMarkerPass(before)).toBeNull();
+    const text = markerTextWithPass(before, 3);
+    expect(JSON.parse(text as string)).toEqual({ format: 'gtracker-memoire', version: 1, id: 'abcdef-123456', synchro: 7, futur: [1, 2], passage: 3 });
+    expect(readMarkerPass(text)).toBe(3);
+    expect(readMarkerSync(text)).toBe(7);
+    expect(readMarkerPass(markerTextWithPass(text, 4))).toBe(4);
+    for (const wrong of [-2, 2.5, 'trois']) expect(readMarkerPass(JSON.stringify({ format: 'gtracker-memoire', version: 1, passage: wrong }))).toBeNull();
+    expect(markerTextWithPass(JSON.stringify({ format: 'gtracker-memoire', version: MEMORY_VERSION + 1 }), 3)).toBeNull();
+    expect(markerTextWithPass(null, 3)).toBeNull();
   });
 
   it('un marqueur d’une version plus récente, ou qui n’en est pas un, ne reçoit pas d’instant', () => {
@@ -127,8 +159,20 @@ describe('lecture et écriture de la base', () => {
     delete raw.phonePath;
     delete raw.syncedAtMs;
     delete raw.removed;
+    delete raw.phonePass;
     const read = parseSyncBase(JSON.stringify(raw));
-    expect(read.state === 'ok' && read.base).toMatchObject({ phonePath: null, syncedAtMs: null, removed: [], held: [] });
+    expect(read.state === 'ok' && read.base).toMatchObject({ phonePath: null, syncedAtMs: null, phonePass: null, removed: [], held: [] });
+  });
+
+  it('le passage du téléphone se relit dans la base ; mal formé, il vaut absent', () => {
+    const read = parseSyncBase(serializeSyncBase({ ...base(), phonePass: 12 }));
+    expect(read.state === 'ok' && read.base.phonePass).toBe(12);
+    expect(read.state === 'ok' && read.base.unknownFields).toBeUndefined();
+    for (const wrong of [-1, 1.5, 'douze']) {
+      const raw = { ...JSON.parse(serializeSyncBase(base())), phonePass: wrong };
+      const bad = parseSyncBase(JSON.stringify(raw));
+      expect(bad.state === 'ok' && bad.base.phonePass).toBeNull();
+    }
   });
 
   it('une session laissée sur le téléphone se relit, sauf si elle a retrouvé sa ligne', () => {

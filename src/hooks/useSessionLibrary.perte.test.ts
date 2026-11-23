@@ -828,6 +828,19 @@ describe('marqueur d\'une version plus récente', () => {
     expect(files.get(MARKER_FILE)).toBe('{ cassé');
     expect(log).toContain('write sessions/seul.json');
   });
+
+  it('marqueur de la version connue : complété de l’identifiant de cet appareil, le reste gardé, une seule fois', async () => {
+    files.set(MARKER_FILE, JSON.stringify({ format: FILE_FORMATS.memoire, version: 1, id: 'dossier-0001', futur: { a: 1 } }));
+    const library = await openFresh();
+    await settle(library);
+    const device = JSON.parse(stored.get(STORAGE_KEYS.deviceId) as string) as string;
+    expect(JSON.parse(files.get(MARKER_FILE) as string)).toEqual({
+      format: FILE_FORMATS.memoire, version: 1, id: 'dossier-0001', futur: { a: 1 }, appareil: device,
+    });
+    const writes = log.filter((l) => l === `write ${MARKER_FILE}`).length;
+    await library.refreshLibrary();
+    expect(log.filter((l) => l === `write ${MARKER_FILE}`).length).toBe(writes);
+  });
 });
 
 describe('dossier fermé ou remplacé pendant la lecture de son marqueur', () => {

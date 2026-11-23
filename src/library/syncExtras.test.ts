@@ -53,17 +53,39 @@ describe('fichiers de réglages', () => {
     // Téléphone neuf qui a repris la date d'un fichier de l'ordinateur, ou horloge du téléphone remise en arrière.
     const computerCopy = settings(TEL, 'Téléphone', 500);
     const phoneOwn = settings(TEL, 'Téléphone', 100, ['wingfoil', 'a-moth']);
-    const plan = planSyncExtras(input({ settings: { computer: [{ name: 'Telephone.json', text: computerCopy }], phone: [{ name: 'Telephone.json', text: phoneOwn }] } }));
-    expect(plan.ops).toEqual([{ kind: 'settings', to: 'computer', path: 'reglages/Telephone.json', text: phoneOwn, replaces: computerCopy, added: 0 }]);
-    expect(plan.left).toEqual([]);
+    for (const phoneDeviceId of [TEL, null]) {
+      const plan = planSyncExtras(input({ phoneDeviceId, settings: { computer: [{ name: 'Telephone.json', text: computerCopy }], phone: [{ name: 'Telephone.json', text: phoneOwn }] } }));
+      expect(plan.ops).toEqual([{ kind: 'settings', to: 'computer', path: 'reglages/Telephone.json', text: phoneOwn, replaces: computerCopy, added: 0 }]);
+      expect(plan.left).toEqual([]);
+    }
     // Même date, contenus différents : la copie du téléphone fait foi de même.
     const sameDate = settings(TEL, 'Téléphone', 500, ['kite']);
-    const same = planSyncExtras(input({ settings: { computer: [{ name: 'Telephone.json', text: computerCopy }], phone: [{ name: 'Telephone.json', text: sameDate }] } }));
+    const same = planSyncExtras(input({ phoneDeviceId: TEL, settings: { computer: [{ name: 'Telephone.json', text: computerCopy }], phone: [{ name: 'Telephone.json', text: sameDate }] } }));
     expect(same.ops.map((op) => [op.to, op.text])).toEqual([['computer', sameDate]]);
+  });
+
+  it('deux téléphones : la vieille copie du fichier de l’un, gardée par l’autre, ne remplace pas la copie récente de l’ordinateur', () => {
+    // Le téléphone A a changé ses réglages et s'est synchronisé (500) ; le téléphone B, relié, tient encore l'ancienne copie (100).
+    const B = 'appareil-telephone-b';
+    const computerCopy = settings(TEL, 'Téléphone A', 500, ['wingfoil', 'a-moth']);
+    const staleOnB = settings(TEL, 'Téléphone A', 100);
+    const plan = planSyncExtras(input({ phoneDeviceId: B, settings: { computer: [{ name: 'A.json', text: computerCopy }], phone: [{ name: 'A.json', text: staleOnB }] } }));
+    expect(plan.ops).toEqual([{ kind: 'settings', to: 'phone', path: 'reglages/A.json', text: computerCopy, replaces: staleOnB, added: 0 }]);
+    expect(plan.left).toEqual([]);
+    // La copie la plus récente vient de B : elle passe à l'ordinateur ; à même date, celle de B l'emporte.
+    const fresherOnB = settings(TEL, 'Téléphone A', 900, ['kite']);
+    const up = planSyncExtras(input({ phoneDeviceId: B, settings: { computer: [{ name: 'A.json', text: computerCopy }], phone: [{ name: 'A.json', text: fresherOnB }] } }));
+    expect(up.ops.map((op) => [op.to, op.text])).toEqual([['computer', fresherOnB]]);
+    const sameDate = settings(TEL, 'Téléphone A', 500, ['kite']);
+    const same = planSyncExtras(input({ phoneDeviceId: B, settings: { computer: [{ name: 'A.json', text: computerCopy }], phone: [{ name: 'A.json', text: sameDate }] } }));
+    expect(same.ops.map((op) => [op.to, op.text])).toEqual([['computer', sameDate]]);
+    // B d'une version qui ne dit pas qui il est : la copie du téléphone l'emporte, comme avant.
+    const unknown = planSyncExtras(input({ phoneDeviceId: null, settings: { computer: [{ name: 'A.json', text: computerCopy }], phone: [{ name: 'A.json', text: staleOnB }] } }));
+    expect(unknown.ops.map((op) => [op.to, op.text])).toEqual([['computer', staleOnB]]);
     // Le fichier propre de l'ordinateur, lui, n'est jamais écrit par le téléphone, même daté d'avant sa copie.
     const pcOwn = settings(PC, 'PC', 100);
     const pcCopy = settings(PC, 'PC', 500, ['kite']);
-    const back = planSyncExtras(input({ settings: { computer: [{ name: 'PC.json', text: pcOwn }], phone: [{ name: 'PC.json', text: pcCopy }] } }));
+    const back = planSyncExtras(input({ phoneDeviceId: B, settings: { computer: [{ name: 'PC.json', text: pcOwn }], phone: [{ name: 'PC.json', text: pcCopy }] } }));
     expect(back.ops.map((op) => [op.to, op.text])).toEqual([['phone', pcOwn]]);
   });
 

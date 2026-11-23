@@ -93,7 +93,13 @@ export type SyncFirstReason =
   | 'sameId'
   | 'noBase'
   /** La base a été faite pour un autre dossier de l'ordinateur, ou pour un autre chemin du téléphone (vieille copie). */
-  | 'otherComputer' | 'otherPath';
+  | 'otherComputer' | 'otherPath'
+  /**
+   * Le marqueur du téléphone porte un passage plus ancien que celui de la base, ou aucun : une copie du dossier remise
+   * plus tard, ou recopiée sur un autre téléphone. Elle reçoit un identifiant à elle ; la base de l'identifiant qu'elle
+   * portait reste pour le téléphone qui le tient vraiment.
+   */
+  | 'olderCopy';
 
 export interface SyncPair {
   /** `null` : paire suivie, la base fait foi ; sinon première rencontre. */
@@ -104,8 +110,13 @@ export interface SyncPair {
   newId: Record<SyncSideName, boolean>;
 }
 
-/** Ce que sont les deux dossiers l'un pour l'autre, d'après leurs identifiants et la base lue pour ce téléphone. */
-export const syncPair = (computerId: string | null, phoneId: string | null, phonePath: string | null, base: SyncBase | null): SyncPair => {
+/**
+ * Ce que sont les deux dossiers l'un pour l'autre, d'après leurs identifiants, la base lue pour ce téléphone et le
+ * passage lu dans son marqueur (`readMarkerPass`, `null` s'il n'en porte pas).
+ */
+export const syncPair = (
+  computerId: string | null, phoneId: string | null, phonePath: string | null, base: SyncBase | null, phonePass: number | null,
+): SyncPair => {
   const first = (reason: SyncFirstReason, phone = phoneId === null): SyncPair =>
     ({ first: reason, base: null, newId: { computer: computerId === null, phone } });
   if (computerId === null) return first('noComputerId');
@@ -114,6 +125,7 @@ export const syncPair = (computerId: string | null, phoneId: string | null, phon
   if (!base) return first('noBase');
   if (base.computerId !== computerId || base.phoneId !== phoneId) return first('otherComputer');
   if (base.phonePath !== null && phonePath !== null && base.phonePath !== phonePath) return first('otherPath');
+  if (base.phonePass !== null && (phonePass === null || phonePass < base.phonePass)) return first('olderCopy', true);
   return { first: null, base, newId: { computer: false, phone: false } };
 };
 
@@ -184,6 +196,11 @@ export interface SyncInput {
    * l'ordinateur. Sans effet sur une identité qui n'est dans aucun de ces cas.
    */
   keep?: readonly number[];
+  /**
+   * Heure de l'ordinateur : avec elle, un champ changé des deux côtés garde la version écrite en dernier
+   * (`mergeSyncRecords`) ; sans elle, celle de l'ordinateur.
+   */
+  nowMs?: number;
 }
 
 /** Noms des fichiers d'une session à l'arrivée d'une copie. */
@@ -262,8 +279,10 @@ export interface SyncItem {
   ops: SyncOp[];
   base: SyncBaseStep;
   left: SyncLeftReason | null;
-  /** Champs saisis changés des deux côtés (`conflictLabels`) : l'ordinateur l'a emporté. */
+  /** Champs saisis changés des deux côtés (`conflictLabels`) : la version écrite en dernier l'a emporté. */
   conflicts: string[];
+  /** Côté dont la version l'a emporté, pour chaque chemin de `conflicts`. Absent : l'ordinateur, partout. */
+  conflictWinners?: Record<string, SyncSideName>;
   /** Deux traces différentes du même instant : aucun GPX remplacé, seuls les champs saisis fondus. */
   twoTracks: boolean;
   /** Session suivie dont une fiche gardée manquait ou ne valait plus : fondue comme à une première rencontre. */
@@ -294,7 +313,7 @@ export interface SyncGuard {
 
 export interface SyncPlan {
   pair: SyncPair;
-  /** Faux : la base ne peut pas être écrite (le téléphone n'a pas d'identifiant et ne reçoit rien) ; les lignes restent telles quelles. */
+  /** Faux : la base ne doit pas être écrite (téléphone qu'on ne peut pas écrire, `restrictSyncPlan`) ; les lignes restent telles quelles. */
   saveBase: boolean;
   /** Une entrée par session qui demande quelque chose, par instant de départ. */
   items: SyncItem[];
@@ -539,6 +558,7 @@ export const planSync = (input: SyncInput): SyncPlan => {
     const written: SyncAncestors = { computer: null, phone: null };
     const ops: SyncOp[] = [];
     let conflicts: string[] = [];
+    let conflictWinners: Record<string, SyncSideName> | null = null;
     let withoutAncestor = false;
     if (o.state === 'future' || t.state === 'future') {
       // Jamais fondue ni réécrite. Suivie, et elle seule a changé : recopiée à l'octet, si le GPX porte le même nom.
@@ -555,9 +575,12 @@ export const planSync = (input: SyncInput): SyncPlan => {
         written[to] = source.text;
       }
     } else {
-      const merged = mergeSyncRecords({ computer: o.text, phone: t.text, computerAncestor: kept.computer, phoneAncestor: kept.phone }, { editsOnly: twoTracks });
+      const merged = mergeSyncRecords(
+        { computer: o.text, phone: t.text, computerAncestor: kept.computer, phoneAncestor: kept.phone }, { editsOnly: twoTracks, nowMs: input.nowMs },
+      );
       if (!merged) return { ...item, left: 'unreadableRecord' };
       conflicts = merged.conflicts;
+      if (conflicts.length > 0) conflictWinners = merged.winners;
       withoutAncestor = line !== null && merged.union;
       for (const side of SYNC_SIDES) {
         const text = merged[side];
@@ -584,7 +607,10 @@ export const planSync = (input: SyncInput): SyncPlan => {
       computer: written.computer ?? (o.read || !line || withoutAncestor ? o.text : null),
       phone: written.phone ?? (t.read || !line || withoutAncestor ? t.text : null),
     };
-    return { ...item, ops, conflicts, twoTracks, withoutAncestor, base: { kind: 'set', ...names, ancestors: ancestorsNow } };
+    return {
+      ...item, ops, conflicts, ...(conflictWinners ? { conflictWinners } : {}), twoTracks, withoutAncestor,
+      base: { kind: 'set', ...names, ancestors: ancestorsNow },
+    };
   };
 
   /** Supprimée sur le téléphone : toutes les copies de l'ordinateur vont à sa corbeille. */
@@ -678,10 +704,11 @@ const opAllowed = (op: SyncOp, scope: SyncScope): boolean => {
  * l'ordinateur (`phone` faux : un téléphone qu'on peut lire sans pouvoir y écrire). Les opérations permises restent.
  * Une session dont une opération est retirée garde sa ligne de base telle quelle (`keep`) : ce qui n'a pas été fait
  * sera retrouvé par le plan suivant, et ce qui a été fait ne se refait pas. Une suppression retenue reste donc à
- * faire, et sera proposée de nouveau. Sans identifiant possible pour le téléphone, la base ne s'écrit pas du tout.
+ * faire, et sera proposée de nouveau. Un téléphone qu'on ne peut pas écrire ne reçoit ni identifiant ni passage : la
+ * base ne s'écrit pas du tout, sans quoi une ligne posée sans passage neuf échapperait à la reconnaissance d'une copie.
  */
 export const restrictSyncPlan = (plan: SyncPlan, scope: SyncScope): SyncPlan => {
-  const saveBase = plan.saveBase && scope.computer && (scope.phone || !plan.pair.newId.phone);
+  const saveBase = plan.saveBase && scope.computer && scope.phone;
   const items = plan.items.map((item): SyncItem => {
     const ops = item.ops.filter((op) => opAllowed(op, scope));
     const cut = ops.length < item.ops.length;

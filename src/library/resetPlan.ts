@@ -288,21 +288,29 @@ export interface EraseResult {
 }
 
 /**
+ * Retire du marqueur son identifiant de synchronisation (`markerTextWithoutId`), le reste gardé : un dossier vidé
+ * exprès, même coupé au milieu, n'est plus celui que l'autre appareil connaît, et la synchronisation suivante, une
+ * première rencontre, ne supprime rien chez lui et lui rend ses sessions. Un marqueur sans identifiant n'est pas
+ * réécrit. Première étape de « Tout supprimer », avant que les écritures soient suspendues (le marqueur ne pourrait
+ * plus se réécrire) : si elle lève, rien ne doit être effacé.
+ */
+export const forgetSyncId = async (folder: Pick<MemoryFolder, 'readText' | 'writeText'>): Promise<void> => {
+  const withoutId = markerTextWithoutId(await folder.readText(MARKER_FILE));
+  if (withoutId !== null) await folder.writeText(MARKER_FILE, withoutId);
+};
+
+/**
  * Efface du dossier les fichiers de l'application (`memoryResetTargets`), un par un, et s'arrête au premier échec,
- * sans rien tenter d'autre. Avant le premier effacement, le marqueur perd son identifiant de synchronisation
- * (`markerTextWithoutId`) : un dossier vidé exprès, même coupé au milieu, n'est plus celui que l'autre appareil
- * connaît, et la synchronisation suivante, une première rencontre, ne supprime rien chez lui et lui rend ses sessions.
- * Si cette réécriture échoue, rien n'est effacé. `onProgress` reçoit le nombre de fichiers effacés et leur total.
+ * sans rien tenter d'autre ; le marqueur, effacé en dernier, a déjà perdu son identifiant (`forgetSyncId`). Rien ne
+ * s'y écrit : les écritures sont alors suspendues. `onProgress` reçoit le nombre de fichiers effacés et leur total.
  */
 export const eraseAppFiles = async (
-  folder: Pick<MemoryFolder, 'list' | 'remove' | 'kind' | 'readText' | 'writeText'>,
+  folder: Pick<MemoryFolder, 'list' | 'remove' | 'kind'>,
   onProgress: (done: number, total: number) => void = () => undefined,
 ): Promise<EraseResult> => {
   let listings: MemoryListings;
   try {
     listings = await readMemoryListings(folder);
-    const withoutId = markerTextWithoutId(await folder.readText(MARKER_FILE));
-    if (withoutId !== null) await folder.writeText(MARKER_FILE, withoutId);
   } catch (error) {
     return { sessionsDone: 0, sessionsTotal: 0, error };
   }

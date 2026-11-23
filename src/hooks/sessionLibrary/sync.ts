@@ -4,7 +4,8 @@ import { LEARNED_PLACES_FILE, RESTING_HR_FILE, SESSIONS_DIR, SETTINGS_DIR, sessi
 import { isCompleteGpxText } from '../../library/pendingTemps';
 import type { SessionRecord } from '../../library/record';
 import {
-  SYNC_DIR, SYNC_SIDES, emptySyncBase, hasSyncMemory, markerTextWithId, markerTextWithSync, otherSyncSide, parseSyncBase, readMarkerId,
+  SYNC_DIR, SYNC_SIDES, emptySyncBase, hasSyncMemory, markerTextWithId, markerTextWithPass, markerTextWithSync, otherSyncSide, parseSyncBase,
+  readMarkerDevice, readMarkerId, readMarkerPass,
   serializeSyncBase, syncAncestorPath, syncBaseLine, syncBasePath, syncRefusal, withSyncDone, withSyncHeld, withSyncLine, withoutSyncLine,
   withoutSyncMemory,
   type SyncBase, type SyncFiles, type SyncSideName, type SyncStamp,
@@ -161,7 +162,8 @@ export interface SyncOptions {
   onPlanned?: (plan: SyncPlan, first: SyncFirstReason | null) => void;
   /**
    * Identifiant de l'ordinateur, celui de son fichier de réglages : ce fichier fait foi, il n'est jamais remplacé sur
-   * l'ordinateur par une copie venue du téléphone. Absent : seule la règle des dates protège les fichiers propres.
+   * l'ordinateur par une copie venue du téléphone. Absent : aucun fichier de même nom des deux côtés n'est remplacé.
+   * Celui du téléphone se lit dans son marqueur (`readMarkerDevice`).
    */
   computerDeviceId?: string | null;
   /** Identifiants des activités de chaque appareil ; un côté absent n'est pas vérifié. */
@@ -282,7 +284,8 @@ const parentDir = (path: string): string => (path.includes('/') ? path.slice(0, 
  * écrivant laisse ce fichier et passe au suivant. Aucun n'entre dans le garde-fou des suppressions.
  */
 const syncExtraFiles = async (
-  folders: Record<SyncSideName, MemoryFolder>, scope: Record<SyncSideName, boolean>, computerDeviceId: string | null, outcome: SyncOutcome,
+  folders: Record<SyncSideName, MemoryFolder>, scope: Record<SyncSideName, boolean>, deviceIds: Record<SyncSideName, string | null>,
+  outcome: SyncOutcome,
 ): Promise<void> => {
   const settingsOf = async (folder: MemoryFolder): Promise<SyncNamedText[]> => {
     const files: SyncNamedText[] = [];
@@ -298,7 +301,8 @@ const syncExtraFiles = async (
     settings: { computer: await settingsOf(folders.computer), phone: await settingsOf(folders.phone) },
     restingHr: await rootOf(RESTING_HR_FILE),
     places: await rootOf(LEARNED_PLACES_FILE),
-    computerDeviceId,
+    computerDeviceId: deviceIds.computer,
+    phoneDeviceId: deviceIds.phone,
   });
   outcome.extras.left.push(...plan.left);
   for (const op of plan.ops) {
@@ -364,7 +368,7 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
     const read = ids.phone ? parseSyncBase(await computer.readText(syncBasePath(ids.phone))) : { state: 'absent' as const };
     if (read.state === 'newer') return emptyOutcome('newerBase');
     // La base de la paire change avant le plan quand une réponse de l'utilisateur lui fait oublier une session.
-    let pair = syncPair(ids.computer, ids.phone, options.phonePath ?? null, read.state === 'ok' ? read.base : null);
+    let pair = syncPair(ids.computer, ids.phone, options.phonePath ?? null, read.state === 'ok' ? read.base : null, readMarkerPass(markers.phone));
     outcome.first = pair.first;
     const running = await computer.readText(SYNC_RUNNING_PATH);
     outcome.interrupted = running !== null;
@@ -399,6 +403,8 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
     }
     const startedAtMs = now();
     await writeWitness(startedAtMs);
+    /** Marqueur du téléphone tel qu'il est maintenant sur le téléphone. */
+    let phoneMarker = markers.phone;
     for (const side of SYNC_SIDES) {
       if (!pair.newId[side] || !scope[side]) continue;
       const id = (options.newFolderId ?? newId)();
@@ -406,7 +412,19 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
       if (text === null) continue;
       await folders[side].writeText(MARKER_FILE, text);
       ids[side] = id;
+      if (side === 'phone') phoneMarker = text;
       if (side === 'phone' && outcome.safetyCopy) await writeWitness(startedAtMs);
+    }
+    // Passage neuf dans le marqueur du téléphone, avant toute ligne de la base : une copie faite avant ce point porte
+    // moins que la base, même si la synchronisation s'arrête en route (`syncPair`, `olderCopy`).
+    let phonePass: number | null = null;
+    if (scope.phone) {
+      const pass = Math.max(readMarkerPass(phoneMarker) ?? 0, pair.base?.phonePass ?? 0) + 1;
+      const text = markerTextWithPass(phoneMarker, pass);
+      if (text !== null) {
+        await phone.writeText(MARKER_FILE, text);
+        phonePass = pass;
+      }
     }
 
     let listings: Record<SyncSideName, SyncListing> = { computer: syncListing([]), phone: syncListing([]) };
@@ -455,11 +473,11 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
     const heldChoice: SyncHeldChoice | undefined = options.heldOnPhone === 'keep' ? undefined : options.heldOnPhone;
     /** Le plan entier des sessions ; `keep` : les identités que l'utilisateur garde. */
     const sessionPlanOf = (keep: readonly number[]): SyncPlan => {
-      const whole = planSync({ ...input, pair, heldOnPhone: heldChoice, keep });
+      const whole = planSync({ ...input, pair, heldOnPhone: heldChoice, keep, nowMs: now() });
       if (heldChoice !== 'remove' || !options.heldToRemove) return whole;
       // Retirer seulement les sessions montrées : une autre apparue depuis la question les fait toutes laisser.
       const shown = new Set(options.heldToRemove);
-      const heldNow = planSync({ ...input, pair, heldOnPhone: 'leave', keep });
+      const heldNow = planSync({ ...input, pair, heldOnPhone: 'leave', keep, nowMs: now() });
       return heldNow.items.some((item) => item.left === 'inTrash' && !shown.has(item.startMs)) ? heldNow : whole;
     };
     /** Le plan entier des itinéraires, de même. */
@@ -636,6 +654,7 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
     options.onPlanned?.(plan, pair.first);
 
     let base: SyncBase = pair.base ?? emptySyncBase(ids.computer ?? '', ids.phone ?? '', options.phonePath ?? null);
+    if (phonePass !== null) base = { ...base, phonePass };
     const saveBase = async (): Promise<void> => {
       if (plan.saveBase) await computer.writeText(syncBasePath(base.phoneId), serializeSyncBase(base));
     };
@@ -782,6 +801,20 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
       if (activityId !== null) receivedActivities.push({ side, startMs, activityId });
     };
 
+    /** Vrai quand le listage du téléphone a déjà été relu pour la session en cours. */
+    let phoneRelisted = false;
+    /**
+     * Relit le listage du téléphone, une fois par session, avant de remplacer l'une de ses fiches : le câble ne voit un
+     * fichier que par son dernier listage, et une fiche enregistrée sur le téléphone depuis le plan (une note saisie
+     * pendant la synchronisation) serait sinon écrasée par la fusion faite avant elle. Changée, la session est sautée
+     * et fondue à la fois suivante. Une copie neuve (`writeNew`) n'en a pas besoin : elle ne remplace rien.
+     */
+    const relistPhone = async (): Promise<void> => {
+      if (phoneRelisted) return;
+      await phone.list(SESSIONS_DIR);
+      phoneRelisted = true;
+    };
+
     const execute = async (op: SyncOp, item: SyncItem): Promise<void> => {
       switch (op.kind) {
         case 'copy': {
@@ -800,6 +833,7 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
           return;
         }
         case 'writeRecord':
+          if (op.on === 'phone') await relistPhone();
           await expect(op.on, op.file);
           await write(op.on, op.file.name, encode(op.text));
           noteActivity(op.on, item.startMs, op.text);
@@ -807,6 +841,7 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
         case 'copyRecord': {
           const from = otherSyncSide(op.to);
           await expect(from, op.source);
+          if (op.to === 'phone') await relistPhone();
           await expect(op.to, op.file);
           const record = await bytesOf(from, op.source.name);
           await write(op.to, op.file.name, record);
@@ -856,6 +891,7 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
     options.onProgress?.(0, total);
     for (const item of plan.items) {
       receivedActivities = [];
+      phoneRelisted = false;
       let reached = before;
       before += filesOfItem(item);
       try {
@@ -913,7 +949,7 @@ export const executeSync = async (computer: MemoryFolder, remote: MemoryFolder, 
       }, outcome.routes);
     }
     options.onProgress?.(total, total);
-    await syncExtraFiles(folders, scope, options.computerDeviceId ?? null, outcome);
+    await syncExtraFiles(folders, scope, { computer: options.computerDeviceId ?? null, phone: readMarkerDevice(markers.phone) }, outcome);
     const extrasStopped = outcome.extras.left.some((l) => l.reason === 'changed' || l.reason === 'failed');
     const routesStopped = outcome.routes.skipped.length > 0 || outcome.routes.failed.length > 0;
     outcome.complete = scope.phone && outcome.deletions === 'made' && outcome.skipped.length === 0 && outcome.failed.length === 0

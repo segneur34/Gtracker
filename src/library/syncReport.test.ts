@@ -151,7 +151,7 @@ describe('compte rendu : ce qui s’est échangé', () => {
 
   it('modifiée des deux côtés : l’encadré dit ce qui est gardé', () => {
     expect(notesOf(describeSync(outcomeOf([item('followed', [OPS.record], { conflicts: ['notes'] })])))).toEqual([
-      "1 session modifiée sur les deux appareils : là où les deux ont changé la même chose, c'est la version de l'ordinateur qui est gardée.",
+      "1 session modifiée sur les deux appareils : là où les deux ont changé la même chose, c'est la version écrite en dernier qui est gardée (celle de l'ordinateur quand on ne peut pas le savoir), et la plus ancienne a été remplacée.",
     ]);
     const tour = route('followed', [{ kind: 'loserToTrash', side: 'phone', files: listed }, copyTo('phone')], { conflict: true });
     expect(notesOf(describeSync(outcomeOf([], routesOf([tour]))))).toEqual([
@@ -367,6 +367,14 @@ describe('deux passes, un compte rendu', () => {
     expect(rowsOf(said)).toEqual(['Reçu du téléphone : 1 session', 'Envoyé au téléphone : 1 session']);
     expect(said.rows.flatMap((r) => r.names)).toEqual(['B', 'A']);
     expect(notesOf(said)).toEqual([]);
+  });
+
+  it('copie plus ancienne du dossier du téléphone : dite à la place de la première synchronisation', () => {
+    const said = describeSync(outcomeOf([item('newOnPhone', [OPS.toComputer])], { first: 'olderCopy', safetyCopy: 'C:\\copies\\2' }));
+    expect(said.paragraphs).toEqual([
+      "Le dossier du téléphone est une copie plus ancienne (une sauvegarde remise, ou le même dossier sur un autre téléphone) : il a été traité comme un nouveau téléphone, et rien n'a été supprimé. Des sessions supprimées depuis cette copie peuvent revenir : supprimez-les de nouveau si vous n'en voulez plus.",
+      'Copie de sécurité :',
+    ]);
   });
 
   it('première synchronisation suivie d’une réponse qui retire du téléphone : jamais « rien n’a été supprimé », le dossier de la copie reste', () => {

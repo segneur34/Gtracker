@@ -1,5 +1,6 @@
 import { sessionPath } from '../../library/folderLayout';
 import { t } from '../../core/i18n';
+import { withEditTimes } from '../../library/recordMerge';
 import { isBlankRecordText, recordToKeep } from '../../library/recordText';
 import {
   applyRecordPatch, imuFileName, mergeLightRecord, parseRecordWithRaw, recordFileName, type LibrarySession,
@@ -84,12 +85,16 @@ export const readSessionMotion = async (file: string): Promise<Uint8Array | null
   return lib.folder && hasSessionMotion(file) ? lib.folder.readBytes(sessionPath(imuFileName(file))) : null;
 };
 
-/** Applique `patch` à la fiche de `file` ; `quiet` : la liste n'est pas redessinée. Vrai si la fiche a changé. */
+/**
+ * Applique `patch` à la fiche de `file`, chaque champ saisi changé daté de maintenant (`withEditTimes`, lu par la
+ * synchronisation) ; `quiet` : la liste n'est pas redessinée. Vrai si la fiche a changé.
+ */
 const patchSessionRecord = (file: string, patch: RecordPatch, quiet: boolean): boolean => {
   const session = findSession(file);
   if (!session || session.readOnly) return false;
-  const { record, resummarize: stale } = applyRecordPatch(session.record, patch);
-  if (record === session.record) return false;
+  const { record: patched, resummarize: stale } = applyRecordPatch(session.record, patch);
+  if (patched === session.record) return false;
+  const record = withEditTimes(session.record, patched, Date.now());
   lib.editCount += 1;
   lastEdit.set(file, lib.editCount);
   noteRecordEdits(file, session.record, record);

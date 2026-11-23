@@ -14,13 +14,23 @@ import type { SyncSideName } from './syncBase';
  * Seuls voyagent, du résumé, les champs que l'analyse y pose (manœuvres, vent).
  *
  * Avec la fiche de chaque côté à la dernière synchronisation (son ancêtre), c'est une fusion à trois : ce qu'un côté
- * a changé depuis passe à l'autre. Même champ changé des deux côtés : c'est un conflit, dit, et le côté préféré
- * l'emporte, l'ordinateur. Aucune date ne départage, pas même celle des notes ou des réglages : les deux appareils
- * n'ont pas la même horloge, et chaque bloc garde la date de son appareil. Sans ancêtre d'un côté ou de l'autre
- * (première rencontre, copie gardée perdue), ou avec une fiche refaite depuis (sa date d'entrée a changé : le GPX a
- * été remis, ou sa fiche perdue puis recréée vide), rien ne prouve qu'un champ vide a été vidé exprès : les deux
- * fiches se complètent, et rien n'est effacé.
+ * a changé depuis passe à l'autre. Même champ changé des deux côtés : c'est un conflit, dit, et la version écrite en
+ * dernier l'emporte. La date d'un côté est l'instant de saisie du champ (`editedAt`) s'il a changé depuis l'ancêtre ;
+ * sinon, pour les notes et les réglages, la date du bloc (`savedAt`) si elle a changé ; sinon il n'y en a pas. Une
+ * date trop loin dans le futur (`FUTURE_SKEW_MS`, horloge déréglée) ne compte pas. Deux dates différentes : la plus
+ * récente l'emporte ; dates absentes ou égales (une version qui ne datait pas ses saisies, une horloge qu'on ne
+ * croit pas), l'ordinateur. Les deux horloges ne sont pas réglées ensemble : c'est l'ordre des saisies à quelques
+ * secondes près, pas mieux. La version qui perd n'est gardée nulle part : la session reste une, la même des deux
+ * côtés. Sans ancêtre d'un côté ou de l'autre (première rencontre, copie gardée perdue), ou avec une fiche refaite
+ * depuis (sa date d'entrée a changé : le GPX a été remis, ou sa fiche perdue puis recréée vide), rien ne prouve qu'un
+ * champ vide a été vidé exprès : les deux fiches se complètent, rien n'est effacé, et aucune date ne départage.
  */
+
+/**
+ * Avance au-delà de laquelle une date de saisie, comparée à l'horloge de l'ordinateur, ne compte pas : un appareil
+ * dont l'horloge file en avant gagnerait sinon tous les conflits jusqu'à ce que le temps la rattrape.
+ */
+export const FUTURE_SKEW_MS = 5 * 60_000;
 
 /** Champs qui décrivent le fichier d'un côté, pas la session : ils ne passent jamais de l'un à l'autre. */
 const SIDE_FIELDS: ReadonlySet<string> = new Set(['format', 'version', 'gpx', 'source', 'addedAt']);
@@ -138,16 +148,44 @@ export interface SyncRecordMerge {
   phone: string | null;
   /** Chemins saisis changés des deux côtés, à dire (`conflictLabels` de `recordMerge.ts`). */
   conflicts: string[];
+  /** Côté dont la version l'emporte, pour chaque chemin de `conflicts`. */
+  winners: Record<string, SyncSideName>;
   /** Vrai si les fiches ont été complétées l'une par l'autre, faute d'ancêtres valables. */
   union: boolean;
 }
 
+/** Bloc daté dont un chemin fait partie, s'il en est un. */
+const blockOf = (path: string): 'notes' | 'analysis' | null => {
+  const top = path.split('.')[0];
+  return top === 'notes' || top === 'analysis' ? top : null;
+};
+
+/**
+ * Date de la saisie d'un chemin d'un côté depuis son ancêtre : son instant de saisie s'il a changé, sinon celle de
+ * son bloc de notes ou de réglages si elle a changé ; `null` sans date, ou si elle dépasse `latestMs`.
+ */
+const editTimeOf = (path: string, self: SessionRecord, ancestor: SessionRecord, latestMs: number): number | null => {
+  const own = self.editedAt?.[path];
+  const block = blockOf(path);
+  const blockAt = block ? self[block]?.savedAt : undefined;
+  const at = own !== undefined && own !== ancestor.editedAt?.[path]
+    ? own
+    : block && blockAt !== undefined && blockAt !== ancestor[block]?.savedAt ? blockAt : null;
+  return at !== null && at <= latestMs ? at : null;
+};
+
+/** Le calcul et l'activité se tranchent ensemble : un seul côté les donne tous deux (`pairActivity`). */
+const ACTIVITY_PATHS = ['sport', 'activityId'];
+
 /**
  * Fond les fiches des deux côtés. `editsOnly` : seuls les champs saisis passent (deux traces différentes du même
- * instant : sauts et manœuvres de l'une ne valent pas pour l'autre). `null` si l'une des deux ne se fond pas
- * (illisible, sans résumé, ou d'une version plus récente) : rien ne doit alors être écrit.
+ * instant : sauts et manœuvres de l'une ne valent pas pour l'autre). `nowMs` : l'heure de l'ordinateur, qui borne les
+ * dates crues (`FUTURE_SKEW_MS`) ; sans elle, aucune date ne compte et l'ordinateur l'emporte. `null` si l'une des
+ * deux ne se fond pas (illisible, sans résumé, ou d'une version plus récente) : rien ne doit alors être écrit.
  */
-export const mergeSyncRecords = (texts: SyncRecordTexts, { editsOnly = false }: { editsOnly?: boolean } = {}): SyncRecordMerge | null => {
+export const mergeSyncRecords = (
+  texts: SyncRecordTexts, { editsOnly = false, nowMs }: { editsOnly?: boolean; nowMs?: number } = {},
+): SyncRecordMerge | null => {
   const sides: Record<SyncSideName, ReadRecord | null> = { computer: readRecord(texts.computer), phone: readRecord(texts.phone) };
   const { computer, phone } = sides;
   if (!computer || !phone || !isWritableRecord(computer.record) || !isWritableRecord(phone.record)) return null;
@@ -166,13 +204,48 @@ export const mergeSyncRecords = (texts: SyncRecordTexts, { editsOnly = false }: 
   };
   const winnerEdits = editsOf(winnerSide, winner, loser);
   const loserEdits = editsOf(loserSide, loser, winner);
-  if (winnerEdits.size === 0 && loserEdits.size === 0) return { computer: null, phone: null, conflicts: [], union };
+  if (winnerEdits.size === 0 && loserEdits.size === 0) return { computer: null, phone: null, conflicts: [], winners: {}, union };
   // Le perdant reçoit ce que le gagnant a changé ; le gagnant reçoit ensuite, sur tout chemin changé d'un côté ou de
   // l'autre, la valeur ainsi tranchée : les deux fiches finissent d'accord.
-  const first = mergeChangedRecord(loser.record, winner.record, winnerEdits, ACROSS_DEVICES);
+  let first = mergeChangedRecord(loser.record, winner.record, winnerEdits, ACROSS_DEVICES);
+  const conflicts = first.conflicts;
+  const winners: Record<string, SyncSideName> = Object.fromEntries(conflicts.map((path) => [path, winnerSide]));
+  const later = union || nowMs === undefined || !before.computer || !before.phone
+    ? []
+    : laterOnPhone(conflicts, computer.record, phone.record, { computer: before.computer, phone: before.phone }, nowMs + FUTURE_SKEW_MS);
+  if (later.length > 0) {
+    // Chemin écrit en dernier sur le téléphone : il quitte les changements de l'ordinateur, et la valeur du téléphone
+    // passe aux deux fiches par la seconde fonte.
+    const moved = new Set(later);
+    if (ACTIVITY_PATHS.some((path) => moved.has(path))) for (const path of ACTIVITY_PATHS) moved.add(path);
+    for (const path of moved) {
+      if (!winnerEdits.has(path)) continue;
+      if (!loserEdits.has(path)) loserEdits.set(path, winnerEdits.get(path));
+      winnerEdits.delete(path);
+    }
+    for (const path of conflicts) if (moved.has(path)) winners[path] = 'phone';
+  }
+  // Activité tranchée pour le côté préféré : son calcul vient avec elle, même s'il n'a changé que de l'autre côté (une
+  // activité du même calcul choisie ici, une d'un autre calcul là-bas), sans quoi la fiche marierait les deux.
+  const activityPath = ACTIVITY_PATHS.find((path) => winners[path] !== undefined);
+  const pulled = activityPath !== undefined && winners[activityPath] === winnerSide
+    ? ACTIVITY_PATHS.filter((path) => loserEdits.has(path) && !winnerEdits.has(path))
+    : [];
+  for (const path of pulled) winnerEdits.set(path, loserEdits.get(path));
+  if (later.length > 0 || pulled.length > 0) first = mergeChangedRecord(loser.record, winner.record, winnerEdits, ACROSS_DEVICES);
   const nextLoser = settle(first.record, loser.record);
   const everyEdit = new Map([...loserEdits, ...winnerEdits]);
   const nextWinner = settle(mergeChangedRecord(winner.record, nextLoser, everyEdit, ACROSS_DEVICES).record, winner.record);
   const written = { [winnerSide]: textIfChanged(nextWinner, winner), [loserSide]: textIfChanged(nextLoser, loser) } as Record<SyncSideName, string | null>;
-  return { computer: written.computer, phone: written.phone, conflicts: first.conflicts, union };
+  return { computer: written.computer, phone: written.phone, conflicts, winners, union };
 };
+
+/** Chemins en conflit dont la saisie du téléphone est datée, et plus récente que celle, datée aussi, de l'ordinateur. */
+const laterOnPhone = (
+  conflicts: readonly string[], computer: SessionRecord, phone: SessionRecord, ancestors: Record<SyncSideName, SessionRecord>, latestMs: number,
+): string[] =>
+  conflicts.filter((path) => {
+    const computerAt = editTimeOf(path, computer, ancestors.computer, latestMs);
+    const phoneAt = editTimeOf(path, phone, ancestors.phone, latestMs);
+    return computerAt !== null && phoneAt !== null && phoneAt > computerAt;
+  });

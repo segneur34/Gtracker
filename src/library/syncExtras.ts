@@ -23,12 +23,16 @@ import { SYNC_SIDES, otherSyncSide, type SyncSideName } from './syncBase';
  *   un fichier du même appareil au moins aussi récent (appareil renommé : l'ancien nom ne revient pas ; renommé sans
  *   autre changement, à même date, aucun des deux noms ne voyage avant le changement suivant de ses réglages).
  * - Même nom des deux côtés, appareils différents : rien n'est écrasé, c'est dit.
- * - Même nom, même appareil, contenus différents : aucune date ne désigne le gagnant. Le fichier d'un appareil n'est
- *   écrit que par cet appareil, la copie de l'autre côté ne fait que le suivre : le fichier propre de l'ordinateur
- *   remplace la copie du téléphone ; celui de tout autre appareil, la copie du téléphone remplace celle de
- *   l'ordinateur. La date d'un fichier peut reculer (téléphone neuf qui a repris la date d'un fichier de
- *   l'ordinateur, horloge du téléphone remise en arrière) : la comparer laisserait une copie ancienne de
- *   l'ordinateur écraser le fichier propre du téléphone.
+ * - Même nom, même appareil, contenus différents : le fichier d'un appareil n'est écrit que par cet appareil, la copie
+ *   de l'autre côté ne fait que le suivre. Le fichier propre de l'ordinateur remplace toujours la copie du téléphone,
+ *   et le fichier propre du téléphone relié (son identifiant, lu dans le marqueur de son dossier) celle de
+ *   l'ordinateur, quelle que soit leur date : la date d'un fichier peut reculer (réglages repris d'un fichier plus
+ *   ancien, horloge remise en arrière), et la comparer laisserait une copie ancienne écraser le fichier de son
+ *   propriétaire. Pour le fichier d'un troisième appareil, la copie à la date la plus récente l'emporte, celle du
+ *   téléphone à égalité : les deux dates viennent de l'horloge de cet appareil. Avec deux téléphones, la vieille copie
+ *   du fichier du premier, gardée par le second, ne remplace donc pas sur l'ordinateur la copie récente reçue du
+ *   premier. Identifiant du téléphone inconnu (version qui ne l'écrit pas dans son marqueur) : tout fichier autre que
+ *   celui de l'ordinateur est pris du téléphone.
  * - Même nom sans pouvoir dire quel appareil a écrit les deux copies (aucune ne porte d'identifiant d'appareil, ou
  *   l'identifiant de l'ordinateur est inconnu) : on ne conclut pas au même appareil, rien n'est écrasé, c'est dit.
  * - Un fichier qui ne se lit pas n'est ni recopié ni écrasé ; un fichier d'une version plus récente n'est jamais
@@ -55,6 +59,11 @@ export interface SyncExtrasInput {
   places: Record<SyncSideName, string | null>;
   /** Identifiant de l'ordinateur (`device.id` de son fichier de réglages) ; inconnu : aucun fichier de même nom des deux côtés n'est remplacé. */
   computerDeviceId?: string | null;
+  /**
+   * Identifiant du téléphone relié, lu dans le marqueur de son dossier (`readMarkerDevice`) : son fichier propre fait
+   * foi. Inconnu : tout fichier autre que celui de l'ordinateur est pris du téléphone.
+   */
+  phoneDeviceId?: string | null;
   placeRules?: PlaceRules;
 }
 
@@ -115,6 +124,16 @@ const byLowerName = (files: readonly SyncNamedText[]): Map<string, SettingsCopy>
 
 const deviceOf = (file: SettingsFile): string | null => file.device?.id ?? null;
 
+/**
+ * Côté dont la copie d'un même fichier de réglages l'emporte : celui de son propriétaire quand il est l'un des deux
+ * appareils (ou quand le téléphone ne dit pas qui il est), sinon la date la plus récente, le téléphone à égalité.
+ */
+const settingsWinner = (device: string | null, own: string, phoneDevice: string | null, computerSavedAt: number, phoneSavedAt: number): SyncSideName => {
+  if (device === own) return 'computer';
+  if (phoneDevice === null || device === phoneDevice) return 'phone';
+  return computerSavedAt > phoneSavedAt ? 'computer' : 'phone';
+};
+
 const planSettings = (input: SyncExtrasInput, plan: SyncExtrasPlan): void => {
   const own = input.computerDeviceId ?? null;
   const sides: Record<SyncSideName, Map<string, SettingsCopy>> = {
@@ -152,7 +171,7 @@ const planSettings = (input: SyncExtrasInput, plan: SyncExtrasPlan): void => {
         leave(settingsPath(c.name), null, 'unknownDevice');
         continue;
       }
-      const winner: SyncSideName = device === own ? 'computer' : 'phone';
+      const winner = settingsWinner(device, own, input.phoneDeviceId ?? null, c.file.savedAt, p.file.savedAt);
       const loser = otherSyncSide(winner);
       const target = copies[loser] as SettingsCopy;
       if ((target.file as SettingsFile).version > SETTINGS_VERSION) {

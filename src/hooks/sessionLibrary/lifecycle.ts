@@ -4,6 +4,7 @@ import {
 import { t, tn } from '../../core/i18n';
 import { describeRefresh } from '../../library/importReport';
 import { LEGACY_MARKER_FILE } from '../../library/legacyImport';
+import { markerTextWithDevice } from '../../library/syncBase';
 import { folderId } from '../../library/libraryCache';
 import { imuFileName } from '../../library/record';
 import {
@@ -22,7 +23,7 @@ import { cancelCacheUpdate } from './cache';
 import { scan } from './scan';
 import { completeScan } from './summaryQueue';
 import {
-  applySettingsChange, flushWrites, forgetSettingsEntries, libraryUiStarted, syncSettingsSafely, watchDeviceSettings,
+  applySettingsChange, deviceId, flushWrites, forgetSettingsEntries, libraryUiStarted, syncSettingsSafely, watchDeviceSettings,
 } from './deviceSettings';
 import { addGpx, countPending } from './addSession';
 import { flushPending } from './pending';
@@ -76,10 +77,17 @@ const isLegacyMemory = async (f: MemoryFolder): Promise<boolean> =>
 /** Contrôle d'un dossier désigné (`FolderCheck`) : fait avant que le choix ne soit gardé, le dossier gardé reste celui d'avant. */
 const legacyFolderCheck = async (f: MemoryFolder): Promise<string | null> => ((await isLegacyMemory(f)) ? LEGACY_FOLDER_REFUSAL : null);
 
-/** Marqueur écrit s'il manque ; mode d'emploi récrit s'il manque ou a changé. Rien en lecture seule. */
+/**
+ * Marqueur écrit s'il manque, et complété de l'identifiant de cet appareil s'il ne le porte pas : l'ordinateur qui
+ * synchronise ce dossier y reconnaît le fichier de réglages propre au téléphone (`readMarkerDevice`). Mode d'emploi
+ * récrit s'il manque ou a changé. Rien en lecture seule.
+ */
 const ensureLayout = async (f: MemoryFolder): Promise<void> => {
   if (f.readOnly) return;
-  if ((await f.readText(MARKER_FILE)) === null) await f.writeText(MARKER_FILE, markerText());
+  const read = await f.readText(MARKER_FILE);
+  const marker = read ?? markerText();
+  const text = markerTextWithDevice(marker, deviceId()) ?? (read === null ? marker : null);
+  if (text !== null) await f.writeText(MARKER_FILE, text);
   if ((await f.readText(README_FILE)) !== readmeText()) await f.writeText(README_FILE, readmeText());
 };
 

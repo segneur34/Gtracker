@@ -410,7 +410,8 @@ const exceptionNotes = (outcome: SyncOutcome): SyncReportNote[] => {
 
   const conflicts = outcome.done.filter((i) => i.conflicts.length > 0).length;
   if (conflicts > 0) {
-    say(tn(conflicts, "{n} session modifiée sur les deux appareils : là où les deux ont changé la même chose, c'est la version de l'ordinateur qui est gardée.", "{n} sessions modifiées sur les deux appareils : là où les deux ont changé la même chose, c'est la version de l'ordinateur qui est gardée."));
+    // La version qui perd n'est gardée nulle part : à la corbeille, elle ferait une seconde fois la même session.
+    say(tn(conflicts, "{n} session modifiée sur les deux appareils : là où les deux ont changé la même chose, c'est la version écrite en dernier qui est gardée (celle de l'ordinateur quand on ne peut pas le savoir), et la plus ancienne a été remplacée.", "{n} sessions modifiées sur les deux appareils : là où les deux ont changé la même chose, c'est la version écrite en dernier qui est gardée (celle de l'ordinateur quand on ne peut pas le savoir), et la plus ancienne a été remplacée."));
   }
   const routeConflicts = outcome.routes.done.filter((i) => i.conflict && hasRouteOp(i, (op) => op.kind === 'copy')).length;
   if (routeConflicts > 0) {
@@ -537,7 +538,9 @@ export const describeSync = (
   // Un téléphone qu'on ne peut pas écrire ne reçoit pas d'identifiant : chaque passe serait « la première ». Une
   // première synchronisation jointe à la passe d'une réponse peut avoir supprimé : la phrase se tait alors.
   const deleted = rows.some((row) => row.label === t('Supprimé'));
-  if (outcome.phoneWritable && outcome.first !== null && !deleted) paragraphs.push(t("Première synchronisation : rien n'a été supprimé."));
+  if (outcome.phoneWritable && outcome.first === 'olderCopy' && !deleted) {
+    paragraphs.push(t("Le dossier du téléphone est une copie plus ancienne (une sauvegarde remise, ou le même dossier sur un autre téléphone) : il a été traité comme un nouveau téléphone, et rien n'a été supprimé. Des sessions supprimées depuis cette copie peuvent revenir : supprimez-les de nouveau si vous n'en voulez plus."));
+  } else if (outcome.phoneWritable && outcome.first !== null && !deleted) paragraphs.push(t("Première synchronisation : rien n'a été supprimé."));
   const notes = exceptionNotes(outcome);
   if (answerFailed !== null) notes.push(answerFailureNote(answerFailed));
   if (unanswered !== null) notes.push({ text: unansweredNote(unanswered), detail: null });

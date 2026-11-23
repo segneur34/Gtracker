@@ -1,7 +1,7 @@
 import { settingsPath } from '../../library/folderLayout';
 import {
-  FOLDER_CLOSED_REFUSAL, RESET_RUNNING_REFUSAL, eraseAppFiles, eraseKeyPlan, factoryKeyPlan, memoryResetTargets, readMemoryListings,
-  resetInterruptedText, type EraseCounts,
+  FOLDER_CLOSED_REFUSAL, RESET_RUNNING_REFUSAL, eraseAppFiles, eraseKeyPlan, factoryKeyPlan, forgetSyncId, memoryResetTargets,
+  readMemoryListings, resetInterruptedText, type EraseCounts, type EraseResult,
 } from '../../library/resetPlan';
 import { clearDeviceFiles } from '../../platform/appReset';
 import { t } from '../../core/i18n';
@@ -81,7 +81,8 @@ export const factoryReset = async (): Promise<string | null> => {
 };
 
 /**
- * « Tout supprimer » : la mémoire s'arrête, puis le dossier perd les fichiers de l'application (la mémoire du
+ * « Tout supprimer » : la mémoire s'arrête, le marqueur de chaque dossier perd son identifiant de synchronisation
+ * (`forgetSyncId`, avant la suspension des écritures), puis le dossier perd les fichiers de l'application (la mémoire du
  * navigateur aussi quand un dossier du PC est désigné, ou dans le programme Windows : elle en garde une copie, ou les
  * essais d'avant le dossier du disque), puis les fichiers de l'appareil
  * hors du dossier, puis les clés de l'appareil ; l'application se recharge comme à sa première ouverture. Un échec
@@ -100,14 +101,12 @@ export const eraseEverything = async (onProgress: (progress: ResetProgress) => v
   }
   await flushWrites();
   stopSettingsWrites();
-  suspendWrites();
   const folder = stopForReset();
   // Dossier du PC choisi, ou programme Windows (dossier retenu ou non) : la mémoire du navigateur, gardée à part, part aussi.
   const copy = folder?.kind === 'picked' || isDesktopApp() ? await browserMemoryCopy() : null;
   const folders = [folder, copy].filter((f): f is MemoryFolder => f !== null);
-  for (const f of folders) {
-    const result = await eraseAppFiles(f, (done, total) => onProgress({ done, total }));
-    if (result.error === null) continue;
+  /** Arrêt sur un échec du dossier : les écritures reprennent, la mémoire est relue, le compte rendu est dit. */
+  const interrupt = async (result: EraseResult): Promise<string> => {
     resumeWrites();
     resumeSettingsWrites();
     resetRunning = false;
@@ -115,6 +114,19 @@ export const eraseEverything = async (onProgress: (progress: ResetProgress) => v
     const message = resetInterruptedText(result, plainError(result.error, t('le dossier ne répond pas')));
     setState({ error: message });
     return message;
+  };
+  // Le marqueur perd son identifiant tant qu'on peut encore écrire ; s'il ne se réécrit pas, rien n'est effacé.
+  for (const f of folders) {
+    try {
+      await forgetSyncId(f);
+    } catch (error) {
+      return interrupt({ sessionsDone: 0, sessionsTotal: 0, error });
+    }
+  }
+  suspendWrites();
+  for (const f of folders) {
+    const result = await eraseAppFiles(f, (done, total) => onProgress({ done, total }));
+    if (result.error !== null) return interrupt(result);
   }
   await clearDeviceFiles();
   // Une écriture partie avant la suspension ne doit pas reposer une clé derrière son retrait.

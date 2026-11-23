@@ -1,7 +1,9 @@
 import { t } from '../core/i18n';
 import type { FileStat } from '../platform/memoryFolder';
 import type { PlaceSource, PlaceSpot, SessionPlace } from './places';
-import { ANALYSIS_SUMMARY_FIELDS, sameJson, type RecordWithoutSummary, type SessionRecord, type SessionSummary } from './record';
+import {
+  ANALYSIS_SUMMARY_FIELDS, sameJson, type RecordEditTimes, type RecordWithoutSummary, type SessionRecord, type SessionSummary,
+} from './record';
 
 /**
  * Fiche changée sur le disque pendant qu'on la tenait en mémoire : deux appareils sur un
@@ -44,7 +46,8 @@ export const addRecordEdits = (edits: Map<string, unknown>, before: SessionRecor
   const a = loose(before);
   const b = loose(after);
   for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
-    if (key === 'gpx' || key === 'summary' || (DATED_BLOCKS as readonly string[]).includes(key)) continue;
+    // Les instants de saisie suivent les saisies qu'ils datent : ils ne sont pas une saisie (`mergedEditTimes`).
+    if (key === 'gpx' || key === 'summary' || key === 'editedAt' || (DATED_BLOCKS as readonly string[]).includes(key)) continue;
     if (!sameJson(a[key], b[key])) note(key, a[key]);
   }
   for (const block of DATED_BLOCKS) {
@@ -171,7 +174,7 @@ export interface MergedRecord {
  * (`isSummaryOutdated`), comme pour une allure changée ici.
  * `datedByClock` faux : `disk` et `mine` viennent de deux appareils, dont les horloges ne se comparent pas ; en notes
  * et en réglages aussi, un champ changé des deux côtés est alors celui de `mine`, et le bloc de `disk` garde sa date
- * (0 s'il n'en avait pas : la date de `mine` ne passe jamais).
+ * (0 s'il n'en avait pas : la date de `mine` ne passe jamais). Instants de saisie (`editedAt`) : `mergedEditTimes`.
  */
 export const mergeChangedRecord = (
   disk: RecordWithoutSummary, mine: SessionRecord, edits: RecordEdits, { datedByClock = true }: { datedByClock?: boolean } = {},
@@ -195,7 +198,56 @@ export const mergeChangedRecord = (
   }
   for (const block of DATED_BLOCKS) out[block] = mergedBlock(block, disk, mine, edits, conflicts, datedByClock);
   out.summary = mergedSummary(disk.summary, mine.summary, edits);
+  const editedAt = mergedEditTimes(disk, mine.editedAt, out as unknown as RecordWithoutSummary);
+  if (editedAt) out.editedAt = editedAt;
+  else delete out.editedAt;
   return { record: out as unknown as SessionRecord, conflicts: conflicts.filter(isSaisie) };
+};
+
+/**
+ * Instants de saisie fondus : ceux du disque, et pour chaque chemin dont la fonte a changé la valeur du disque,
+ * le plus grand des deux. Une saisie d'ici qui ne change rien au disque (le même nom donné des deux côtés, un champ
+ * où le disque l'emporte) ne lui apporte pas sa date. `undefined` s'il n'y en a aucun.
+ */
+const mergedEditTimes = (
+  disk: RecordWithoutSummary, mine: RecordEditTimes | undefined, merged: RecordWithoutSummary,
+): RecordEditTimes | undefined => {
+  let out = disk.editedAt;
+  for (const [path, at] of Object.entries(mine ?? {})) {
+    if (at <= (out?.[path] ?? -1) || sameJson(valueAt(disk, path), valueAt(merged, path))) continue;
+    out = { ...out, [path]: at };
+  }
+  return out;
+};
+
+/** Vrai si le lieu a été corrigé par l'utilisateur entre ces deux états, au départ ou à l'arrivée. */
+const placeCorrected = (before: SessionPlace | undefined, after: SessionPlace | undefined): boolean =>
+  (after?.source === 'utilisateur' && !sameJson(spotOf(before), spotOf(after)))
+  || (after?.arrival?.source === 'utilisateur' && !sameJson(before?.arrival, after.arrival));
+
+/**
+ * La fiche `after`, ses instants de saisie (`SessionRecord.editedAt`) posés à `atMs` sur chaque chemin saisi changé
+ * depuis `before` (champs de `SAISIE_LABEL`, chaque champ d'un bloc de notes ou de réglages né ou retiré). Le lieu ne
+ * compte que corrigé par l'utilisateur : un lieu trouvé ou appris n'est pas une saisie. La même fiche si rien n'a
+ * changé.
+ */
+export const withEditTimes = (before: SessionRecord, after: SessionRecord, atMs: number): SessionRecord => {
+  const edits = new Map<string, unknown>();
+  addRecordEdits(edits, before, after);
+  const paths: string[] = [];
+  for (const path of edits.keys()) {
+    if (!isSaisie(path) || (path === 'place' && !placeCorrected(before.place, after.place))) continue;
+    paths.push(path);
+    if ((DATED_BLOCKS as readonly string[]).includes(path)) {
+      const block = path as DatedBlock;
+      const fields = new Set([...Object.keys(before[block] ?? {}), ...Object.keys(after[block] ?? {})]);
+      for (const field of fields) if (field !== 'savedAt') paths.push(`${block}.${field}`);
+    }
+  }
+  if (paths.length === 0) return after;
+  const editedAt: Record<string, number> = { ...after.editedAt };
+  for (const path of paths) editedAt[path] = atMs;
+  return { ...after, editedAt };
 };
 
 /** Ce que l'utilisateur saisit, en clair, par champ de premier niveau ; les champs calculés (sauts) ne s'annoncent pas. */

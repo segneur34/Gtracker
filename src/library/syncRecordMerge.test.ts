@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { RECORD_VERSION, serializeRecord, type SessionRecord, type StoredSessionNotes } from './record';
-import { inspectSyncRecord, mergeSyncRecords, renamedSyncRecord, syncRecordChanged, type SyncRecordMerge } from './syncRecordMerge';
+import {
+  FUTURE_SKEW_MS, inspectSyncRecord, mergeSyncRecords, renamedSyncRecord, syncRecordChanged, type SyncRecordMerge,
+} from './syncRecordMerge';
 import { sessionRecord } from '../test/record.fixture';
 
 const notes = (patch: Partial<StoredSessionNotes>): StoredSessionNotes => ({
@@ -27,7 +29,7 @@ interface Sides {
 }
 
 /** Fond deux fiches ; `before` : ce qu'elles étaient à la dernière synchronisation, absent à une première rencontre. */
-const merge = (now: Sides, before?: Sides, options?: { editsOnly?: boolean }): SyncRecordMerge => {
+const merge = (now: Sides, before?: Sides, options?: { editsOnly?: boolean; nowMs?: number }): SyncRecordMerge => {
   const merged = mergeSyncRecords({
     computer: text(now.computer), phone: text(now.phone),
     computerAncestor: before ? text(before.computer) : null, phoneAncestor: before ? text(before.phone) : null,
@@ -65,11 +67,109 @@ describe('ce que la synchronisation peut faire d’une fiche', () => {
   });
 });
 
+describe('même champ changé des deux côtés : la version écrite en dernier l’emporte', () => {
+  const NOW = 1_800_000_000_000;
+  const at = (minutes: number): number => NOW - 60 * 60_000 + minutes * 60_000;
+  const start: Sides = {
+    computer: onComputer({ name: 'Matin', editedAt: { name: at(0) } }), phone: onPhone({ name: 'Matin', editedAt: { name: at(0) } }),
+  };
+  const renamed = (computerAt: number | undefined, phoneAt: number | undefined): Sides => ({
+    computer: onComputer({ name: 'Ordinateur', editedAt: { name: computerAt ?? at(0) } }),
+    phone: onPhone({ name: 'Téléphone', editedAt: { name: phoneAt ?? at(0) } }),
+  });
+
+  it('téléphone plus récent : son nom passe aux deux fiches, c’est dit, et sa date le suit', () => {
+    const now = renamed(at(10), at(20));
+    const merged = merge(now, start, { nowMs: NOW });
+    const both = after(now, merged);
+    expect(merged.conflicts).toEqual(['name']);
+    expect(merged.winners).toEqual({ name: 'phone' });
+    expect(merged.phone).toBeNull();
+    expect(both.computer).toEqual({ ...now.computer, name: 'Téléphone', editedAt: { name: at(20) } });
+    expect(merge(both, both, { nowMs: NOW })).toMatchObject({ computer: null, phone: null, conflicts: [] });
+  });
+
+  it('ordinateur plus récent : son nom l’emporte', () => {
+    const now = renamed(at(20), at(10));
+    const merged = merge(now, start, { nowMs: NOW });
+    expect(merged.winners).toEqual({ name: 'computer' });
+    expect(merged.computer).toBeNull();
+    expect(after(now, merged).phone).toEqual({ ...now.phone, name: 'Ordinateur', editedAt: { name: at(20) } });
+  });
+
+  it('date absente d’un côté, dates égales, date trop loin dans le futur, ou heure inconnue : l’ordinateur l’emporte', () => {
+    const cases: [Sides, number | undefined][] = [
+      // Téléphone d'une version qui ne datait pas ses saisies : sa date est restée celle de l'ancêtre.
+      [renamed(at(10), undefined), NOW],
+      [renamed(undefined, at(20)), NOW],
+      [renamed(at(10), at(10)), NOW],
+      [renamed(at(10), NOW + FUTURE_SKEW_MS + 1), NOW],
+      [renamed(at(10), at(20)), undefined],
+    ];
+    for (const [now, nowMs] of cases) {
+      const merged = merge(now, start, { nowMs });
+      expect(merged.winners).toEqual({ name: 'computer' });
+      expect(after(now, merged).phone.name).toBe('Ordinateur');
+    }
+    // Un peu d'avance reste crue : une horloge n'est jamais réglée à la seconde.
+    expect(merge(renamed(at(10), NOW + FUTURE_SKEW_MS), start, { nowMs: NOW }).winners).toEqual({ name: 'phone' });
+  });
+
+  it('première rencontre : aucune date ne départage', () => {
+    const now = renamed(at(10), at(20));
+    const merged = merge(now, undefined, { nowMs: NOW });
+    expect(merged.union).toBe(true);
+    expect(after(now, merged).phone.name).toBe('Ordinateur');
+  });
+
+  it('notes datées par leur bloc seul : la plus récente l’emporte, champ par champ', () => {
+    const begin: Sides = { computer: onComputer({ notes: notes({ comment: 'lu', savedAt: at(0) }) }), phone: onPhone({ notes: notes({ comment: 'lu', savedAt: at(0) }) }) };
+    const now: Sides = {
+      computer: onComputer({ notes: notes({ comment: 'ordinateur', conditions: 'clapot', savedAt: at(10) }) }),
+      phone: onPhone({ notes: notes({ comment: 'téléphone', savedAt: at(20) }) }),
+    };
+    const merged = merge(now, begin, { nowMs: NOW });
+    const both = after(now, merged);
+    expect(merged.winners).toEqual({ 'notes.comment': 'phone' });
+    for (const side of [both.computer, both.phone]) expect(side.notes).toMatchObject({ comment: 'téléphone', conditions: 'clapot' });
+  });
+
+  it('activité choisie en dernier sur le téléphone : elle passe avec son calcul, même si l’ordinateur n’a changé que le calcul', () => {
+    const begin: Sides = { computer: onComputer({ activityId: 'a-wing' }), phone: onPhone({ activityId: 'a-wing' }) };
+    const now: Sides = {
+      computer: onComputer({ sport: 'kite', activityId: 'a-kite', editedAt: { sport: at(10), activityId: at(10) } }),
+      phone: onPhone({ activityId: 'a-wing-2', editedAt: { activityId: at(20) } }),
+    };
+    const both = after(now, merge(now, begin, { nowMs: NOW }));
+    for (const side of [both.computer, both.phone]) {
+      expect(side.sport).toBe(now.phone.sport);
+      expect(side.activityId).toBe('a-wing-2');
+    }
+  });
+
+  it('activité choisie en dernier sur l’ordinateur, ou sans date : son calcul la suit, même si seul le téléphone en a changé', () => {
+    const begin: Sides = { computer: onComputer({ activityId: 'a-wing' }), phone: onPhone({ activityId: 'a-wing' }) };
+    const now: Sides = {
+      computer: onComputer({ activityId: 'a-wing-2', editedAt: { activityId: at(20) } }),
+      phone: onPhone({ sport: 'kite', activityId: 'a-kite', editedAt: { sport: at(10), activityId: at(10) } }),
+    };
+    for (const nowMs of [NOW, undefined]) {
+      const merged = merge(now, begin, { nowMs });
+      expect(merged.winners).toEqual({ activityId: 'computer' });
+      const both = after(now, merged);
+      for (const side of [both.computer, both.phone]) {
+        expect(side.sport).toBe(now.computer.sport);
+        expect(side.activityId).toBe('a-wing-2');
+      }
+    }
+  });
+});
+
 describe('fusion à trois : ce qu’un côté a changé passe à l’autre', () => {
   const before: Sides = { computer: onComputer(), phone: onPhone() };
 
   it('rien de changé : rien à écrire', () => {
-    expect(merge(before, before)).toEqual({ computer: null, phone: null, conflicts: [], union: false });
+    expect(merge(before, before)).toEqual({ computer: null, phone: null, conflicts: [], winners: {}, union: false });
   });
 
   it('le résumé seul refait d’un côté n’est pas un changement', () => {

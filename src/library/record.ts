@@ -359,7 +359,23 @@ export interface SessionRecord {
    * supprimés dans l'analyse ; dans l'ordre du temps. Absent sans repère.
    */
   marks?: SessionMark[];
+  /**
+   * Instant de la dernière saisie de chaque champ saisi (horloge de l'appareil qui l'a faite), par chemin de fiche
+   * (`name`, `notes.comment` : `RecordEdits`), posé à chaque changement (`withEditTimes`). La synchronisation y lit,
+   * pour un même champ changé des deux côtés, la version écrite en dernier. Absent : aucune saisie datée.
+   */
+  editedAt?: RecordEditTimes;
 }
+
+/** Instant (ms) de la dernière saisie par chemin de fiche (`SessionRecord.editedAt`). */
+export type RecordEditTimes = Readonly<Record<string, number>>;
+
+/** Instants de saisie relus, les entrées mal formées écartées ; `null` s'il n'en reste aucune. */
+const readEditTimes = (raw: unknown): RecordEditTimes | null => {
+  if (!isObject(raw)) return null;
+  const entries = Object.entries(raw).filter((e): e is [string, number] => e[0] !== '' && isFiniteNumber(e[1]) && e[1] >= 0);
+  return entries.length > 0 ? Object.fromEntries(entries) : null;
+};
 
 const readSummary = (raw: unknown): SessionSummary | null => {
   if (!isObject(raw)) return null;
@@ -674,10 +690,11 @@ const readRecordParts = (raw: unknown, formats: readonly string[]): RecordWithou
   if (typeof raw.gpx !== 'string' || raw.gpx === '') return null;
   const summary = readSummary(raw.summary);
   // Voies, altitude du terrain et sa source (course et vélo) passent bruts par `rest`, comme tout champ inconnu.
-  const { place: rawPlace, mapBase: rawMapBase, jumps: rawJumps, marks: rawMarks, ...rest } = raw;
+  const { place: rawPlace, mapBase: rawMapBase, jumps: rawJumps, marks: rawMarks, editedAt: rawEditedAt, ...rest } = raw;
   const place = readSessionPlace(rawPlace);
   const jumps = readSessionJumps(rawJumps);
   const marks = readSessionMarks(rawMarks);
+  const editedAt = readEditTimes(rawEditedAt);
   return {
     ...rest,
     format: RECORD_FORMAT,
@@ -697,6 +714,7 @@ const readRecordParts = (raw: unknown, formats: readonly string[]): RecordWithou
     ...(isMapBase(rawMapBase) ? { mapBase: rawMapBase } : {}),
     ...(jumps ? { jumps } : {}),
     ...(marks ? { marks } : {}),
+    ...(editedAt ? { editedAt } : {}),
   };
 };
 
@@ -875,7 +893,7 @@ export const isBlankGpxText = (text: string): boolean => text.trim() === '';
  */
 export const RECORD_LIGHT_FIELDS = [
   'format', 'version', 'gpx', 'sport', 'activityId', 'source', 'addedAt', 'title', 'name', 'place',
-  'summary', 'notes', 'analysis', 'mapBase', 'marks',
+  'summary', 'notes', 'analysis', 'mapBase', 'marks', 'editedAt',
 ] as const satisfies readonly (keyof SessionRecord)[];
 
 /**

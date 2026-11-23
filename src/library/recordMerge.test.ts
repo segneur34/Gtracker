@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addRecordEdits, conflictLabels, mergeChangedRecord, sameStamp } from './recordMerge';
+import { addRecordEdits, conflictLabels, mergeChangedRecord, sameStamp, withEditTimes } from './recordMerge';
 import { SUMMARY_CALC_VERSION, type SessionRecord, type StoredSessionNotes } from './record';
 import { sessionRecord } from '../test/record.fixture';
 
@@ -34,6 +34,43 @@ describe('chemins changés ici', () => {
     expect([...editsOf(a, { ...a, summary: { ...a.summary, distanceM: 1 } }).keys()]).toEqual(['summary']);
     expect([...editsOf(a, { ...a, summary: { ...a.summary, maneuverCount: 3 } }).keys()]).toEqual(['summary.maneuverCount']);
     expect(editsOf(a, { ...a }).size).toBe(0);
+  });
+});
+
+describe('instants de saisie', () => {
+  it('posés sur chaque champ saisi changé, jamais sur le résumé ; les instants seuls ne sont pas un changement', () => {
+    const before = sessionRecord({ notes: notes({ comment: 'a' }), editedAt: { marks: 10 } });
+    const after = { ...before, name: 'X', notes: notes({ comment: 'b', savedAt: 200 }), summary: { ...before.summary, distanceM: 1 } };
+    expect(withEditTimes(before, after, 500).editedAt).toEqual({ marks: 10, name: 500, 'notes.comment': 500 });
+    expect(withEditTimes(before, { ...before }, 500)).toEqual(before);
+    expect(editsOf(before, { ...before, editedAt: { name: 1 } }).size).toBe(0);
+  });
+
+  it('un bloc de notes né : chacun de ses champs daté', () => {
+    const before = sessionRecord({ notes: null });
+    const editedAt = withEditTimes(before, { ...before, notes: notes({ comment: 'b' }) }, 500).editedAt ?? {};
+    expect(editedAt.notes).toBe(500);
+    expect(editedAt['notes.comment']).toBe(500);
+    expect(editedAt['notes.savedAt']).toBeUndefined();
+  });
+
+  it('le lieu seulement corrigé par l’utilisateur', () => {
+    const found = { name: 'Carnon', source: 'carte' as const, lat: 43.5, lon: 3.9 };
+    const before = sessionRecord();
+    expect(withEditTimes(before, { ...before, place: found }, 500).editedAt).toBeUndefined();
+    const fixed = { ...before, place: found };
+    expect(withEditTimes(fixed, { ...fixed, place: { ...found, name: 'Palavas', source: 'utilisateur' } }, 500).editedAt).toEqual({ place: 500 });
+    expect(withEditTimes(fixed, { ...fixed, place: { ...found, arrival: { ...found, name: 'Sète', source: 'utilisateur' } } }, 500).editedAt).toEqual({ place: 500 });
+  });
+
+  it('fondus au plus grand, sauf une saisie d’ici qui ne change rien au disque', () => {
+    const base = sessionRecord({ name: 'A', editedAt: { name: 100, marks: 50 } });
+    const mine = { ...base, name: 'B', editedAt: { name: 300, marks: 50 } };
+    const disk = { ...base, editedAt: { name: 100, marks: 80 } };
+    expect(mergeChangedRecord(disk, mine, editsOf(base, mine)).record.editedAt).toEqual({ name: 300, marks: 80 });
+    // Le même nom déjà sur le disque : sa date reste celle du disque.
+    const same = { ...base, name: 'B', editedAt: { name: 200 } };
+    expect(mergeChangedRecord(same, mine, editsOf(base, mine)).record.editedAt).toEqual({ name: 200 });
   });
 });
 

@@ -23,10 +23,21 @@ import { MEMORY_FORMAT, MEMORY_VERSION, readMarkerVersion } from './folderLayout
  * à la réécriture (`unknownFields`).
  *
  * Les dossiers se reconnaissent à un identifiant tiré au hasard, écrit dans leur marqueur (champ `id`) : l'application
- * ne lit du marqueur que son format, sa version et l'instant de la dernière synchronisation (`synchro`), et ne le
- * réécrit que s'il manque. « Tout supprimer » retire l'identifiant avant tout autre effacement (`markerTextWithoutId`) :
- * un dossier remis à zéro, même à moitié, revient donc sans identifiant, et rien ne se déduit de lui. Ce module ne
- * lit ni n'écrit aucun fichier.
+ * ne lit du marqueur de sa mémoire que son format, sa version et l'instant de la dernière synchronisation (`synchro`),
+ * et ne le réécrit que s'il manque ou pour y poser son identifiant d'appareil. « Tout supprimer » retire l'identifiant
+ * avant tout autre effacement (`markerTextWithoutId`) : un dossier remis à zéro, même à moitié, revient donc sans
+ * identifiant, et rien ne se déduit de lui.
+ *
+ * Une copie du dossier du téléphone garde son identifiant : remise plus tard, ou recopiée sur un second téléphone,
+ * elle passerait pour le même téléphone, et ce qu'elle n'a pas encore vu pour des suppressions. Chaque synchronisation
+ * qui écrit le téléphone pose donc, avant toute autre chose, un compteur de passages dans son marqueur (`passage`), et
+ * la base le retient (`phonePass`) : un marqueur qui porte moins, ou rien, est une copie plus ancienne, et la paire
+ * repart comme une première rencontre. Un compteur plutôt qu'un instant : rien ne dépend des horloges.
+ *
+ * Chaque appareil écrit aussi dans le marqueur de sa mémoire son identifiant d'appareil (`appareil`) : l'ordinateur y
+ * reconnaît le fichier de réglages propre au téléphone relié (`planSyncExtras`).
+ *
+ * Ce module ne lit ni n'écrit aucun fichier.
  */
 
 export const SYNC_DIR = 'synchro';
@@ -85,6 +96,11 @@ export interface SyncBase {
   phonePath: string | null;
   /** Fin de la dernière synchronisation menée au bout, horloge de l'ordinateur ; `null` : aucune encore. */
   syncedAtMs: number | null;
+  /**
+   * Dernier passage écrit dans le marqueur du téléphone (`markerTextWithPass`) ; un marqueur qui porte moins est une
+   * copie plus ancienne. `null` : base d'une version qui ne le posait pas, le contrôle ne joue pas pour elle.
+   */
+  phonePass: number | null;
   sessions: SyncBaseSession[];
   /**
    * Sessions dont la synchronisation a mené la suppression au bout, encore dans la corbeille de l'ordinateur. Une
@@ -188,6 +204,48 @@ export const markerTextWithSync = (text: string | null, atMs: number): string | 
   return `${stringifyJson({ ...marker, synchro })}\n`;
 };
 
+/**
+ * Passage écrit par l'ordinateur dans le marqueur du téléphone (champ `passage`, entier croissant) ; `null` sans
+ * marqueur ou sans passage. Distinct de `synchro`, que le téléphone surveille pour savoir que ses sessions ont changé.
+ */
+export const readMarkerPass = (text: string | null): number | null => {
+  const passage = readMarker(text)?.passage;
+  return Number.isSafeInteger(passage) && (passage as number) >= 0 ? (passage as number) : null;
+};
+
+/**
+ * Texte du marqueur avec ce passage, tout le reste gardé tel quel. `null` si le texte n'est pas un marqueur, ou s'il
+ * est d'une version plus récente : un tel marqueur n'est jamais réécrit.
+ */
+export const markerTextWithPass = (text: string | null, pass: number): string | null => {
+  const marker = readMarker(text);
+  if (!marker || readMarkerVersion(text) > MEMORY_VERSION) return null;
+  return `${stringifyJson({ ...marker, passage: pass })}\n`;
+};
+
+/** Identifiant d'appareil acceptable dans un marqueur : un texte court, sans plus de contrôle. */
+const isDeviceId = (value: unknown): value is string => typeof value === 'string' && value !== '' && value.length <= 128;
+
+/**
+ * Identifiant de l'appareil qui a ouvert ce dossier comme sa mémoire (champ `appareil`, celui de son fichier de
+ * réglages) ; `null` sans marqueur ou sans identifiant (version qui ne l'écrivait pas). L'ordinateur le lit dans le
+ * marqueur du téléphone pour reconnaître le fichier de réglages propre au téléphone relié.
+ */
+export const readMarkerDevice = (text: string | null): string | null => {
+  const device = readMarker(text)?.appareil;
+  return isDeviceId(device) ? device : null;
+};
+
+/**
+ * Texte du marqueur avec cet identifiant d'appareil, tout le reste gardé tel quel. `null` si le texte n'est pas un
+ * marqueur, s'il porte déjà cet identifiant (rien à réécrire), ou s'il est d'une version plus récente.
+ */
+export const markerTextWithDevice = (text: string | null, device: string): string | null => {
+  const marker = readMarker(text);
+  if (!marker || !isDeviceId(device) || marker.appareil === device || readMarkerVersion(text) > MEMORY_VERSION) return null;
+  return `${stringifyJson({ ...marker, appareil: device })}\n`;
+};
+
 /** Pourquoi deux dossiers ne se synchronisent pas, avant tout listage. */
 export type SyncRefusal = 'computerNoMarker' | 'phoneNoMarker' | 'computerNewer' | 'phoneNewer';
 
@@ -204,7 +262,7 @@ export const syncRefusal = (computerMarker: string | null, phoneMarker: string |
 };
 
 export const emptySyncBase = (computerId: string, phoneId: string, phonePath: string | null): SyncBase =>
-  ({ computerId, phoneId, phonePath, syncedAtMs: null, sessions: [], removed: [], held: [], routes: [], removedRoutes: [], heldRoutes: [] });
+  ({ computerId, phoneId, phonePath, syncedAtMs: null, phonePass: null, sessions: [], removed: [], held: [], routes: [], removedRoutes: [], heldRoutes: [] });
 
 const parseStamp = (v: unknown): SyncStamp | null =>
   isObject(v) && typeof v.name === 'string' && v.name !== '' && isFiniteNumber(v.size) && isFiniteNumber(v.mtimeMs)
@@ -245,7 +303,8 @@ const parseRouteLine = (v: unknown): SyncBaseRoute | null => {
 
 /** Champs de la base que cette version lit ; les autres sont gardés tels quels (`SyncBase.unknownFields`). */
 const KNOWN_BASE_FIELDS = new Set([
-  'format', 'version', 'computerId', 'phoneId', 'phonePath', 'syncedAtMs', 'sessions', 'removed', 'held', 'routes', 'removedRoutes', 'heldRoutes',
+  'format', 'version', 'computerId', 'phoneId', 'phonePath', 'syncedAtMs', 'phonePass', 'sessions', 'removed', 'held', 'routes', 'removedRoutes',
+  'heldRoutes',
   'unknownFields',
 ]);
 
@@ -292,6 +351,7 @@ export const parseSyncBase = (text: string | null): SyncBaseRead => {
       phoneId: value.phoneId,
       phonePath: typeof value.phonePath === 'string' ? value.phonePath : null,
       syncedAtMs: isFiniteNumber(value.syncedAtMs) ? value.syncedAtMs : null,
+      phonePass: Number.isSafeInteger(value.phonePass) && (value.phonePass as number) >= 0 ? (value.phonePass as number) : null,
       sessions,
       removed,
       held,

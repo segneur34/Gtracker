@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { STORAGE_KEYS } from '../../core/appIdentity';
 import { MEMORY_VERSION, markerText, sessionPath } from '../../library/folderLayout';
-import { eraseAppFiles } from '../../library/resetPlan';
+import { eraseAppFiles, forgetSyncId } from '../../library/resetPlan';
 import { learnedPlacesFileText } from '../../library/learnedPlaces';
 import type { LearnedPlace } from '../../library/places';
 import { restingHrFileText, type StoredRestingResult } from '../../library/restingHrStore';
 import { buildSettingsFile, serializeSettingsFile } from '../../library/settingsFile';
 import { imuFileName, recordFileName, type SessionRecord, type StoredSessionNotes } from '../../library/record';
-import { parseSyncBase, readMarkerId, readMarkerSync, syncBasePath } from '../../library/syncBase';
+import { parseSyncBase, readMarkerId, readMarkerPass, readMarkerSync, syncBasePath } from '../../library/syncBase';
 import { describeSync, describeSyncQuestion } from '../../library/syncReport';
 import { TRASH_INDEX_PATH, parseTrashIndex, sessionRestorePlan, sessionTrashEntries, shownTrashEntries, type TrashEntry } from '../../library/trash';
 import { copyFromTrash, dropTrashEntries, emptyTrash, stashInTrash } from '../../library/trashFolder';
@@ -41,6 +41,16 @@ const pairOf = (cable = true): Pair => ({
 let ids = 0;
 const run = (pair: Pair, options: SyncOptions = {}, phone: MemoryFolder = pair.phone, computer: MemoryFolder = pair.computer): Promise<SyncOutcome> =>
   executeSync(computer, phone, { now: () => NOW, newFolderId: () => `dossier-sync-${String(++ids).padStart(4, '0')}`, ...options });
+
+/** Opérations élémentaires de l'écriture du marqueur du téléphone, où chaque passage qui l'écrit pose son compteur. */
+const MARKER_STEPS = 3;
+
+/** Le marqueur sans son passage, qui change à chaque synchronisation qui écrit le téléphone. */
+const withoutPass = (text: string | null): unknown => {
+  const marker = JSON.parse(text ?? 'null') as Record<string, unknown> | null;
+  if (marker) delete marker.passage;
+  return marker;
+};
 
 const putBoth = (pair: Pair, k: number, imuBytes?: number): void => {
   putSyncSession(pair.computer, at(k), { imuBytes });
@@ -141,7 +151,7 @@ describe('exécutant de la synchronisation', () => {
     await restoreOnComputer(pair, 2);
     const steps = pair.phone.steps();
     const quiet = await run(pair);
-    expect(pair.phone.steps()).toBe(steps);
+    expect(pair.phone.steps()).toBe(steps + MARKER_STEPS);
     expect(quiet.plan?.items.flatMap((i) => i.ops)).toEqual([]);
     expect(trashOf(pair)).toEqual([]);
   });
@@ -194,6 +204,25 @@ describe('exécutant de la synchronisation', () => {
     const kept = trashOf(pair).filter((e) => e.startMs === at(1));
     const texts = kept.map((e) => pair.computer.text(`corbeille/${e.dir}/${recordFileName(e.main)}`) ?? '');
     expect(texts.some((text) => text.includes('écrit pendant la synchronisation'))).toBe(true);
+  });
+
+  it('une fiche du téléphone enregistrée pendant la synchronisation n’est pas écrasée : la session est sautée, puis fondue', async () => {
+    const pair = await syncedPair(3);
+    editSyncRecord(pair.computer, fileOf(1), (r) => ({ ...r, name: 'Nom de l’ordinateur' }));
+    const outcome = await run(pair, {
+      // Juste après le plan, une note est enregistrée sur le téléphone (l’application y était ouverte).
+      onPlanned: () => editSyncRecord(pair.phone, fileOf(1), (r) => ({ ...r, notes: notes({ comment: 'note du téléphone' }) })),
+    });
+    expect(outcome.plan?.items.find((i) => i.startMs === at(1))?.ops.map((op) => op.kind)).toEqual(['writeRecord']);
+    expect(outcome.skipped.map((i) => i.startMs)).toEqual([at(1)]);
+    expect(outcome.complete).toBe(false);
+    expect(readSyncRecord(pair.phone, fileOf(1))?.notes?.comment).toBe('note du téléphone');
+    // La fois suivante, les deux saisies se rejoignent des deux côtés.
+    expect((await run(pair)).complete).toBe(true);
+    for (const side of [pair.computer, pair.phone]) {
+      const record = readSyncRecord(side, fileOf(1));
+      expect([record?.name, record?.notes?.comment]).toEqual(['Nom de l’ordinateur', 'note du téléphone']);
+    }
   });
 
   it('listage en retard : une session que le téléphone liste absente mais qui y est encore n’est pas mise à la corbeille', async () => {
@@ -267,6 +296,23 @@ describe('exécutant de la synchronisation', () => {
     expect(readSyncRecord(pair.phone, fileOf(1))?.name).toBe('Ordinateur');
   });
 
+  it('même nom changé des deux côtés : celui écrit en dernier passe aux deux appareils, l’autre n’est gardé nulle part', async () => {
+    const pair = await syncedPair(3);
+    editSyncRecord(pair.computer, fileOf(1), (r) => ({ ...r, name: 'Ordinateur', editedAt: { name: NOW - 120_000 } }));
+    editSyncRecord(pair.phone, fileOf(1), (r) => ({ ...r, name: 'Téléphone', editedAt: { name: NOW - 60_000 } }));
+    editSyncRecord(pair.computer, fileOf(2), (r) => ({ ...r, name: 'Ordinateur', editedAt: { name: NOW - 60_000 } }));
+    editSyncRecord(pair.phone, fileOf(2), (r) => ({ ...r, name: 'Téléphone', editedAt: { name: NOW - 120_000 } }));
+    const outcome = await run(pair);
+    expect(outcome.complete).toBe(true);
+    expect(outcome.done.find((i) => i.startMs === at(1))).toMatchObject({ conflicts: ['name'], conflictWinners: { name: 'phone' } });
+    expect(outcome.done.find((i) => i.startMs === at(2))).toMatchObject({ conflicts: ['name'], conflictWinners: { name: 'computer' } });
+    for (const folder of [pair.computer, pair.phone]) {
+      expect(readSyncRecord(folder, fileOf(1))?.name).toBe('Téléphone');
+      expect(readSyncRecord(folder, fileOf(2))?.name).toBe('Ordinateur');
+    }
+    expect(trashOf(pair)).toEqual([]);
+  });
+
   it('supprimée sur l’ordinateur avant toute synchronisation : laissée sur le téléphone, retenue par la base, jamais ramenée', async () => {
     const pair = pairOf();
     for (let k = 0; k < 5; k++) putBoth(pair, k);
@@ -292,7 +338,7 @@ describe('exécutant de la synchronisation', () => {
     expect(outcome.withheldDeletions.map((i) => i.startMs)).toEqual([at(1), at(2)]);
     expect(await syncSessionFiles(pair.computer)).toEqual([0, 1, 3, 4, 5, 6, 7, 9].map(fileOf));
     expect(await syncSessionFiles(pair.phone)).toEqual([0, 2, 3, 4, 5, 6, 7, 9].map(fileOf));
-    expect(pair.phone.steps()).toBe(steps);
+    expect(pair.phone.steps()).toBe(steps + MARKER_STEPS);
     expect(trashOf(pair).map((e) => e.startMs)).toEqual([at(2)]);
     expect(baseOf(pair)?.sessions.map((s) => s.startMs)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 9].map(at));
     const after = await run(pair);
@@ -335,10 +381,8 @@ describe('exécutant de la synchronisation', () => {
     expect(readSyncRecord(pair.computer, fileOf(3))?.name).toBe('Du téléphone');
     expect(half.withheldDeletions).toEqual([]);
     expect(half.withheldForPhone.map((i) => i.startMs)).toContain(at(5));
-    const lines = baseOf(pair)?.sessions.map((s) => s.startMs);
-    expect(lines).toContain(at(11));
-    expect(lines).toContain(at(5));
-    expect(lines).not.toContain(at(10));
+    // Sans passage neuf dans le marqueur du téléphone, la base ne change pas : la copie reçue n'y a pas de ligne.
+    expect(baseOf(pair)?.sessions.map((s) => s.startMs)).toEqual([0, 1, 2, 3, 4, 5, 6, 7].map(at));
     const whole = await run(pair);
     expect(whole.complete).toBe(true);
     expect(await syncSessionFiles(pair.phone)).toEqual(await syncSessionFiles(pair.computer));
@@ -380,7 +424,7 @@ describe('exécutant de la synchronisation', () => {
     const steps = pair.phone.steps();
     const outcome = await run(pair, {}, pair.phone, failing);
     expect(outcome.failed.map((f) => f.item.startMs)).toEqual([at(1)]);
-    expect(pair.phone.steps()).toBe(steps);
+    expect(pair.phone.steps()).toBe(steps + MARKER_STEPS);
     expect(await syncSessionFiles(pair.phone)).toContain(fileOf(1));
     expect(baseOf(pair)?.sessions.map((s) => s.startMs)).toContain(at(1));
   });
@@ -1162,11 +1206,34 @@ describe('fichiers de réglages, FC repos et lieux', () => {
       ['places', 'computer', 1], ['places', 'phone', 1], ['restingHr', 'computer', 1], ['restingHr', 'phone', 1],
       ['settings', 'computer', 0], ['settings', 'phone', 0],
     ]);
-    // Rien de plus à faire, et rien n'est écrit sur le téléphone.
+    // Rien de plus à faire, et rien n'est écrit sur le téléphone que son marqueur.
     const steps = pair.phone.steps();
     const again = await run(pair, { computerDeviceId: PC_ID });
     expect(again.extras.done).toEqual([]);
-    expect(pair.phone.steps()).toBe(steps);
+    expect(pair.phone.steps()).toBe(steps + MARKER_STEPS);
+  });
+
+  it('le téléphone dit qui il est dans son marqueur : son fichier fait foi, celui d’un autre téléphone suit la date', async () => {
+    const withDevice = (pair: Pair, device: string): void => {
+      pair.phone.put('gtracker.json', JSON.stringify({ format: 'gtracker-memoire', version: 1, appareil: device }));
+    };
+    // Date du téléphone qui a reculé : sa copie, moins datée, remplace quand même celle de l'ordinateur.
+    const own = pairOf();
+    putBoth(own, 0);
+    own.computer.put('reglages/Téléphone.json', settingsText(TEL_ID, 'Téléphone', 500));
+    own.phone.put('reglages/Téléphone.json', settingsText(TEL_ID, 'Téléphone', 100));
+    withDevice(own, TEL_ID);
+    await run(own, { computerDeviceId: PC_ID });
+    expect(own.computer.text('reglages/Téléphone.json')).toBe(settingsText(TEL_ID, 'Téléphone', 100));
+    // Un autre téléphone relié, qui tient la vieille copie : la copie récente de l'ordinateur lui revient.
+    const other = pairOf();
+    putBoth(other, 0);
+    other.computer.put('reglages/Téléphone.json', settingsText(TEL_ID, 'Téléphone', 500));
+    other.phone.put('reglages/Téléphone.json', settingsText(TEL_ID, 'Téléphone', 100));
+    withDevice(other, 'telephone-deux');
+    await run(other, { computerDeviceId: PC_ID });
+    expect(other.computer.text('reglages/Téléphone.json')).toBe(settingsText(TEL_ID, 'Téléphone', 500));
+    expect(other.phone.text('reglages/Téléphone.json')).toBe(settingsText(TEL_ID, 'Téléphone', 500));
   });
 
   it('un fichier illisible ou d’une version plus récente n’est ni réécrit ni fondu, et c’est dit', async () => {
@@ -1356,9 +1423,10 @@ describe('le téléphone l’apprend par l’instant posé dans son marqueur', (
     const marker = pair.phone.text(MARKER);
     expect(JSON.parse(marker as string)).toMatchObject({ format: 'gtracker-memoire', version: 1, futur: { a: 1 }, synchro: NOW });
     expect(readMarkerId(marker)).toBe(baseOf(pair)?.phoneId);
-    // Rien à faire : le marqueur n'est pas réécrit.
+    // Rien à faire : l'instant reste, seul le passage change.
     expect((await run(pair)).complete).toBe(true);
-    expect(pair.phone.text(MARKER)).toBe(marker);
+    expect(withoutPass(pair.phone.text(MARKER))).toEqual(withoutPass(marker));
+    expect(readMarkerPass(pair.phone.text(MARKER))).toBe((readMarkerPass(marker) ?? 0) + 1);
     // Un retrait du téléphone le change aussi, même à la même milliseconde.
     await trashOnComputer(pair, 0);
     expect((await run(pair, { confirmDeletions: true })).complete).toBe(true);
@@ -1374,10 +1442,11 @@ describe('le téléphone l’apprend par l’instant posé dans son marqueur', (
     expect((await run(pair)).complete).toBe(true);
     expect(await syncSessionFiles(pair.computer)).toContain(fileOf(5));
     expect(readSyncRecord(pair.computer, fileOf(1))?.name).toBe('Du téléphone');
-    expect(pair.phone.text(MARKER)).toBe(before);
+    expect(withoutPass(pair.phone.text(MARKER))).toEqual(withoutPass(before));
+    const written = pair.phone.text(MARKER);
     putSyncSession(pair.computer, at(6));
     await run(pair, { phoneWritable: false });
-    expect(pair.phone.text(MARKER)).toBe(before);
+    expect(pair.phone.text(MARKER)).toBe(written);
   });
 
   it('posé quand le téléphone ne reçoit qu’un fichier de lieux', async () => {
@@ -1411,6 +1480,16 @@ describe('« Tout supprimer » ne vide jamais l’autre appareil', () => {
     return pair;
   };
 
+  /** « Tout supprimer » dans le dossier, dans l'ordre de `eraseEverything` : l'identifiant d'abord, puis les fichiers. */
+  const eraseFolder = async (folder: SyncFolder): Promise<{ error: unknown }> => {
+    try {
+      await forgetSyncId(folder);
+    } catch (error) {
+      return { error };
+    }
+    return eraseAppFiles(folder);
+  };
+
   /** Réouverture de l'application après la remise à zéro : le marqueur, s'il manque, est recréé sans identifiant. */
   const reopen = async (folder: SyncFolder): Promise<void> => {
     if ((await folder.readText(MARKER)) === null) folder.put(MARKER, markerText());
@@ -1431,7 +1510,7 @@ describe('« Tout supprimer » ne vide jamais l’autre appareil', () => {
 
   it('téléphone vidé : première rencontre, l’ordinateur garde tout et le lui rend', async () => {
     const pair = await syncedPlainPair();
-    expect((await eraseAppFiles(pair.phone)).error).toBeNull();
+    expect((await eraseFolder(pair.phone)).error).toBeNull();
     expect(await syncSessionFiles(pair.phone)).toEqual([]);
     await reopen(pair.phone);
     expect((await syncAfterReset(pair, 'vidé')).first).toBe('noPhoneId');
@@ -1440,7 +1519,7 @@ describe('« Tout supprimer » ne vide jamais l’autre appareil', () => {
   it('ordinateur vidé : sa base part avec lui, le téléphone garde son identifiant et toutes ses sessions, et les lui rend', async () => {
     const pair = await syncedPlainPair();
     const phoneId = readMarkerId(pair.phone.text(MARKER));
-    expect((await eraseAppFiles(pair.computer)).error).toBeNull();
+    expect((await eraseFolder(pair.computer)).error).toBeNull();
     expect(hasSyncFiles(pair.computer)).toBe(false);
     await reopen(pair.computer);
     expect((await syncAfterReset(pair, 'vidé')).first).toBe('noComputerId');
@@ -1454,7 +1533,7 @@ describe('« Tout supprimer » ne vide jamais l’autre appareil', () => {
       const folder = pair[side];
       const id = readMarkerId(folder.text(MARKER));
       folder.cutAfter(n);
-      const result = await eraseAppFiles(folder);
+      const result = await eraseFolder(folder);
       folder.cutAfter(null);
       if (result.error === null) break;
       cuts += 1;
@@ -1468,5 +1547,77 @@ describe('« Tout supprimer » ne vide jamais l’autre appareil', () => {
       await syncAfterReset(pair, label);
     }
     expect(cuts).toBeGreaterThan(COUNT);
+  });
+});
+
+describe('une copie plus ancienne du dossier du téléphone ne supprime rien', () => {
+  const MARKER = 'gtracker.json';
+
+  /** Le contenu d'un dossier, tel qu'une copie de sauvegarde le garde. */
+  const snapshot = (folder: SyncFolder): Map<string, string> => new Map(folder.paths().map((path) => [path, folder.text(path) as string]));
+  /** Le dossier remplacé par une copie : tout ce qu'il tenait part, la copie revient telle quelle. */
+  const restore = (folder: SyncFolder, copy: ReadonlyMap<string, string>): void => {
+    for (const path of folder.paths()) folder.drop(path);
+    for (const [path, text] of copy) folder.put(path, text);
+  };
+
+  it('copie remise plus tard : première rencontre sous un identifiant neuf, rien à la corbeille, chaque session revient', async () => {
+    const pair = await syncedPair(3);
+    const copy = snapshot(pair.phone);
+    const oldId = readMarkerId(pair.phone.text(MARKER));
+    putSyncSession(pair.phone, at(5));
+    expect((await run(pair)).complete).toBe(true);
+    expect(await syncSessionFiles(pair.computer)).toContain(fileOf(5));
+    // Le téléphone remis à neuf reçoit sa sauvegarde, puis enregistre une session de plus.
+    restore(pair.phone, copy);
+    putSyncSession(pair.phone, at(7));
+    const outcome = await run(pair, { confirmDeletions: true, beforeWrites: async () => 'copie' });
+    expect(outcome).toMatchObject({ first: 'olderCopy', complete: true, safetyCopy: 'copie' });
+    expect(trashOf(pair)).toEqual([]);
+    const all = [0, 1, 2, 5, 7].map(fileOf);
+    expect(await syncSessionFiles(pair.computer)).toEqual(all);
+    expect(await syncSessionFiles(pair.phone)).toEqual(all);
+    const newId = readMarkerId(pair.phone.text(MARKER));
+    expect(newId).not.toBe(oldId);
+    // L'ancienne base reste, pour le téléphone qui tiendrait encore l'ancien identifiant.
+    expect(pair.computer.text(syncBasePath(oldId as string))).not.toBeNull();
+    expect(describeSync(outcome).paragraphs[0]).toMatch(/^Le dossier du téléphone est une copie plus ancienne/);
+    // La fois suivante, la paire est suivie.
+    expect((await run(pair)).first).toBeNull();
+  });
+
+  it('le même dossier sur deux téléphones, en alternance : chacun garde ses sessions, rien ne part à la corbeille', async () => {
+    const pair = await syncedPair(3);
+    const second = syncMemoryFolder({ phone: true, clockMs: 1_800_000_900_000, cable: true });
+    restore(second, snapshot(pair.phone));
+    putSyncSession(pair.phone, at(5));
+    expect((await run(pair)).complete).toBe(true);
+    putSyncSession(second, at(6));
+    const outcome = await run(pair, { confirmDeletions: true }, second);
+    expect(outcome).toMatchObject({ first: 'olderCopy', complete: true });
+    expect(readMarkerId(second.text(MARKER))).not.toBe(readMarkerId(pair.phone.text(MARKER)));
+    for (let pass = 0; pass < 2; pass++) {
+      expect((await run(pair, { confirmDeletions: true })).first).toBeNull();
+      expect((await run(pair, { confirmDeletions: true }, second)).first).toBeNull();
+    }
+    const all = [0, 1, 2, 5, 6].map(fileOf);
+    for (const folder of [pair.computer, pair.phone, second]) expect(await syncSessionFiles(folder)).toEqual(all);
+    expect(trashOf(pair)).toEqual([]);
+  });
+
+  it('base d’une version qui ne posait pas de passage : la paire reste suivie, les suppressions passent', async () => {
+    const pair = await syncedPair(8);
+    const id = readMarkerId(pair.phone.text(MARKER)) as string;
+    const oldBase = JSON.parse(pair.computer.text(syncBasePath(id)) as string) as Record<string, unknown>;
+    delete oldBase.phonePass;
+    pair.computer.put(syncBasePath(id), JSON.stringify(oldBase));
+    const marker = JSON.parse(pair.phone.text(MARKER) as string) as Record<string, unknown>;
+    delete marker.passage;
+    pair.phone.put(MARKER, JSON.stringify(marker));
+    deleteSyncSession(pair.phone, fileOf(1));
+    const outcome = await run(pair);
+    expect(outcome).toMatchObject({ first: null, complete: true });
+    expect(trashOf(pair).map((e) => e.startMs)).toEqual([at(1)]);
+    expect(baseOf(pair)?.phonePass).toBe(readMarkerPass(pair.phone.text(MARKER)));
   });
 });
