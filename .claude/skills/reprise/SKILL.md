@@ -30,7 +30,7 @@ D'après le tableau de `docs/MODELES.md`, dis si le modèle et l'effort de cette
 En français courant, sans jargon, sur les quatre blocs du tableau de bord :
 - Où en est `main` : dernier commit, version, envoyé ou non (nombre de commits locaux).
 - **Vous** : essais à faire et l'APK qui les porte, lots à relire et valider, questions avec ce que Claude fera sans réponse.
-- **Claude** : lot en cours laissé non commité, éléments prêts dans l'ordre d'Ensuite (ou « rien avant validation »), passe doc à faire pour des lots validés.
+- **Claude** : lot en cours laissé non commité, éléments prêts dans l'ordre d'Ensuite, passe doc à faire pour des lots validés.
 - **Ça attend une occasion** et **Plus tard** : une ligne chacun, seulement s'il y a une condition à vérifier ou une idée de plus de 90 jours.
 - Tout écart ou oubli relevé (alerte du script, fichiers non commités, mémoire périmée, fichier manquant).
 

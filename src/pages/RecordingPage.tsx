@@ -892,8 +892,8 @@ function RecordingScreen() {
           )}
 
           {chosen && heartRateSetting !== null && native && (
-            <CaptureOption label={t('Ceinture cardio')} checked={measureHeartRate} disabled={belt === null}
-              onChange={setHeartRatePicked} noteAlert={belt === null}
+            <CaptureOption label={t('Ceinture cardio')} checked={heartRatePicked} disabled={belt === null && !heartRatePicked}
+              onChange={setHeartRatePicked} noteAlert={belt === null && heartRatePicked}
               note={belt === null
                 ? tRich('Aucune ceinture choisie : <a>Réglages</a>, bloc « Connexion ».', undefined, { a: (children) => <Link to={SETTINGS_SENSORS_PATH}>{children}</Link> })
                 : <>

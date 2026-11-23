@@ -25,7 +25,7 @@ export const ZONES = {
 }
 
 /** Règles du fichier (en-tête de docs/BACKLOG.md). */
-export const LIMITES = { lotsAvecEssais: 3, ensuite: 7, questions: 5, joursQuestion: 28, joursPlusTard: 90 }
+export const LIMITES = { ensuite: 7, questions: 5, joursQuestion: 28, joursPlusTard: 90 }
 
 const TYPES = ['bogue', 'idée', 'dette', 'outil']
 const SEP = ' · '
@@ -253,8 +253,8 @@ function titreCourt(element) {
 }
 
 /**
- * Les lots de Maintenant par sorte : bloqué par une question, à revoir après un bogue (ni l'un ni l'autre ne compte
- * dans la limite), avec des essais au téléphone (la limite), à valider sur lecture, en cours.
+ * Les lots de Maintenant par sorte : bloqué par une question, à revoir après un bogue (les essais au téléphone ne bloquent
+ * rien), avec des essais au téléphone, à valider sur lecture, en cours.
  */
 export function rangerMaintenant(r) {
   const s = { bloques: [], aRevoir: [], avecEssais: [], surLecture: [], enCours: [] }
@@ -277,10 +277,6 @@ export function relecturesDues(r) {
 /** Les alertes de limite (pas des erreurs de forme). */
 export function alertes(r, aujourdhui = new Date()) {
   const a = []
-  const lotsAvecEssais = rangerMaintenant(r).avecEssais
-  if (lotsAvecEssais.length > LIMITES.lotsAvecEssais) {
-    a.push(`Maintenant : ${lotsAvecEssais.length} lots attendent des essais au téléphone (${LIMITES.lotsAvecEssais} au plus) : valider avant d'en lancer un autre.`)
-  }
   const relectureDue = relecturesDues(r)
   if (relectureDue.length) {
     a.push(`Relecture due : lot ${numeros(relectureDue)} commité sans relecture : la faire avant la validation.`)
@@ -335,9 +331,7 @@ export function tableauDeBord(r, aujourdhui = new Date(), chemin = 'docs/BACKLOG
   }
   const dues = relecturesDues(r)
   if (dues.length) out.push(`- Relecture due : lot ${numeros(dues)}.`)
-  if (lotsAvecEssais.length >= LIMITES.lotsAvecEssais) {
-    out.push(`- Rien avant validation : ${lotsAvecEssais.length} lots attendent leurs essais.`)
-  } else if (r.ensuite.length) {
+  if (r.ensuite.length) {
     const prets = r.ensuite.map((e) => `${e.numero} ${titreCourt(e)} (${[e.taille, e.modele].filter(Boolean).join(', ')})`)
     out.push(`- Prêts, dans l'ordre : ${prets.join(' ; ')}.`)
   } else {

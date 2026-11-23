@@ -32,7 +32,7 @@ Le code des lots peut s'écrire en parallèle ; tout le reste (vérification, re
 **Lots en parallèle** : quand Ensuite a 2 ou 3 lots prêts, lis `.claude/skills/chaine/parallele.md` avant de les lancer (conditions, worktrees, rapatriement, nettoyage).
 
 Pour chaque lot :
-1. **Limite** : si Maintenant compte déjà 3 lots avec des essais au téléphone (`node outils/backlog.mjs` le dit : « Rien avant validation »), ne lance rien : « validez d'abord les essais », et propose `/clore`. Un lot validé sur lecture, sans essai, ne compte pas. La limite ne se lève jamais en cours de paquet sans l'écrire dans Maintenant, avec la raison.
+1. **Pas de limite de lots en attente** : les essais au téléphone ne bloquent plus le lancement d'un lot (décision de l'utilisateur du 23/11) ; `node outils/backlog.mjs` les liste toujours sous « Vous ».
 2. Prendre le premier élément d'Ensuite dont « dépend de » est levé. **Relevé de départ** : `git status --short` avant de lancer le lot, gardé pour toute sa durée. Hors `docs/BACKLOG.md` et `docs/backlog/` (qui partent avec le commit suivant, du lot ou de la doc), les fichiers déjà modifiés ne sont pas du lot : restes d'un lot précédent de cette chaîne mal clos (étape 5 ou 6), le dire et s'arrêter ; sinon d'une autre session : les noter, le dire dans le compte rendu, ne jamais les nettoyer. Déplacer la ligne du lot en Maintenant, état « en cours ».
 3. Deux garde-fous avant de coder, puis le lancement :
    - **Maquette d'abord** pour un lot qui change ce que l'utilisateur voit (page neuve, disposition, image de partage, thème) : si la ligne ou le brief ne cite pas une maquette validée, ne lance pas le lot ; traite-le comme BLOQUÉ par une question majeure (étape 5) et propose la maquette.
@@ -58,7 +58,6 @@ Seulement une vraie décision : choix de produit, donnée perdue, seuil à reten
 
 Arrête la boucle, mets `docs/BACKLOG.md` à jour, lance `node outils/backlog.mjs` (sans erreur de forme), et propose `/clore` quand :
 - un paquet de 2 ou 3 lots est « à valider » : construis alors l'APK (procédure au §12 d'ETAT, version déjà augmentée), pose son tag annoté `v<version>`, installe-la, et note-la dans la première ligne de Maintenant (« APK <version> installée le jj/mm (versionCode …). ») ; jamais `lot` ni `/clore` ne la construisent ;
-- la limite de 3 lots avec essais est atteinte ;
 - une compaction a eu lieu, ou `/context` dépasse environ 350 000 jetons : c'est le plafond, et il ne coupe jamais un paquet commencé, qui se finit toujours ;
 - un paquet vient de finir, un autre est demandé et `/context` dépasse environ 200 000 jetons (décision prise là, jamais au milieu d'un paquet) : proposer `/clore` puis une conversation neuve (plutôt qu'un `/compact`) avant de le lancer ; si l'utilisateur préfère continuer, continuer sans redemander pendant le paquet ;
 - tout ce qui reste est bloqué par des réponses de l'utilisateur : pose alors toutes les questions en attente en une fois (§ 3).
