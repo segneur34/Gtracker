@@ -12,15 +12,23 @@
 // - les règles entrantes du programme (même nom de fichier ; le chemin entier est comparé ici, variables développées
 //   et sans casse) et les règles actives sans programme, ni service, ni propriétaire, ni paquet : celles des
 //   applications du Store, sans programme mais réservées à leur paquet (`LocalUserOwner`), ne valent pas pour Gtracker.
+// - quand un blocage du programme est vu, le nombre de ceux que Windows n'a pas posés lui-même (`blocagesPersonnels`,
+//   lus par le module NetSecurity) : un blocage posé par l'utilisateur ou l'administrateur n'est jamais retiré.
 // Ne se voient pas : un pare-feu tiers, une stratégie de groupe au-delà de `LocalPolicyModifyState`.
 //
-// Autorisation (`scriptAutorisation`) : un PowerShell ordinaire en lance un second, élevé (une seule demande de
-// Windows, qui affiche « Windows PowerShell »), qui remplace les règles `Gtracker-SansFil-TCP` et `Gtracker-SansFil-UDP`
-// (entrantes, autorisées, pour l'exécutable, ports du serveur et de la sonde, sous-réseau local, profils privé et
-// public : le partage de connexion est un réseau public pour Windows) et retire les règles de blocage entrantes du
-// même exécutable (un blocage l'emporte toujours sur une autorisation). Le refus de l'utilisateur se lit au code
-// d'erreur 1223 de Windows, rendu en code de sortie 3. La règle reste après une désinstallation, sans effet puisque
-// le chemin qu'elle vise a disparu.
+// Autorisation (`scriptAutorisation`) : un PowerShell ordinaire relance Gtracker lui-même, élevé, avec le drapeau
+// `--gtracker-pare-feu=poser` : la demande de Windows porte donc le nom de Gtracker. Ce Gtracker élevé s'arrête au tout
+// début de la coquille (`actionElevee`, `executerActionElevee`), sans fenêtre : il lance `scriptRegles` pour son propre
+// chemin dans un PowerShell qui hérite de ses droits, puis quitte avec son code. Il ne reçoit aucun script par la ligne
+// de commande. `scriptRegles` remplace les règles `Gtracker-SansFil-TCP` et `Gtracker-SansFil-UDP` (entrantes,
+// autorisées, pour l'exécutable, ports du serveur et de la sonde, sous-réseau local, profils privé et public : le
+// partage de connexion est un réseau public pour Windows) et ne retire, parmi les blocages entrants du même exécutable,
+// que ceux que la fenêtre « Alerte de sécurité Windows » a créés (identifiant « TCP Query User{… » ou « UDP Query
+// User{… ») : un blocage l'emporte toujours sur une autorisation, et s'il en reste un, la sortie est 7. Le refus de
+// l'utilisateur se lit au code d'erreur 1223 de Windows, rendu en code de sortie 3.
+//
+// Désinstallation : le désinstalleur relance Gtracker élevé avec `--gtracker-pare-feu=retirer` (`scriptRetrait`),
+// seulement si les deux règles existent (`outils/bureau.mjs`) ; jamais lors d'une mise à jour.
 
 import { execFile } from 'node:child_process'
 import path from 'node:path'
@@ -60,6 +68,19 @@ export const REGLE_UDP = 'Gtracker-SansFil-UDP'
 /** Variable d'environnement qui porte le chemin de l'exécutable au script de lecture. */
 export const VARIABLE_EXE = 'GTRACKER_PAREFEU_EXE'
 
+/** Drapeaux de la ligne de commande du Gtracker relancé élevé : poser ses règles, ou les retirer. */
+export const ARG_PAREFEU_POSER = '--gtracker-pare-feu=poser'
+export const ARG_PAREFEU_RETIRER = '--gtracker-pare-feu=retirer'
+
+/** Ce que fait un Gtracker relancé élevé. */
+export type ActionElevee = 'poser' | 'retirer'
+
+/**
+ * Identifiants des blocages que la fenêtre « Alerte de sécurité Windows » crée elle-même quand on la refuse ; un
+ * blocage posé par l'utilisateur porte un identifiant `{GUID}` nu ou son propre nom.
+ */
+const FILTRE_BLOCAGE_WINDOWS = "($_.Name -like 'TCP Query User{*' -or $_.Name -like 'UDP Query User{*')"
+
 /** Profils du pare-feu, en bits. */
 const PROFIL_DOMAINE = 1
 const PROFIL_PRIVE = 2
@@ -76,9 +97,16 @@ const TOUS_PROTOCOLES = 256
 const BLOQUER = 0
 const AUTORISER = 1
 
-/** Codes de sortie du script d'autorisation : refus de l'utilisateur, échec dans la session élevée. */
+/**
+ * Codes de sortie du script d'autorisation : refus de l'utilisateur, échec dans la session élevée, blocage du même
+ * exécutable resté en place (posé par l'utilisateur ou l'administrateur, jamais retiré).
+ */
 const SORTIE_REFUS = 3
 const SORTIE_ECHEC_REGLES = 4
+const SORTIE_BLOCAGE_RESTANT = 7
+
+/** Délai du script lancé par le Gtracker élevé : le module NetSecurity peut mettre plusieurs secondes à se charger. */
+const DELAI_ACTION_ELEVEE_MS = 60_000
 
 /**
  * Délai de la lecture : mesurée à 7 s au lancement du programme sur un vrai poste (1 s lancée à la main), quand
@@ -116,6 +144,11 @@ export type ReleveWindows = {
   /** `LocalPolicyModifyState` : 0 quand les règles locales s'appliquent. */
   strategie: number
   regles: RegleRelevee[]
+  /**
+   * Blocages entrants actifs du même exécutable que Windows n'a pas créés lui-même (ni « TCP Query User{… », ni « UDP
+   * Query User{… ») : l'autorisation ne les retire pas. Lu seulement quand un blocage du programme est vu, 0 sinon.
+   */
+  blocagesPersonnels: number
 }
 
 /** Ce que le serveur écoute, et l'exécutable qui écoute. */
@@ -175,7 +208,16 @@ export function scriptReleve(): string {
       "  elseif (-not $programme.Trim('\"').EndsWith($fin, [StringComparison]::OrdinalIgnoreCase)) { continue }",
       '  @{ programme = $programme; action = [int]$r.Action; activee = [bool]$r.Enabled; profils = [int]$r.Profiles; protocole = [int]$r.Protocol; ports = [string]$r.LocalPorts; distantes = [string]$r.RemoteAddresses; interfaces = [string]$r.InterfaceTypes }',
       '})',
-      '$releve = @{ adresses = $adresses; categories = $categories; profils = $profils; strategie = [int]$fw.LocalPolicyModifyState; regles = $regles }',
+      // Le module NetSecurity, plus lent, seulement quand un blocage du programme est vu : il donne l'identifiant des
+      // règles, que l'interface COM ne montre pas.
+      '$blocagesPersonnels = 0',
+      "if (@($regles | Where-Object { $_.action -eq 0 -and $_.activee -and $_.programme -ne '' }).Count -gt 0) {",
+      '  try {',
+      '    $cible = $exe.ToLowerInvariant()',
+      `    $blocagesPersonnels = @(Get-NetFirewallRule -PolicyStore ActiveStore -Direction Inbound -Action Block -Enabled True | Where-Object { -not ${FILTRE_BLOCAGE_WINDOWS} -and [Environment]::ExpandEnvironmentVariables(([string]($_ | Get-NetFirewallApplicationFilter).Program).Trim('"')).ToLowerInvariant() -eq $cible }).Count`,
+      '  } catch { $blocagesPersonnels = 0 }',
+      '}',
+      '$releve = @{ adresses = $adresses; categories = $categories; profils = $profils; strategie = [int]$fw.LocalPolicyModifyState; regles = $regles; blocagesPersonnels = [int]$blocagesPersonnels }',
       '[Console]::Out.Write((ConvertTo-Json -InputObject $releve -Depth 6 -Compress))',
     ].join('\n'),
   )
@@ -186,7 +228,11 @@ export type PlageAutorisee = { premier: number; dernier: number; sonde: number }
 
 const PLAGE_SANS_FIL: PlageAutorisee = { premier: PORT_SANS_FIL, dernier: PORT_SANS_FIL + ESSAIS_PORT - 1, sonde: PORT_SONDE }
 
-/** Script lancé élevé : les deux règles de Gtracker remplacées, les blocages du même exécutable retirés. */
+/**
+ * Script lancé élevé : les deux règles de Gtracker remplacées, puis, parmi les blocages entrants du même exécutable,
+ * ceux que Windows a créés retirés (programme comparé variables développées et sans casse) ; 7 s'il reste un blocage
+ * actif du même exécutable, que l'utilisateur ou l'administrateur a posé.
+ */
 export function scriptRegles(exe: string, plage: PlageAutorisee = PLAGE_SANS_FIL): string {
   const regle = (nom: string, protocole: string, ports: string) =>
     `  New-NetFirewallRule -Name ${litteral(nom)} -DisplayName ${litteral(`Gtracker, sans-fil (${protocole})`)} -Direction Inbound -Action Allow -Program $exe -Protocol ${protocole} -LocalPort ${litteral(ports)} -RemoteAddress LocalSubnet -Profile Private, Public | Out-Null`
@@ -199,25 +245,75 @@ export function scriptRegles(exe: string, plage: PlageAutorisee = PLAGE_SANS_FIL
     regle(REGLE_TCP, 'TCP', `${plage.premier}-${plage.dernier}`),
     regle(REGLE_UDP, 'UDP', String(plage.sonde)),
     '  $cible = $exe.ToLowerInvariant()',
-    '  $fw = New-Object -ComObject HNetCfg.FwPolicy2',
-    "  $noms = @($fw.Rules | Where-Object { $_.Direction -eq 1 -and $_.Action -eq 0 -and -not [string]::IsNullOrEmpty($_.ApplicationName) -and [Environment]::ExpandEnvironmentVariables($_.ApplicationName.Trim('\"')).ToLowerInvariant() -eq $cible } | ForEach-Object { $_.Name })",
-    '  foreach ($nom in $noms) { $fw.Rules.Remove($nom) }',
+    "  function Vise($r) { [Environment]::ExpandEnvironmentVariables(([string]($r | Get-NetFirewallApplicationFilter).Program).Trim('\"')).ToLowerInvariant() -eq $cible }",
+    `  $crees = @(Get-NetFirewallRule -PolicyStore PersistentStore -Direction Inbound -Action Block | Where-Object { ${FILTRE_BLOCAGE_WINDOWS} -and (Vise $_) })`,
+    '  foreach ($r in $crees) { Remove-NetFirewallRule -InputObject $r }',
+    '  $restants = @(Get-NetFirewallRule -PolicyStore ActiveStore -Direction Inbound -Action Block -Enabled True | Where-Object { Vise $_ })',
+    `  if ($restants.Count -gt 0) { exit ${SORTIE_BLOCAGE_RESTANT} }`,
     '  exit 0',
     `} catch { exit ${SORTIE_ECHEC_REGLES} }`,
   ].join('\n')
 }
 
+/** Script lancé élevé à la désinstallation : les deux règles de Gtracker retirées ; 4 si l'une reste. */
+export function scriptRetrait(): string {
+  const noms = `${litteral(REGLE_TCP)}, ${litteral(REGLE_UDP)}`
+  return [
+    "$ErrorActionPreference = 'Stop'",
+    "$ProgressPreference = 'SilentlyContinue'",
+    'try {',
+    `  Remove-NetFirewallRule -Name ${noms} -PolicyStore PersistentStore -ErrorAction SilentlyContinue`,
+    `  if (@(Get-NetFirewallRule -Name ${noms} -PolicyStore PersistentStore -ErrorAction SilentlyContinue).Count -gt 0) { exit ${SORTIE_ECHEC_REGLES} }`,
+    '  exit 0',
+    `} catch { exit ${SORTIE_ECHEC_REGLES} }`,
+  ].join('\n')
+}
+
+/** L'action demandée par la ligne de commande d'un Gtracker relancé élevé, `null` pour un lancement ordinaire. */
+export function actionElevee(argv: readonly string[]): ActionElevee | null {
+  if (argv.includes(ARG_PAREFEU_POSER)) return 'poser'
+  if (argv.includes(ARG_PAREFEU_RETIRER)) return 'retirer'
+  return null
+}
+
+/** Lance un script encodé et rend la fin de son Windows PowerShell (`lancerPowershell`, remplacé dans les tests). */
+export type LanceurPowershell = (encode: string, delaiMs: number) => Promise<SortiePowershell>
+
 /**
- * Script d'autorisation, encodé pour `-EncodedCommand` : il lance `scriptRegles` élevé, caché, et rend son code de
- * sortie ; 3 si l'utilisateur refuse la demande de Windows.
+ * Dans le Gtracker relancé élevé : pose les règles de son propre chemin (`exe`), ou les retire, par un Windows
+ * PowerShell qui hérite de ses droits ; rend le code de sortie du programme (4 si le script n'a pas rendu de code).
  */
-export function scriptAutorisation(exe: string, powershell: string = cheminPowershell(), plage: PlageAutorisee = PLAGE_SANS_FIL): string {
-  const arguments_ = [...ARGUMENTS_POWERSHELL, encoderCommande(scriptRegles(exe, plage))].join(' ')
+export async function executerActionElevee(action: ActionElevee, exe: string, lancer: LanceurPowershell = lancerPowershell): Promise<number> {
+  const sortie = await lancer(encoderCommande(action === 'poser' ? scriptRegles(exe) : scriptRetrait()), DELAI_ACTION_ELEVEE_MS)
+  return sortie.code >= 0 && sortie.code <= 255 ? sortie.code : SORTIE_ECHEC_REGLES
+}
+
+/** Un argument de la ligne de commande de Windows : entre guillemets s'il porte une espace (un chemin). */
+const argumentWindows = (argument: string) => (/\s/.test(argument) ? `"${argument}"` : argument)
+
+/**
+ * Arguments à placer avant le drapeau quand Gtracker se relance : aucun pour le programme emballé ; le dossier de la
+ * coquille quand Electron est lancé sur lui (`electron.exe <dossier>`, essai depuis le dépôt).
+ */
+export function argumentsDeRelance(proc: { defaultApp?: boolean; argv: readonly string[] } = process): string[] {
+  return proc.defaultApp === true && proc.argv[1] ? [path.resolve(proc.argv[1])] : []
+}
+
+/**
+ * Script d'autorisation, encodé pour `-EncodedCommand` : il relance Gtracker (`exe`) élevé avec
+ * `--gtracker-pare-feu=poser`, attend sa fin et rend son code de sortie ; 3 si l'utilisateur refuse la demande de
+ * Windows. `WaitForExit` plutôt que `-Wait`, qui attendrait aussi les processus fils d'Electron.
+ */
+export function scriptAutorisation(exe: string, argumentsAppli: readonly string[] = []): string {
+  const arguments_ = [...argumentsAppli, ARG_PAREFEU_POSER].map(argumentWindows).join(' ')
   return encoderCommande(
     [
       "$ErrorActionPreference = 'Stop'",
       'try {',
-      `  $p = Start-Process -FilePath ${litteral(powershell)} -ArgumentList ${litteral(arguments_)} -Verb RunAs -WindowStyle Hidden -Wait -PassThru`,
+      `  $p = Start-Process -FilePath ${litteral(exe)} -ArgumentList ${litteral(arguments_)} -Verb RunAs -PassThru`,
+      // La poignée lue tout de suite : sans elle, Windows PowerShell 5.1 peut perdre le code de sortie.
+      '  $null = $p.Handle',
+      '  $p.WaitForExit()',
       '  if ($null -eq $p.ExitCode) { exit 6 }',
       '  exit $p.ExitCode',
       '} catch {',
@@ -290,7 +386,7 @@ export function lireReleve(json: string): ReleveWindows | null {
       interfaces: texte(r.interfaces),
     })
   }
-  return { adresses, categories, profils, strategie, regles }
+  return { adresses, categories, profils, strategie, regles, blocagesPersonnels: Math.max(0, entier(racine.blocagesPersonnels) ?? 0) }
 }
 
 // ---------- jugement ----------
@@ -361,7 +457,8 @@ const INCONNU: JugementPareFeu = Object.freeze({ pareFeu: 'inconnu', reparable: 
 /**
  * Juge le relevé pour chaque adresse où le serveur écoute : le port TCP du serveur et le port UDP de la sonde doivent
  * passer, sinon c'est bloqué (dès qu'une adresse l'est). Réparable si l'autorisation de Gtracker suffirait : profil
- * privé ou public, ni tout entrant bloqué, ni blocage d'une règle sans programme, ni stratégie de groupe. Sous une
+ * privé ou public, ni tout entrant bloqué, ni blocage d'une règle sans programme, ni blocage du programme que Windows
+ * n'a pas créé lui-même (`blocagesPersonnels`, jamais retiré), ni stratégie de groupe. Sous une
  * stratégie de groupe, une ouverture qui ne tient qu'à une règle locale n'est pas sûre : `inconnu`.
  */
 export function jugerPareFeu(releve: ReleveWindows | null, contexte: ContexteJugement): JugementPareFeu {
@@ -391,6 +488,7 @@ export function jugerPareFeu(releve: ReleveWindows | null, contexte: ContexteJug
       if (verdict.startsWith('bloque')) {
         bloque = true
         if (verdict === 'bloqueParRegleGenerale' || (profil & PROFILS_AUTORISES) === 0) reparable = false
+        if (verdict === 'bloqueParProgramme' && releve.blocagesPersonnels > 0) reparable = false
       }
     }
   }
@@ -450,13 +548,21 @@ export async function lirePareFeuWindows(contexte: ContexteJugement, { delaiMs =
   return lectureDeSortie(sortie, contexte, delaiMs)
 }
 
-/** Demande à Windows d'autoriser Gtracker (une demande de confirmation à l'utilisateur) ; ne rejette jamais. */
-export async function autoriserPareFeuWindows(exe: string): Promise<ResultatAutorisation> {
-  if (process.platform !== 'win32') return { issue: 'echec', detail: "le pare-feu de Windows n'existe que sous Windows" }
-  const sortie = await lancerPowershell(scriptAutorisation(exe), DELAI_AUTORISATION_MS)
+/** L'issue de la demande d'autorisation d'après la fin de son Windows PowerShell. */
+export function issueAutorisation(sortie: SortiePowershell): ResultatAutorisation {
   if (sortie.code === 0) return { issue: 'accordee' }
   if (sortie.code === SORTIE_REFUS) return { issue: 'refusee' }
   if (sortie.delaiDepasse) return { issue: 'echec', detail: "Windows n'a pas répondu à temps" }
   if (sortie.code === SORTIE_ECHEC_REGLES) return { issue: 'echec', detail: "Windows n'a pas accepté la règle du pare-feu" }
+  if (sortie.code === SORTIE_BLOCAGE_RESTANT) return { issue: 'echec', detail: 'un blocage de Gtracker posé dans le pare-feu de Windows reste en place' }
   return { issue: 'echec', detail: sortie.code === -1 ? sortie.message : `Windows PowerShell a rendu le code ${sortie.code}` }
+}
+
+/**
+ * Demande à Windows d'autoriser Gtracker (une demande de confirmation à l'utilisateur, au nom de Gtracker) ; ne
+ * rejette jamais.
+ */
+export async function autoriserPareFeuWindows(exe: string, argumentsAppli: readonly string[] = argumentsDeRelance()): Promise<ResultatAutorisation> {
+  if (process.platform !== 'win32') return { issue: 'echec', detail: "le pare-feu de Windows n'existe que sous Windows" }
+  return issueAutorisation(await lancerPowershell(scriptAutorisation(exe, argumentsAppli), DELAI_AUTORISATION_MS))
 }

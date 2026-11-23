@@ -19,7 +19,9 @@
 // menu Démarrer ; la désinstallation garde le profil (`%APPDATA%\Gtracker`), et le dossier mémoire n'est jamais connu
 // de l'installeur. Une version plus récente s'installe par-dessus, sans question quand Gtracker est ouvert :
 // l'installeur le ferme lui-même (`inclusNsis`), et ne s'arrête sur un message, « Réessayer » ou « Annuler », que s'il
-// n'y parvient pas. Tout se fabrique dans `bureau/sortie/installeur/`
+// n'y parvient pas. La désinstallation retire les deux règles du pare-feu posées par « Autoriser Gtracker » : si elles
+// existent, Windows demande de confirmer, au nom de Gtracker ; un refus ne l'arrête pas ; une mise à jour n'y touche
+// pas. Tout se fabrique dans `bureau/sortie/installeur/`
 // (coquille compilée à part : `bureau/dist` de l'essai n'est pas touché), puis l'installeur est rangé dans
 // `bureau/sortie/`. L'APK est celle de Gradle en version de publication (`cheminApk`), jamais une APK de débogage ;
 // absente ou d'une autre version, la construction s'arrête et dit comment la fabriquer.
@@ -178,22 +180,58 @@ export function scriptFermeture({ fermetureS = ATTENTE_FERMETURE_S, forceS = ATT
   ].join('\n')
 }
 
+/** Variable d'environnement qui porte le chemin de Gtracker.exe au script de la désinstallation. */
+const VARIABLE_EXE_DESINSTALLATION = 'GTRACKER_EXE_DESINSTALLATION'
+
+/** Noms des règles du pare-feu posées par « Autoriser Gtracker » (`REGLE_TCP` et `REGLE_UDP` de `bureau/pareFeu.ts`). */
+export const REGLES_PAREFEU = ['Gtracker-SansFil-TCP', 'Gtracker-SansFil-UDP']
+
+/** Drapeau qui fait retirer ses règles au Gtracker relancé élevé (`ARG_PAREFEU_RETIRER` de `bureau/pareFeu.ts`). */
+export const ARG_RETRAIT_PAREFEU = '--gtracker-pare-feu=retirer'
+
+/**
+ * Script Windows PowerShell de la désinstallation : il lit les règles du pare-feu de Gtracker, sans droits ; aucune,
+ * il rend 0 sans rien demander ; sinon il relance Gtracker.exe (variable `GTRACKER_EXE_DESINSTALLATION`) élevé avec
+ * `--gtracker-pare-feu=retirer`, ce qui fait demander à Windows de confirmer au nom de Gtracker, et attend sa fin.
+ * Codes de sortie : 0 rien à retirer ou retiré, 1 refus ou panne, 2 exécutable absent, sinon celui de Gtracker ; la
+ * désinstallation n'en fait rien.
+ */
+export function scriptRetraitDesinstallation() {
+  const noms = REGLES_PAREFEU.map((n) => `'${n}'`).join(', ')
+  return [
+    "$ErrorActionPreference = 'Stop'",
+    'try {',
+    `  if (@(Get-NetFirewallRule -Name ${noms} -PolicyStore PersistentStore -ErrorAction SilentlyContinue).Count -eq 0) { exit 0 }`,
+    `  $exe = [string]$env:${VARIABLE_EXE_DESINSTALLATION}`,
+    '  if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { exit 2 }',
+    `  $p = Start-Process -FilePath $exe -ArgumentList '${ARG_RETRAIT_PAREFEU}' -Verb RunAs -PassThru`,
+    '  $null = $p.Handle',
+    '  $p.WaitForExit()',
+    '  if ($null -eq $p.ExitCode) { exit 6 }',
+    '  exit $p.ExitCode',
+    '} catch { exit 1 }',
+  ].join('\n')
+}
+
 /**
  * Fichier inclus dans le script NSIS d'electron-builder (option `nsis.include`). Sa macro `customCheckAppRunning`
  * remplace, à l'installation seulement, la question « Gtracker est en cours d'utilisation. Cliquez sur OK pour fermer
  * ce programme. », qui attendait sans limite : l'installeur ferme Gtracker comme le faisait la réponse OK
  * (`scriptFermeture`), puis installe et relance comme avant. Sans Windows PowerShell, repli sur `taskkill` par le nom
  * du programme, pour l'utilisateur courant. Gtracker encore ouvert : message « Réessayer » ou « Annuler », toujours au
- * premier plan ; Annuler laisse l'ancienne version et rend le code 2. La désinstallation (passe `BUILD_UNINSTALLER`)
- * garde le comportement d'electron-builder.
+ * premier plan ; Annuler laisse l'ancienne version et rend le code 2. Dans la passe du désinstalleur
+ * (`BUILD_UNINSTALLER`), sa macro `customUnInstall`, lancée avant l'effacement des fichiers, retire les règles du
+ * pare-feu (`scriptRetraitDesinstallation`), sauf quand une mise à jour relance l'ancien désinstalleur (`isUpdated`) ;
+ * son issue est ignorée, et rien ne s'affiche.
  */
 export function inclusNsis(options = {}) {
   const fermetureMs = (options.fermetureS ?? ATTENTE_FERMETURE_S) * 1000
   const forceMs = (options.forceS ?? ATTENTE_FORCE_S) * 1000
   const encode = Buffer.from(scriptFermeture(options), 'utf16le').toString('base64')
+  const encodeRetrait = Buffer.from(scriptRetraitDesinstallation(), 'utf16le').toString('base64')
   const filtre = '/FI "USERNAME eq %USERNAME%"'
   return [
-    "; Fermeture de Gtracker avant une installation par-dessus, sans question (écrit par outils/bureau.mjs).",
+    "; Fermeture de Gtracker avant une installation par-dessus, sans question, et retrait de ses règles du pare-feu à la désinstallation (écrit par outils/bureau.mjs).",
     '!ifndef BUILD_UNINSTALLER',
     '!macro customCheckAppRunning',
     `  System::Call 'kernel32::SetEnvironmentVariable(t "${VARIABLE_DOSSIER}", t "$INSTDIR")'`,
@@ -225,6 +263,14 @@ export function inclusNsis(options = {}) {
     '  SetErrorLevel 2',
     '  Quit',
     '  gtracker_ferme:',
+    '!macroend',
+    '!else',
+    '!macro customUnInstall',
+    '  ${ifNot} ${isUpdated}',
+    `    System::Call 'kernel32::SetEnvironmentVariable(t "${VARIABLE_EXE_DESINSTALLATION}", t "$INSTDIR\\\${APP_EXECUTABLE_FILENAME}")'`,
+    `    nsExec::Exec '"$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ${encodeRetrait}'`,
+    '    Pop $0',
+    '  ${endIf}',
     '!macroend',
     '!endif',
     '',

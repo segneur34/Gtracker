@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { WirelessPhone, WirelessState } from '../platform/wirelessPhone';
 import {
-  authorizationOutcomeText, countdownText, describePhoneSeen, describeWireless, firewallNotice, pairingAddress, pairingDeadline, pairingStatus, remainingMs,
+  authorizationNoticeText, authorizationOutcomeText, countdownText, describePhoneSeen, describeWireless, firewallNotice, pairingAddress, pairingDeadline, pairingStatus, remainingMs,
 } from './wirelessPhone';
 
 const state = (patch: Partial<WirelessState> = {}): WirelessState => ({
@@ -54,6 +54,12 @@ describe('pare-feu de Windows en phrases', () => {
     expect(firewallNotice(state({ actif: false, ecoute: false, pareFeu: 'bloque' }))).toBeNull();
     expect(firewallNotice(state({ ecoute: false, pareFeu: 'bloque' }))).toBeNull();
     expect(JSON.stringify(firewallNotice(state({ pareFeu: 'bloque' })))).not.toMatch(/câble|USB/);
+  });
+
+  it('avant la demande de Windows : la confirmation, et les réseaux publics à cause du partage de connexion', () => {
+    expect(authorizationNoticeText()).toBe(
+      "Windows va demander de confirmer. L'autorisation vaut aussi sur les réseaux publics : le partage de connexion du téléphone en est un.",
+    );
   });
 
   it('issue de la demande : rien si accordée, le refus, l\'échec avec sa raison', () => {

@@ -25,7 +25,9 @@
 //                           son pare-feu est factice (jamais Windows PowerShell)
 //
 // Hors du mode d'essai, le pare-feu de Windows est lu et l'autorisation demandée pour l'exécutable en cours
-// (`process.execPath`), par `pareFeu.ts`.
+// (`process.execPath`), par `pareFeu.ts`. Relancé élevé avec `--gtracker-pare-feu=poser` ou `=retirer` (par cette
+// autorisation, ou par le désinstalleur), le programme pose ou retire les règles de son propre chemin, puis quitte,
+// avant le verrou d'instance unique et sans rien ouvrir, sur un profil jetable.
 //   GTRACKER_BANC_COPIES    en mode d'essai seulement : le dossier des copies de sécurité « choisi » (aucune fenêtre),
 //                           voir `copieSecurite.ts` ; l'ouverture d'une copie y est seulement journalisée
 //   GTRACKER_APK, GTRACKER_BANC_APK_DESTINATION, GTRACKER_BANC_APPLICATION_REFUS : en mode d'essai seulement, voir
@@ -61,7 +63,7 @@ import type { Journal, Journaliser } from './journal'
 import { creerJournal, journaliseur, lireNote, suivreEtats } from './journal'
 import { creerMemoire, gestionnairesMemoire, optionsDepuisEnvironnement } from './memoire'
 import type { ContexteEcoute } from './pareFeu'
-import { autoriserPareFeuWindows, lirePareFeuWindows } from './pareFeu'
+import { actionElevee, autoriserPareFeuWindows, executerActionElevee, lirePareFeuWindows } from './pareFeu'
 import type { Chiffreur } from './sansFil'
 import { AVIS_ARRIVEE, AVIS_DEPART, DOSSIER_SANS_FIL, ServeurSansFil, dossierSansFilPuisCable, essaiSansFilDepuisEnvironnement, gestionnairesSansFil, stockageDossier } from './sansFil'
 import type { DossierDistant } from './telephone'
@@ -580,9 +582,16 @@ function demarrer(): void {
   })
 }
 
+const ACTION_ELEVEE = actionElevee(process.argv)
+
 if (DEBOGAGE_REFUSE) {
   // Port de débogage sans le mode d'essai : on quitte avant d'ouvrir quoi que ce soit.
   app.exit(1)
+} else if (ACTION_ELEVEE !== null) {
+  // Relancé élevé pour le pare-feu : les règles de cet exécutable seulement, puis on quitte avec le code du script.
+  // Profil jetable : un programme élevé n'écrit rien dans celui de l'utilisateur.
+  app.setPath('userData', path.join(app.getPath('temp'), 'Gtracker-pare-feu'))
+  void executerActionElevee(ACTION_ELEVEE, process.execPath).then((code) => app.exit(code))
 } else if (!app.requestSingleInstanceLock()) {
   // Le verrou est pris dans le dossier du profil : deux profils d'essai peuvent tourner ensemble. Un second
   // lancement sur le même profil réveille la première fenêtre (`second-instance`) et s'arrête.

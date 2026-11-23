@@ -290,6 +290,17 @@ Résultat attendu : la demande d'autorisation s'affiche au nom de Gtracker, ne r
 - Constat : La règle du pare-feu posée par « Autoriser Gtracker » reste après la désinstallation, et vise un programme rangé dans un dossier que tout logiciel de l'utilisateur peut remplacer sans droits d'administrateur.
 - Correction suggérée : Retirer les règles Gtracker-SansFil-TCP et -UDP à la désinstallation (macro customUnInstall de l'inclus NSIS, élévation demandée seulement si elles existent), ou au minimum le dire dans la notice d'installation.
 
+Questions tranchées par l'orchestrateur :
+- À la désinstallation, la demande de confirmation de Windows quand les règles existent est le résultat attendu ; un refus n'affiche rien et n'arrête pas la désinstallation.
+- Un blocage de Gtracker posé par l'utilisateur rend le cas non réparable, avec la phrase existante « Un réglage de l'administrateur de cet ordinateur empêche de l'autoriser ici. », sans texte neuf.
+- Les règles d'autorisation « Query User » créées par Windows ne sont pas retirées à la désinstallation.
+- Le détail du code 7 (blocage resté en place) s'écrit comme les messages voisins de la coquille ; le lot 502 les traduira tous.
+
+Limites relevées par la relecture du 23/11, gardées telles quelles :
+- Un blocage posé par l'utilisateur pour Gtracker compte même s'il ne vise qu'un autre profil de réseau ou un autre port : l'autorisation est alors posée et marche, mais le programme la dit empêchée. Cas rare, jugement prudent voulu (ni ports ni profils regardés).
+- La demande de droits lance Gtracker.exe, installé dans le dossier de l'utilisateur, donc remplaçable par un logiciel du même utilisateur (constat B-10). L'ancien montage n'était pas plus sûr sur ce point : le script confié à PowerShell venait du même programme. À dire dans la note de remise (lot 507) : une installation par machine et un programme signé ferment ce point.
+- Le banc `exe-sansfil` cherche encore les anciennes phrases (contrôles 1a, 7b, 7f, constante `ALLUMAGE`) : adapté avec les autres scripts du programme Windows, en fin de paquet.
+
 ## 501 · Android prêt pour Google Play
 
 Résultat attendu : l'application Android se construit au format demandé par Google, ne demande plus de permission que Google refuse, et n'écrit plus de données du client dans ses traces. Modèle : Opus/high.
@@ -363,6 +374,9 @@ Résultat attendu : le nombre de virages comptés au GPS ne dépend plus du nomb
 - Endroit : src/surfing/gpsTurns.ts:109 et 296-301
 - Constat : En surf, le nombre de virages vus par le GPS (chiffre marqué expérimental) dépend de la cadence du fichier quand celui-ci ne porte pas le cap de l'appareil : la même vague compte plus de virages à 5 points par seconde qu'à 1.
 - Correction suggérée : Lire le cap des positions sur une corde d'au moins une seconde, comme les caps stabilisés de la voile, par une constante nommée de gpsTurns.ts passée en option.
+
+Plan retenu : sans cap de l'appareil, chaque point se lit au cap de la corde des positions qui remonte d'environ `TURN_COURSE_STRIDE_S` (0,9 s, option `courseStrideS`, 0 pour le cap du pas), sans franchir un trou ni une reprise ; le cap du pas reste quand la corde n'a qu'un pas (1 Hz inchangé). Au codage, la lecture espacée d'au moins 0,9 s et la corde « au-delà de 0,9 s » ont été écartées : sur une cadence irrégulière (pas de 0,2 à 1,5 s), elles effaçaient les virages (0 au lieu de 3) ; l'ancrage est le point le plus proche de 0,9 s.
+Tranché par l'orchestrateur : vraie corde des positions, pas une moyenne de caps ; le cap de l'appareil n'est pas relu par corde ; un fichier à 1 Hz aux pas irréguliers de moins de 0,9 s peut bouger d'une unité, accepté.
 
 ## 504 · Livraison complétée
 

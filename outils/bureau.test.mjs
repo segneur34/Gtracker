@@ -17,8 +17,15 @@ import {
   nomInstalleur,
   paquetDeLaCoquille,
   scriptFermeture,
+  scriptRetraitDesinstallation,
   versionBureau,
+  REGLES_PAREFEU,
+  ARG_RETRAIT_PAREFEU,
 } from './bureau.mjs'
+import { ARG_PAREFEU_RETIRER, REGLE_TCP, REGLE_UDP, cheminPowershell } from '../bureau/pareFeu.ts'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 
 describe('cheminApk', () => {
   it('prend l’APK de publication de Gradle, au nom de la version de package.json', () => {
@@ -154,6 +161,75 @@ describe('fermeture de Gtracker par l’installeur', () => {
     const suite = lignes.slice(lignes.indexOf(message) + 1, lignes.indexOf(message) + 3).map((l) => l.trim())
     expect(suite).toEqual(['SetErrorLevel 2', 'Quit'])
   })
+})
+
+describe('retrait des règles du pare-feu par le désinstalleur', () => {
+  const inclus = inclusNsis()
+  const lignes = inclus.split('\r\n')
+  const debut = lignes.indexOf('!macro customUnInstall')
+  const fin = lignes.indexOf('!macroend', debut)
+  const macro = lignes.slice(debut, fin)
+  const commande = macro.find((l) => l.includes('-EncodedCommand')) ?? ''
+  const decoder = (texte) => Buffer.from(/-EncodedCommand ([A-Za-z0-9+/=]+)'/.exec(texte)?.[1] ?? '', 'base64').toString('utf16le')
+
+  it('dans la passe du désinstalleur seulement, jamais lors d’une mise à jour', () => {
+    expect(debut).toBeGreaterThan(lignes.indexOf('!else'))
+    expect(lignes.indexOf('!else')).toBeGreaterThan(lignes.indexOf('!macro customCheckAppRunning'))
+    expect(lignes.indexOf('!endif')).toBeGreaterThan(fin)
+    expect(macro[1].trim()).toBe('${ifNot} ${isUpdated}')
+    expect(macro[macro.length - 1].trim()).toBe('${endIf}')
+    expect(macro.findIndex((l) => l.includes('-EncodedCommand'))).toBeGreaterThan(1)
+  })
+
+  it('passe Gtracker.exe par l’environnement, ignore l’issue, n’affiche rien', () => {
+    expect(macro.join('\n')).toContain('SetEnvironmentVariable(t "GTRACKER_EXE_DESINSTALLATION", t "$INSTDIR\\${APP_EXECUTABLE_FILENAME}")')
+    expect(decoder(commande)).toBe(scriptRetraitDesinstallation())
+    expect(commande.length).toBeLessThan(LONGUEUR_MAX_NSIS - 512)
+    expect(macro.join('\n')).not.toMatch(/MessageBox|Abort|Quit|SetErrorLevel/)
+    expect(macro.filter((l) => l.includes('Pop $0'))).toHaveLength(1)
+  })
+
+  it('aucune règle : rien n’est demandé ; sinon Gtracker relancé élevé avec le drapeau de retrait', () => {
+    const script = scriptRetraitDesinstallation()
+    expect(REGLES_PAREFEU).toEqual([REGLE_TCP, REGLE_UDP])
+    expect(ARG_RETRAIT_PAREFEU).toBe(ARG_PAREFEU_RETIRER)
+    const lecture = script.indexOf(`Get-NetFirewallRule -Name '${REGLE_TCP}', '${REGLE_UDP}'`)
+    const sansRegle = script.indexOf('.Count -eq 0) { exit 0 }')
+    const demande = script.indexOf(`Start-Process -FilePath $exe -ArgumentList '${ARG_PAREFEU_RETIRER}' -Verb RunAs -PassThru`)
+    expect(lecture).toBeGreaterThan(0)
+    expect(sansRegle).toBeGreaterThan(lecture)
+    expect(demande).toBeGreaterThan(sansRegle)
+    expect(script).toContain('$env:GTRACKER_EXE_DESINSTALLATION')
+    expect(script).toContain('$p.WaitForExit()')
+    expect(script).toMatch(/\} catch \{ exit 1 \}$/)
+  })
+
+  it.runIf(process.platform === 'win32')('scripts lus par Windows PowerShell sans erreur d’analyse, jamais exécutés', () => {
+    const dossier = mkdtempSync(join(tmpdir(), 'gtracker-nsis-'))
+    try {
+      writeFileSync(join(dossier, 'retrait.ps1'), `﻿${scriptRetraitDesinstallation()}`, 'utf8')
+      writeFileSync(join(dossier, 'fermeture.ps1'), `﻿${scriptFermeture()}`, 'utf8')
+      const analyse = [
+        "$ProgressPreference = 'SilentlyContinue'",
+        '$n = 0',
+        `foreach ($f in Get-ChildItem -LiteralPath '${dossier}' -Filter *.ps1) {`,
+        '  $t = $null; $e = $null',
+        '  [void][Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$t, [ref]$e)',
+        '  $n += 10 * @($e).Count + 1',
+        '}',
+        '[Console]::Out.Write($n)',
+      ].join('\n')
+      const sortie = execFileSync(cheminPowershell(), ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(analyse, 'utf16le').toString('base64')], {
+        encoding: 'utf8',
+        windowsHide: true,
+        timeout: 30_000,
+      })
+      // Deux fichiers lus, aucune erreur.
+      expect(sortie.trim()).toBe('2')
+    } finally {
+      rmSync(dossier, { recursive: true, force: true })
+    }
+  }, 40_000)
 })
 
 describe('versionBureau', () => {

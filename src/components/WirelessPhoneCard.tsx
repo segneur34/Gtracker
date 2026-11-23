@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { t } from '../core/i18n';
 import { settingsBlockFromSearch } from '../core/parentPage';
 import { useWirelessPhones } from '../hooks/useWirelessPhones';
-import { countdownText, describePhoneSeen, describeWireless, firewallNotice, pairingAddress, remainingMs } from '../library/wirelessPhone';
+import { authorizationNoticeText, countdownText, describePhoneSeen, describeWireless, firewallNotice, pairingAddress, remainingMs } from '../library/wirelessPhone';
 import { phoneCableAvailable, phoneState } from '../platform/phoneCable';
 import Button from './ui/Button';
 import './WirelessPhoneCard.css';
@@ -94,7 +94,7 @@ function WirelessPhoneCard() {
       </label>
       {state !== null && !active && (
         <p className="ui-muted ui-text-s ui-m-0">
-          {t("Windows va vous demander d'autoriser Gtracker sur le réseau : acceptez.")}
+          {authorizationNoticeText()}
         </p>
       )}
       {status !== null && <p className="wireless-card__status ui-text-s ui-m-0">{status.text}</p>}
@@ -106,7 +106,7 @@ function WirelessPhoneCard() {
               <Button size="s" className="wireless-card__authorize" onClick={() => void view.authorize()} disabled={busy}>
                 {t('Autoriser Gtracker')}
               </Button>
-              <span className="ui-muted ui-text-s">{t('Windows demande de confirmer.')}</span>
+              <span className="ui-muted ui-text-s">{authorizationNoticeText()}</span>
             </div>
           )}
           {view.authorizationMessage !== null && <p className="ui-danger-text ui-text-s ui-m-0">{view.authorizationMessage}</p>}

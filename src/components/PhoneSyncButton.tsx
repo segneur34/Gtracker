@@ -9,6 +9,7 @@ import {
   type PhoneSyncAnswer, type PhoneSyncStep,
 } from '../hooks/useSessionLibrary';
 import { routeStore } from '../hooks/routeFiles';
+import { authorizationNoticeText } from '../library/wirelessPhone';
 import {
   computerScanText, describeFirstStart, describeNoPhone, describePhoneSync, describeQuestion, describeWait, linkedPhoneText,
   safetyCopyProgressText, safetyFolderChosenText, syncProgressText, syncRunningTitle, syncStepText, syncSubtitle, type SyncQuestion,
@@ -203,7 +204,7 @@ function WaitView({ wait, atMs, firewallMessage, onCancel }: { wait: SyncWait; a
           <div className="phone-sync__note">
             <p>
               <strong>{wait.firewall.text}</strong>
-              {authorize && <> {t('Autorisez Gtracker : Windows vous demandera de confirmer.')}</>}
+              {authorize && <> {authorizationNoticeText()}</>}
             </p>
             {firewallMessage !== null && <p className="ui-danger-text">{firewallMessage}</p>}
           </div>

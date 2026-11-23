@@ -53,6 +53,13 @@ export const firewallNotice = (state: WirelessState): FirewallNotice | null => {
   return { text: `${blocked} ${t("Un réglage de l'administrateur de cet ordinateur empêche de l'autoriser ici.")}`, canAuthorize: false };
 };
 
+/**
+ * Phrase dite avant la demande d'autorisation de Windows (à l'allumage du sans-fil et près des boutons « Autoriser
+ * Gtracker ») : la règle posée vaut aussi sur les réseaux publics, parce que le partage de connexion en est un.
+ */
+export const authorizationNoticeText = (): string =>
+  t("Windows va demander de confirmer. L'autorisation vaut aussi sur les réseaux publics : le partage de connexion du téléphone en est un.");
+
 /** Phrase de l'issue de la demande d'autorisation ; `null` quand elle est accordée (le message du pare-feu s'en va). */
 export const authorizationOutcomeText = (outcome: AuthorizationOutcome, detail?: string): string | null => {
   if (outcome === 'accordee') return null;

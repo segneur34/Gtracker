@@ -1,10 +1,21 @@
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { ReleveWindows, RegleRelevee, SortiePowershell } from './pareFeu'
 import {
+  ARG_PAREFEU_POSER,
+  ARG_PAREFEU_RETIRER,
   DELAI_RELEVE_MS,
   REGLE_TCP,
   REGLE_UDP,
   VARIABLE_EXE,
+  actionElevee,
+  argumentsDeRelance,
+  cheminPowershell,
+  executerActionElevee,
+  issueAutorisation,
   jugerPareFeu,
   lectureDeSortie,
   lireReleve,
@@ -13,6 +24,7 @@ import {
   scriptAutorisation,
   scriptRegles,
   scriptReleve,
+  scriptRetrait,
 } from './pareFeu'
 
 const EXE = 'C:\\Users\\Ana\\AppData\\Local\\Programs\\Gtracker\\Gtracker.exe'
@@ -47,6 +59,7 @@ const releve = (patch: Partial<ReleveWindows> = {}): ReleveWindows => ({
   profils: [1, 2, 4].map((profil) => ({ profil, actif: true, toutBloque: false, entreeParDefaut: 0 })),
   strategie: 0,
   regles: [],
+  blocagesPersonnels: 0,
   ...patch,
 })
 
@@ -74,6 +87,14 @@ describe('jugement du pare-feu de Windows', () => {
     const r = releve({ regles: [...reglesWindows(), regle({ action: 0, profils: 4 })] })
     expect(juger(r)).toEqual({ pareFeu: 'bloque', reparable: true })
     expect(juger(r, [MAISON]).pareFeu).toBe('ouvert')
+  })
+
+  it('un blocage du programme posé par l’utilisateur n’est jamais retiré : non réparable', () => {
+    const r = releve({ regles: [...reglesWindows(), regle({ action: 0, profils: 4 })], blocagesPersonnels: 1 })
+    expect(juger(r)).toEqual({ pareFeu: 'bloque', reparable: false })
+    expect(juger(r, [MAISON]).pareFeu).toBe('ouvert')
+    // Sans blocage du programme sur le flux, le compte ne change rien.
+    expect(juger(releve({ blocagesPersonnels: 2 }))).toEqual({ pareFeu: 'bloque', reparable: true })
   })
 
   it('un blocage sans programme sur le port n’est pas retiré par l’autorisation : non réparable', () => {
@@ -164,6 +185,14 @@ describe('lecture du relevé', () => {
     expect(r?.adresses).toEqual([{ adresse: PARTAGE, interface: 7 }])
     expect(r?.categories).toEqual([])
     expect(r?.regles).toHaveLength(1)
+    expect(r?.blocagesPersonnels).toBe(0)
+  })
+
+  it('blocages personnels : lus quand ils sont donn\u00E9s, 0 absents ou illisibles', () => {
+    const base = { profils: [1, 2, 4].map((profil) => ({ profil, actif: true, toutBloque: false, entreeParDefaut: 0 })), strategie: 0 }
+    expect(lireReleve(JSON.stringify({ ...base, blocagesPersonnels: 2 }))?.blocagesPersonnels).toBe(2)
+    expect(lireReleve(JSON.stringify({ ...base, blocagesPersonnels: 'deux' }))?.blocagesPersonnels).toBe(0)
+    expect(lireReleve(JSON.stringify({ ...base, blocagesPersonnels: -1 }))?.blocagesPersonnels).toBe(0)
   })
 
   it('illisible : null (pas du JSON, profil manquant, stratégie absente)', () => {
@@ -231,26 +260,133 @@ describe('scripts de Windows PowerShell', () => {
     expect(script).toContain('ConvertTo-Json')
   })
 
-  it('autorisation : noms stables, apostrophe et accents du chemin, refus en code 3', () => {
+  it('lecture : les blocages personnels comptés seulement après un blocage du programme, hors « Query User »', () => {
+    const script = decoder(scriptReleve())
+    expect(script).toContain('$_.action -eq 0 -and $_.activee')
+    expect(script).toContain("-not ($_.Name -like 'TCP Query User{*' -or $_.Name -like 'UDP Query User{*')")
+    expect(script).toContain('Get-NetFirewallApplicationFilter')
+    expect(script).toContain('} catch { $blocagesPersonnels = 0 }')
+    expect(script).toContain('blocagesPersonnels = [int]$blocagesPersonnels')
+  })
+
+  it('autorisation : Gtracker relancé élevé avec son drapeau, jamais Windows PowerShell ; refus en code 3', () => {
     const exe = "D:\\Programmes d'Éloïse\\Gtracker\\Gtracker.exe"
-    const externe = decoder(scriptAutorisation(exe, 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'))
-    expect(externe).toContain('-Verb RunAs')
+    const externe = decoder(scriptAutorisation(exe))
+    expect(externe).toContain(`Start-Process -FilePath 'D:\\Programmes d''Éloïse\\Gtracker\\Gtracker.exe' -ArgumentList '${ARG_PAREFEU_POSER}' -Verb RunAs -PassThru`)
+    expect(externe).toContain('$p.WaitForExit()')
+    expect(externe).not.toContain('-Wait ')
+    expect(externe).not.toMatch(/powershell\.exe|EncodedCommand/i)
     expect(externe).toContain('NativeErrorCode -eq 1223) { exit 3 }')
-    expect(externe).not.toContain('Éloïse')
-    const encode = /-EncodedCommand ([A-Za-z0-9+/=]+)'/.exec(externe)?.[1]
-    expect(encode).toBeDefined()
-    const interne = decoder(encode as string)
-    expect(interne).toBe(scriptRegles(exe))
-    expect(interne).toContain("$exe = 'D:\\Programmes d''Éloïse\\Gtracker\\Gtracker.exe'")
-    expect(interne).toContain(`Remove-NetFirewallRule -Name '${REGLE_TCP}', '${REGLE_UDP}'`)
-    expect(interne).toContain(`-Name '${REGLE_TCP}'`)
-    expect(interne).toContain("-Protocol TCP -LocalPort '48217-48226' -RemoteAddress LocalSubnet -Profile Private, Public")
-    expect(interne).toContain("-Protocol UDP -LocalPort '48218' -RemoteAddress LocalSubnet -Profile Private, Public")
-    expect(interne).toContain('$_.Action -eq 0')
+    // Essai depuis le dépôt : le dossier de la coquille passe avant le drapeau, entre guillemets s'il a une espace.
+    expect(decoder(scriptAutorisation('C:\\e\\electron.exe', ['D:\\mes essais\\bureau\\dist']))).toContain(
+      `-ArgumentList '"D:\\mes essais\\bureau\\dist" ${ARG_PAREFEU_POSER}'`,
+    )
+  })
+
+  it('relance : aucun argument pour le programme emballé, le dossier de la coquille sous Electron', () => {
+    expect(argumentsDeRelance({ argv: [EXE] })).toEqual([])
+    expect(argumentsDeRelance({ defaultApp: true, argv: ['electron.exe', path.resolve('dist')] })).toEqual([path.resolve('dist')])
+  })
+
+  it('règles : noms stables, sous-réseau local, privé et public ; seuls les blocages créés par Windows sont retirés', () => {
+    const exe = "D:\\Programmes d'Éloïse\\Gtracker\\Gtracker.exe"
+    const regles = scriptRegles(exe)
+    expect(regles).toContain("$exe = 'D:\\Programmes d''Éloïse\\Gtracker\\Gtracker.exe'")
+    expect(regles).toContain(`Remove-NetFirewallRule -Name '${REGLE_TCP}', '${REGLE_UDP}'`)
+    expect(regles).toContain("-Protocol TCP -LocalPort '48217-48226' -RemoteAddress LocalSubnet -Profile Private, Public")
+    expect(regles).toContain("-Protocol UDP -LocalPort '48218' -RemoteAddress LocalSubnet -Profile Private, Public")
+    expect(regles).toContain("Get-NetFirewallRule -PolicyStore PersistentStore -Direction Inbound -Action Block | Where-Object { ($_.Name -like 'TCP Query User{*' -or $_.Name -like 'UDP Query User{*') -and (Vise $_) }")
+    expect(regles).toContain('Remove-NetFirewallRule -InputObject $r')
+    expect(regles).toContain('-Enabled True | Where-Object { Vise $_ })')
+    expect(regles).toContain('{ exit 7 }')
+    expect(regles).not.toContain('$fw.Rules.Remove')
+    expect(regles).not.toContain('HNetCfg')
+  })
+
+  it('retrait : les deux règles de Gtracker seulement, 4 si l’une reste', () => {
+    const retrait = scriptRetrait()
+    expect(retrait).toContain(`Remove-NetFirewallRule -Name '${REGLE_TCP}', '${REGLE_UDP}' -PolicyStore PersistentStore`)
+    expect(retrait).toContain('.Count -gt 0) { exit 4 }')
+    expect(retrait).not.toMatch(/Block|Query User/)
+  })
+
+  it('apostrophes typographiques du chemin doublées dans les deux scripts', () => {
+    const exe = 'C:\\Users\\D\u2019Artagnan\\Gtracker.exe'
+    expect(decoder(scriptAutorisation(exe))).toContain("-FilePath 'C:\\Users\\D\u2019\u2019Artagnan\\Gtracker.exe'")
   })
 
   it('autorisation : les apostrophes typographiques du chemin sont doublées aussi', () => {
     const interne = scriptRegles('C:\\Users\\D\u2019Artagnan\\\u2018a\u201Ab\u201B\\Gtracker.exe')
     expect(interne).toContain("$exe = 'C:\\Users\\D\u2019\u2019Artagnan\\\u2018\u2018a\u201A\u201Ab\u201B\u201B\\Gtracker.exe'")
   })
+})
+
+describe('Gtracker relancé élevé', () => {
+  const sortie = (patch: Partial<SortiePowershell> = {}): SortiePowershell => ({ code: 0, stdout: '', delaiDepasse: false, message: '', erreur: '', ...patch })
+
+  it('l’action se lit au drapeau ; un lancement ordinaire n’en a aucune', () => {
+    expect(actionElevee([EXE, ARG_PAREFEU_POSER])).toBe('poser')
+    expect(actionElevee(['electron.exe', 'D:\\dist', ARG_PAREFEU_RETIRER])).toBe('retirer')
+    expect(actionElevee([EXE])).toBeNull()
+    expect(actionElevee([EXE, '--gtracker-pare-feu=autre', '--gtracker-pare-feu'])).toBeNull()
+  })
+
+  it('pose les règles de son propre chemin, ou les retire, et rend le code du script', async () => {
+    const lances: { script: string; delaiMs: number }[] = []
+    const lanceur = (code: number) => async (encode: string, delaiMs: number) => {
+      lances.push({ script: decoder(encode), delaiMs })
+      return sortie({ code })
+    }
+    expect(await executerActionElevee('poser', EXE, lanceur(0))).toBe(0)
+    expect(lances[0].script).toBe(scriptRegles(EXE))
+    expect(lances[0].delaiMs).toBeGreaterThanOrEqual(30_000)
+    expect(await executerActionElevee('retirer', EXE, lanceur(7))).toBe(7)
+    expect(lances[1].script).toBe(scriptRetrait())
+    // Pas de code (lancement impossible, délai) : 4, l'échec des règles.
+    expect(await executerActionElevee('poser', EXE, lanceur(-1))).toBe(4)
+  })
+
+  it('issue : accordée, refusée, blocage resté en place (code 7) en échec avec sa raison', () => {
+    expect(issueAutorisation(sortie())).toEqual({ issue: 'accordee' })
+    expect(issueAutorisation(sortie({ code: 3 }))).toEqual({ issue: 'refusee' })
+    expect(issueAutorisation(sortie({ code: 4 }))).toEqual({ issue: 'echec', detail: "Windows n'a pas accepté la règle du pare-feu" })
+    expect(issueAutorisation(sortie({ code: 7 }))).toEqual({ issue: 'echec', detail: 'un blocage de Gtracker posé dans le pare-feu de Windows reste en place' })
+    expect(issueAutorisation(sortie({ code: -1, delaiDepasse: true }))).toEqual({ issue: 'echec', detail: "Windows n'a pas répondu à temps" })
+    expect(issueAutorisation(sortie({ code: 9 }))).toEqual({ issue: 'echec', detail: 'Windows PowerShell a rendu le code 9' })
+  })
+})
+
+describe.runIf(process.platform === 'win32')('syntaxe des scripts, lue par Windows PowerShell sans jamais les exécuter', () => {
+  it('aucune erreur d’analyse', () => {
+    const dossier = mkdtempSync(path.join(tmpdir(), 'gtracker-parefeu-'))
+    try {
+      const scripts: Record<string, string> = {
+        releve: decoder(scriptReleve()),
+        regles: scriptRegles("D:\\Programmes d'Éloïse\\Gtracker.exe"),
+        retrait: scriptRetrait(),
+        autorisation: decoder(scriptAutorisation('C:\\e\\electron.exe', ['D:\\mes essais\\dist'])),
+      }
+      for (const [nom, script] of Object.entries(scripts)) writeFileSync(path.join(dossier, `${nom}.ps1`), `\uFEFF${script}`, 'utf8')
+      const analyse = [
+        "$ProgressPreference = 'SilentlyContinue'",
+        `$res = @{}`,
+        `foreach ($f in Get-ChildItem -LiteralPath '${dossier}' -Filter *.ps1) {`,
+        '  $t = $null; $e = $null',
+        '  [void][Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$t, [ref]$e)',
+        '  $res[$f.BaseName] = @($e | ForEach-Object { $_.Message })',
+        '}',
+        '[Console]::Out.Write((ConvertTo-Json -InputObject $res -Compress))',
+      ].join('\n')
+      const sortieJson = execFileSync(cheminPowershell(), ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(analyse, 'utf16le').toString('base64')], {
+        encoding: 'utf8',
+        windowsHide: true,
+        timeout: 30_000,
+      })
+      const erreurs = JSON.parse(sortieJson) as Record<string, string[] | string | null>
+      expect(Object.keys(erreurs).sort()).toEqual(Object.keys(scripts).sort())
+      for (const liste of Object.values(erreurs)) expect([liste ?? []].flat()).toEqual([])
+    } finally {
+      rmSync(dossier, { recursive: true, force: true })
+    }
+  }, 40_000)
 })
