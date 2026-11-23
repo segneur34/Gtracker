@@ -202,6 +202,56 @@ const profileSummary = (profile, top = 12) => {
 };
 const profileStart = () => send('Profiler.start');
 const profileStop = async () => (await send('Profiler.stop')).result?.profile;
+/**
+ * Tas mémoire utilisé (Mo) de la page et du calcul de fond (le worker de `trackWorkerClient`), après un ramasse-miettes
+ * forcé de chacun (`HeapProfiler.collectGarbage`) : ce qui reste est ce que l'analyse garde vraiment. La page se lit par
+ * connexion, les workers par celle du navigateur ; `null` si aucun worker ne répond (le total des workers est rendu).
+ */
+const MO = 1024 * 1024;
+const tasMemoire = async () => {
+  // Les workers se lisent par la connexion du navigateur, en s'attachant à chacun (`Target.attachToTarget`, mode à plat).
+  const ws = new WebSocket((await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()).webSocketDebuggerUrl);
+  await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
+  let n = 0;
+  const attente = new Map();
+  const attaches = [];
+  ws.onmessage = (e) => {
+    const m = JSON.parse(e.data);
+    if (m.method === 'Target.attachedToTarget' && m.params.targetInfo.type === 'worker') attaches.push(m.params.sessionId);
+    attente.get(m.id)?.(m);
+  };
+  // Une commande sans réponse (worker disparu) est coupée à 5 s : réponse vide.
+  const appel = (method, params = {}, sessionId) => new Promise((resolve) => {
+    const i = ++n;
+    attente.set(i, resolve);
+    setTimeout(() => resolve({}), 5000);
+    ws.send(JSON.stringify({ id: i, method, params, ...(sessionId ? { sessionId } : {}) }));
+  });
+  const diag = (what, r) => { if (process.env.FLUIDITE_DIAG === '1') console.log('tas', what, ':', JSON.stringify(r).slice(0, 200)); };
+  const cibles = (await appel('Target.getTargets')).result?.targetInfos ?? [];
+  // Les workers d'une page s'attachent par la page : on s'attache à elle, puis `setAutoAttach` rend une session par worker existant.
+  const pageCible = cibles.find((c) => c.type === 'page' && c.url.startsWith(BASE));
+  const pageSession = pageCible ? (await appel('Target.attachToTarget', { targetId: pageCible.targetId, flatten: true })).result?.sessionId : null;
+  if (pageSession) await appel('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }, pageSession);
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const workers = attaches;
+  const worker = [];
+  for (const sessionId of workers) {
+    diag('enable', await appel('Runtime.enable', {}, sessionId));
+    await appel('HeapProfiler.collectGarbage', {}, sessionId);
+    const r = await appel('Runtime.getHeapUsage', {}, sessionId);
+    diag('worker', r);
+    if (typeof r.result?.usedSize === 'number') worker.push(r.result.usedSize / MO);
+    await appel('Target.detachFromTarget', { sessionId });
+  }
+  ws.close();
+  await send('HeapProfiler.enable');
+  await send('HeapProfiler.collectGarbage');
+  const page = (await send('Runtime.getHeapUsage')).result?.usedSize;
+  return { page: page == null ? null : page / MO, worker: worker.length ? worker.reduce((a, x) => a + x, 0) : null, nbWorkers: workers.length };
+};
+const mo = (x) => (x == null ? '—' : `${x.toFixed(0)} Mo`);
+const tasText = (t) => `tas page ${mo(t.page)}, calcul de fond ${mo(t.worker)} (${t.nbWorkers} worker${t.nbWorkers > 1 ? 's' : ''})`;
 /** Un chiffre de mesure tenu : un nombre fini et strictement positif (les temps changent d'un passage à l'autre, jamais leur présence). */
 const fini = (x) => typeof x === 'number' && Number.isFinite(x) && x > 0;
 
@@ -212,10 +262,12 @@ const hrPeak = (t, every, height) => (t % every < PEAK_S ? height : 0);
 const HEURES = Math.max(0.25, Number(process.env.FLUIDITE_HEURES ?? 1) || 1);
 const nbPoints = (gpx) => (gpx.match(/<trkpt /g) ?? []).length;
 const T_LONG = Date.UTC(2026, 7, 1, 9, 0, 0);
-const longSail = traceLongue(HEURES, 5, 'wingfoil', { debutMs: T_LONG, nom: 'Voile longue 5 Hz' });
+/** Cadence de la longue session (`FLUIDITE_HZ=1`, par exemple pour situer l'usage courant) ; les libellés disent « 5 Hz » quel que soit ce réglage. */
+const HZ = Math.max(1, Number(process.env.FLUIDITE_HZ ?? 5) || 5);
+const longSail = traceLongue(HEURES, HZ, 'wingfoil', { debutMs: T_LONG, nom: `Voile longue ${HZ} Hz` });
 const longPath = join(workDir, 'fluidite-voile-longue.gpx');
 writeFileSync(longPath, longSail);
-console.log('trace voile longue    :', `${nbPoints(longSail)} points à 5 Hz, ${HEURES} h, ${(longSail.length / 1e6).toFixed(1).replace('.', ',')} Mo`);
+console.log('trace voile longue    :', `${nbPoints(longSail)} points à ${HZ} Hz, ${HEURES} h, ${(longSail.length / 1e6).toFixed(1).replace('.', ',')} Mo`);
 // Une seconde session, pour que la bibliothèque compte plusieurs lignes.
 const shortPath = join(workDir, 'fluidite-voile-courte.gpx');
 writeFileSync(shortPath, traceVoile({ debutMs: Date.UTC(2026, 7, 2, 9, 0, 0), nom: 'Voile courte' }));
@@ -297,7 +349,8 @@ const openLong = async ({ profile = false } = {}) => {
   const lt = await longTasks(out.t0, tEnd);
   const dom = await domParser(out.t0, tEnd);
   const prof = profile ? await profileStop() : null;
-  const r = { titre: out.titre, trace: out.trace, chiffres: out.chiffres, max: lt.max, total: lt.total, count: lt.count,
+  const tas = await tasMemoire();
+  const r = { tas, titre: out.titre, trace: out.trace, chiffres: out.chiffres, max: lt.max, total: lt.total, count: lt.count,
     libre: lt.lastEnd === null ? 0 : lt.lastEnd - out.t0, dom, script: (after.ScriptDuration - before.ScriptDuration) * 1000, prof };
   // Retour à la bibliothèque (navigation dans la page) : l'analyse démontée, la liste rendue (sous ralenti, React peut
   // n'avoir rien rendu quand `settle` voit un DOM immobile).
@@ -306,7 +359,7 @@ const openLong = async ({ profile = false } = {}) => {
   await settle({ max: 10000, label: 'retour bibliothèque' });
   return r;
 };
-const openText = (r) => `titre ${sec(r.titre)} | trace ${sec(r.trace)} | chiffres ${sec(r.chiffres)} | fil libre à ${sec(r.libre)} | ${ltText(r)} | DOMParser ${sec(r.dom)} | script ${sec(r.script)}`;
+const openText = (r) => `titre ${sec(r.titre)} | trace ${sec(r.trace)} | chiffres ${sec(r.chiffres)} | fil libre à ${sec(r.libre)} | ${ltText(r)} | DOMParser ${sec(r.dom)} | script ${sec(r.script)}${r.tas ? ` | ${tasText(r.tas)}` : ''}`;
 
 if (MESURES.includes('ouverture')) {
   console.log(`\n== Ouverture de la session de voile (${HEURES} h à 5 Hz) depuis la bibliothèque, onglets par défaut [${minutes()}] ==`);
@@ -325,6 +378,7 @@ if (MESURES.includes('ouverture')) {
     }
     const med = Object.fromEntries(['titre', 'trace', 'chiffres', 'libre', 'max', 'total', 'dom', 'script'].map((k) => [k, median(runs.map((r) => r[k]))]));
     med.count = median(runs.map((r) => r.count));
+    med.tas = { page: median(runs.map((r) => r.tas.page)), worker: median(runs.map((r) => r.tas.worker)), nbWorkers: runs[0].tas.nbWorkers };
     results.ouverture[rate] = med;
     console.log(`×${rate} médiane : ${openText(med)}`);
     check(`ouverture ×${rate} : titre, trace et chiffres rendus, tous mesurés`, [med.titre, med.trace, med.chiffres].every(fini) && runs.every((r) => [r.titre, r.trace, r.chiffres].every(fini)),
@@ -430,9 +484,9 @@ if (MESURES.includes('seuil')) {
     })`);
     if (!out) return null;
     const lt = await longTasks(out.t0, out.t1);
-    return { chiffres: out.chiffres, calme: out.calme, max: lt.max, total: lt.total, count: lt.count };
+    return { chiffres: out.chiffres, calme: out.calme, max: lt.max, total: lt.total, count: lt.count, tas: await tasMemoire() };
   };
-  const thText = (r) => (r ? `chiffres ${sec(r.chiffres)} | DOM calme à ${sec(r.calme)} | ${ltText(r)}` : '(champ absent)');
+  const thText = (r) => (r ? `chiffres ${sec(r.chiffres)} | DOM calme à ${sec(r.calme)} | ${ltText(r)}${r.tas ? ` | ${tasText(r.tas)}` : ''}` : '(champ absent)');
   await changeThreshold(12); // chauffe
   await wait(1500);
   results.seuil = {};
@@ -447,6 +501,7 @@ if (MESURES.includes('seuil')) {
       await wait(1500);
     }
     const med = Object.fromEntries(['chiffres', 'calme', 'max', 'total', 'count'].map((k) => [k, median(runs.map((r) => r[k]))]));
+    med.tas = { page: median(runs.map((r) => r.tas.page)), worker: median(runs.map((r) => r.tas.worker)), nbWorkers: runs[0]?.tas.nbWorkers ?? 0 };
     results.seuil[rate] = med;
     console.log(`×${rate} médiane : ${thText(med)}`);
     check(`seuil ×${rate} : les chiffres sont refaits à chaque prise (${runs.length}/${REPS})`, runs.length === REPS && runs.every((r) => fini(r.chiffres) && fini(r.calme)), `${sec(med.chiffres)} / ${sec(med.calme)}`);
@@ -728,9 +783,10 @@ if (MESURES.includes('demarrage')) {
         if (t > WINDOW_MS) break;
       }
     }
-    return { rendu: homeAt, interactif: interactive, max: lt.max, total: lt.total, count: lt.count, script: (m1.ScriptDuration - m0.ScriptDuration) * 1000, modules: scripts };
+    const tas = await tasMemoire();
+    return { tas, rendu: homeAt, interactif: interactive, max: lt.max, total: lt.total, count: lt.count, script: (m1.ScriptDuration - m0.ScriptDuration) * 1000, modules: scripts };
   };
-  const startText = (r) => `Profil rendu ${sec(r.rendu)} | interactif ${r.interactif == null ? `> ${FENETRE_S} s` : sec(r.interactif)} | ${ltText(r)} | script ${sec(r.script)} | ${r.modules} modules chargés`;
+  const startText = (r) => `Profil rendu ${sec(r.rendu)} | interactif ${r.interactif == null ? `> ${FENETRE_S} s` : sec(r.interactif)} | ${ltText(r)} | script ${sec(r.script)} | ${r.modules} modules chargés | ${tasText(r.tas)}`;
   results.demarrage = {};
   let noPreload = null;
   for (const mode of ['avec préchargement', 'sans préchargement']) {
@@ -748,6 +804,7 @@ if (MESURES.includes('demarrage')) {
       }
       const med = Object.fromEntries(['rendu', 'interactif', 'max', 'total', 'count', 'script', 'modules'].map((k) => [k, median(runs.map((r) => r[k]))]));
       if (runs.some((r) => r.interactif == null)) med.interactif = null;
+      med.tas = { page: median(runs.map((r) => r.tas.page)), worker: median(runs.map((r) => r.tas.worker)), nbWorkers: runs[0].tas.nbWorkers };
       results.demarrage[mode][rate] = med;
       console.log(`${mode}, ×${rate} médiane : ${startText(med)}`);
       check(`démarrage ${mode} ×${rate} : le Profil est rendu à chaque prise, modules comptés`, runs.every((r) => fini(r.rendu) && fini(r.modules) && fini(r.script)),
@@ -920,6 +977,7 @@ if (results.ouverture) {
   row(`Ouverture voile ${HEURES} h 5 Hz : titre / trace / chiffres`, (r) => `${sec(o[r].titre)} / ${sec(o[r].trace)} / ${sec(o[r].chiffres)}`);
   row('Ouverture : tâche max / bloqué / fil libre à', (r) => `${sec(o[r].max)} / ${sec(o[r].total)} / ${sec(o[r].libre)}`);
   row('Ouverture : DOMParser (lecture du GPX)', (r) => sec(o[r].dom));
+  row('Ouverture : tas page / calcul de fond', (r) => `${mo(o[r].tas.page)} / ${mo(o[r].tas.worker)}`);
 }
 if (results.quitter) {
   const q = results.quitter;
@@ -929,6 +987,7 @@ if (results.seuil) {
   const s = results.seuil;
   row('Seuil changé : chiffres / DOM calme', (r) => `${sec(s[r].chiffres)} / ${sec(s[r].calme)}`);
   row('Seuil changé : tâche max / bloqué', (r) => `${sec(s[r].max)} / ${sec(s[r].total)}`);
+  row('Seuil changé : tas page / calcul de fond', (r) => `${mo(s[r].tas.page)} / ${mo(s[r].tas.worker)}`);
 }
 for (const nom of ZOOM_DEMANDEES) {
   const z = results[`zoom ${nom}`];
@@ -947,6 +1006,7 @@ if (results.demarrage) {
     const d = results.demarrage[mode];
     row(`Démarrage ${mode} : Profil / interactif`, (r) => `${sec(d[r].rendu)} / ${d[r].interactif == null ? `> ${FENETRE_S} s` : sec(d[r].interactif)}`);
     row(`Démarrage ${mode} : tâche max / bloqué (${FENETRE_S} s) / modules`, (r) => `${sec(d[r].max)} / ${sec(d[r].total)} / ${d[r].modules}`);
+    row(`Démarrage ${mode} : tas page / calcul de fond`, (r) => `${mo(d[r].tas.page)} / ${mo(d[r].tas.worker)}`);
   }
 }
 
