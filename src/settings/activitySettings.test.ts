@@ -7,7 +7,7 @@ import {
   PER_ACTIVITY_KEYS, FAMILY_UNITS, defaultAutoPauseOf, defaultHeartRateOf,
   defaultHrOffsetOf, defaultLiveFieldsFor, defaultMarkGuideOf, defaultNotificationFieldsFor, defaultSpeedRangeOf, defaultSpeedUnitOf,
   defaultThresholdOf, hiddenFamiliesOf, isActivityOverridden, isValidAutoPause, nextBoundPair, nextSpeedRange, rangeFollowsPace, resetOverrides,
-  resolveFoil, resolveJumps, resolvePumping, resolveRecordingProfile, resolveThresholdOverride, resolveTurns, defaultTurnsOf, withVisibility,
+  resolveFoil, resolveJumps, resolvePumping, resolveRecordingProfile, resolveThresholdOverride, resolveTurns, defaultTurnsOf, withActivities, withVisibility,
   SETTING_FIELDS, defaultTabsOf, effectiveHrZoneLines, settingsView, tabsAfterJumpsChange, thresholdFollowsPace, withSetting, type StoredSettings,
 } from './activitySettings';
 
@@ -73,6 +73,31 @@ describe('familles cachées', () => {
     expect(next).toEqual({ activities: DEFAULT_ACTIVITIES, hiddenFamilies: ['surf'] });
     // Cacher aussi la voile ne laisserait rien : refusé.
     expect(withVisibility(stored, [...DEFAULT_ACTIVITIES], ['voile', 'surf'])).toBeNull();
+  });
+
+  it('garde à son rang une entrée d\'un calcul inconnu de la liste rangée', () => {
+    const futur = { id: 'a-ski', name: 'Ski', base: 'ski', color: '#123456' };
+    const raw = [DEFAULT_ACTIVITIES[0], futur, ...DEFAULT_ACTIVITIES.slice(1)];
+    const stored = { activities: raw } as unknown as StoredSettings;
+    const next = withVisibility(stored, [...DEFAULT_ACTIVITIES], ['surf']);
+    expect(next?.activities).toEqual(raw);
+    expect(next?.hiddenFamilies).toEqual(['surf']);
+  });
+});
+
+describe('withActivities', () => {
+  const futur = { id: 'a-ski', name: 'Ski', base: 'ski', color: '#123456' };
+
+  it('sans liste rangée : la liste donnée, telle quelle', () => {
+    const list = [byId('kite')];
+    expect(withActivities({ thresholds: { kite: 9 } }, list)).toEqual({ thresholds: { kite: 9 }, activities: list });
+  });
+
+  it('remet les entrées inconnues, sans toucher aux autres réglages ; une entrée connue retirée reste retirée', () => {
+    const stored = { activities: [byId('wingfoil'), futur, byId('kite')], thresholds: { kite: 9 } } as unknown as StoredSettings;
+    const next = withActivities(stored, [byId('wingfoil')]);
+    expect(next.activities).toEqual([byId('wingfoil'), futur]);
+    expect(next.thresholds).toEqual({ kite: 9 });
   });
 });
 

@@ -1,10 +1,9 @@
-import { readActivities } from '../core/activities';
+import { keepUnknownActivities, readActivities } from '../core/activities';
 import { isObject, parseJson, stringifyJson } from '../core/basics';
 import { t } from '../core/i18n';
 import { sanitizeAthleteProfile } from './athleteProfile';
 import { activityGearLists, compareGear, isAdoptableGear, phoneGearChanges, type PhoneGearChanges } from './gearCompare';
 import { STORAGE_KEYS, FILE_FORMATS } from '../core/appIdentity';
-import { isSportType } from '../core/sportProfiles';
 
 /**
  * Fichiers de réglages du dossier mémoire : un par appareil,
@@ -86,42 +85,18 @@ export const buildSettingsFile = (
   values: { ...previous?.values, ...values },
 });
 
-/** Identifiant d'une activité rangée, `null` si elle n'en a pas. */
-const storedActivityId = (item: unknown): string | null =>
-  isObject(item) && typeof item.id === 'string' && item.id !== '' ? item.id : null;
-
 /**
  * Valeurs à écrire (`values`) avec, remises à leur place, les activités de l'ancien fichier (`previous`) posées
- * sur un calcul que cette version ne connaît pas et absentes de `values`. Elle ne les montre pas, donc ne peut pas
- * les avoir retirées : sa liste ne les a perdues qu'en se réécrivant (`readActivities` les écarte). Chacune revient
- * juste après la voisine qui la précédait, en tête sans voisine. Les mêmes valeurs s'il n'y a rien à remettre, ou
- * si l'un des deux côtés n'a pas de liste rangée.
+ * sur un calcul que cette version ne connaît pas et absentes de `values` (`keepUnknownActivities`). Les mêmes
+ * valeurs s'il n'y a rien à remettre, ou si l'un des deux côtés n'a pas de liste rangée.
  */
 export const withUnknownActivities = (values: Record<string, unknown>, previous: Record<string, unknown> | null): Record<string, unknown> => {
   const key = STORAGE_KEYS.sportSettings;
   const sport = values[key];
   const previousSport = previous?.[key];
   if (!isObject(sport) || !Array.isArray(sport.activities) || !isObject(previousSport) || !Array.isArray(previousSport.activities)) return values;
-  const list: unknown[] = [...sport.activities];
-  const ids = new Set(list.map(storedActivityId));
-  let anchor: string | null = null;
-  let restored = false;
-  for (const item of previousSport.activities) {
-    const id = storedActivityId(item);
-    if (id === null) continue;
-    if (ids.has(id)) {
-      anchor = id;
-      continue;
-    }
-    // Activité d'un calcul connu, absente : retirée par l'utilisateur.
-    if (isSportType((item as Record<string, unknown>).base)) continue;
-    const at = anchor === null ? 0 : list.findIndex((a) => storedActivityId(a) === anchor) + 1;
-    list.splice(at, 0, item);
-    ids.add(id);
-    anchor = id;
-    restored = true;
-  }
-  return restored ? { ...values, [key]: { ...sport, activities: list } } : values;
+  const list = keepUnknownActivities(sport.activities, previousSport.activities);
+  return list === sport.activities ? values : { ...values, [key]: { ...sport, activities: list } };
 };
 
 /** Texte du fichier, indenté, tableaux de nombres sur une ligne (`stringifyJson`). */

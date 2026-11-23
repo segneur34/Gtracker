@@ -1,5 +1,5 @@
 import {
-  FAMILY_BASE, activitiesOfFamily, activityFamily, baseActivity, findActivity,
+  FAMILY_BASE, activitiesOfFamily, activityFamily, baseActivity, findActivity, keepUnknownActivities,
   readActivities, visibleFamilies, type Activity,
 } from '../core/activities';
 import { presetOf } from './activityPresets';
@@ -295,9 +295,21 @@ const isKnownFamily = (value: unknown): value is SportFamily =>
 export const hiddenFamiliesOf = (stored: StoredSettings): SportFamily[] =>
   Array.isArray(stored.hiddenFamilies) ? stored.hiddenFamilies.filter(isKnownFamily) : [];
 
+/**
+ * Réglages avec cette liste d'activités, celle que `readActivities` rend et que l'utilisateur vient de changer.
+ * Les entrées posées sur un calcul inconnu de cette version, que la lecture a écartées, sont remises à leur
+ * place (`keepUnknownActivities`) : une écriture ne les efface pas de la liste de l'appareil.
+ */
+export const withActivities = (stored: StoredSettings, activities: Activity[]): StoredSettings => {
+  const previous: unknown = stored.activities;
+  if (!Array.isArray(previous)) return { ...stored, activities };
+  // La liste rangée peut porter des entrées que `Activity` ne décrit pas : elles ne sont ni lues ni modifiées.
+  return { ...stored, activities: keepUnknownActivities(activities, previous) as Activity[] };
+};
+
 /** Réglages avec ces activités et ces familles cachées ; `null` s'il ne resterait aucune famille visible. */
 export const withVisibility = (stored: StoredSettings, activities: Activity[], hiddenFamilies: SportFamily[]): StoredSettings | null =>
-  visibleFamilies(activities, hiddenFamilies).length === 0 ? null : { ...stored, activities, hiddenFamilies };
+  visibleFamilies(activities, hiddenFamilies).length === 0 ? null : { ...withActivities(stored, activities), hiddenFamilies };
 
 /** Unité de distance d'une activité : celle choisie, sinon le kilomètre. */
 export const resolveDistanceUnit = (stored: StoredSettings, activity: Activity): DistanceUnit => {

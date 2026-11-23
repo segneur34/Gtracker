@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   ACTIVITY_PALETTE, DEFAULT_ACTIVITIES, SURF_ACTIVITY, SURF_FOIL_ACTIVITY, activitiesOfFamily,
   activityCounts, activityDisplayName, activityFamily, baseActivity, findActivity, insertActivity, isActivityShown, isFamilyHidden,
-  logoColor, newActivityId, nextActivityColor, paletteColorText, readActivities, sessionActivity, sportDisplayName,
-  visibleActivities, visibleFamilies, withHidden, withPaletteColors, type Activity,
+  keepUnknownActivities, logoColor, newActivityId, nextActivityColor, paletteColorText, readActivities, sessionActivity,
+  sportDisplayName, storedActivityIds, visibleActivities, visibleFamilies, withHidden, withPaletteColors, type Activity,
 } from './activities';
 import { CONTEXT_MARK, setLanguage, type Dictionary } from './i18n';
 import { SPORT_PROFILES } from './sportProfiles';
@@ -229,6 +229,35 @@ describe('findActivity et activitiesOfFamily', () => {
   });
 });
 
+describe('entrées d\'un calcul inconnu dans la liste rangée', () => {
+  const futur = { id: 'a-ski', name: 'Ski', base: 'ski', color: '#123456', reglage: 1 };
+  const autre = { id: 'a-luge', name: 'Luge', base: 'luge', color: '#654321' };
+  const wing = { id: 'wingfoil', name: 'Wingfoil', base: 'wingfoil', color: '#ffffff' };
+  const kite = { id: 'kite', name: 'Kite', base: 'kite', color: '#ff7a1a' };
+
+  it('storedActivityIds : tous les identifiants, entrées écartées comprises', () => {
+    expect(storedActivityIds([wing, futur, { id: '', base: 'kite' }, 'abîmé', { name: 'sans id' }, kite])).toEqual(['wingfoil', 'a-ski', 'kite']);
+    expect(storedActivityIds(undefined)).toEqual([]);
+    expect(storedActivityIds({ id: 'a' })).toEqual([]);
+  });
+
+  it('keepUnknownActivities : l\'entrée revient après sa voisine d\'avant, ou en tête', () => {
+    expect(keepUnknownActivities([wing, kite], [wing, futur, kite])).toEqual([wing, futur, kite]);
+    expect(keepUnknownActivities([kite], [futur, autre, kite])).toEqual([futur, autre, kite]);
+    expect(keepUnknownActivities([wing, kite], [wing, kite, futur])).toEqual([wing, kite, futur]);
+  });
+
+  it('keepUnknownActivities : une entrée d\'un calcul connu, absente, ne revient pas ; rien à remettre : la même liste', () => {
+    expect(keepUnknownActivities([wing], [wing, kite])).toEqual([wing]);
+    const same = [wing, futur];
+    expect(keepUnknownActivities(same, [futur, wing])).toBe(same);
+  });
+
+  it('readActivities les écarte, la liste lue ne les montre pas', () => {
+    expect(readActivities([wing, futur]).map((a) => a.id)).toEqual(['wingfoil']);
+  });
+});
+
 describe('newActivityId et nextActivityColor', () => {
   it('tire un identifiant unique du nom, jamais celui d\'un calcul', () => {
     expect(newActivityId('Moth à foil', [])).toBe('a-moth-a-foil');
@@ -236,6 +265,14 @@ describe('newActivityId et nextActivityColor', () => {
     expect(newActivityId('Kite', [])).toBe('a-kite');
     expect(newActivityId('10 000 m', [])).toBe('a-10-000-m');
     expect(newActivityId('!!!', [])).toBe('a-activite');
+  });
+
+  it('ne reprend pas un identifiant réservé, même absent de la liste', () => {
+    expect(newActivityId('Ski', [], ['a-ski'])).toBe('a-ski-2');
+    expect(newActivityId('Ski', [{ ...moth, id: 'a-ski-2' }], ['a-ski'])).toBe('a-ski-3');
+    expect(newActivityId('Ski', [], ['a-autre'])).toBe('a-ski');
+    // Sans réservés, le résultat est celui d'avant.
+    expect(newActivityId('Ski', [], [])).toBe(newActivityId('Ski', []));
   });
 
   it('propose la première couleur libre de la palette, le blanc d\'abord, puis les reprend dans l\'ordre', () => {

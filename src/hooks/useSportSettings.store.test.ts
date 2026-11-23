@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { patchedDraft, type SessionEdits } from '../library/sessionEdits';
 import { jsonStore } from '../platform/storage';
 import { withSetting } from '../settings/activitySettings';
-import { readStoredSettings, subscribeStoredSettings, updateStoredSettings } from './useSportSettings';
+import {
+  addStoredActivity, readStoredSettings, removeStoredActivity, setStoredActivityHidden, setStoredFamilyHidden,
+  subscribeStoredSettings, updateStoredActivity, updateStoredSettings,
+} from './useSportSettings';
 import { STORAGE_KEYS } from '../core/appIdentity';
 
 const KEY = STORAGE_KEYS.sportSettings;
@@ -71,6 +74,60 @@ describe('lecture des réglages par useSyncExternalStore (A4)', () => {
     unsubscribe();
     jsonStore.write(KEY, { a: 1 });
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('activité d\'un calcul inconnu dans la liste de l\'appareil', () => {
+  const futur = { id: 'a-ski', name: 'Ski', base: 'ski', color: '#123456', reglage: 1 };
+  const wing = { id: 'wingfoil', name: 'Wingfoil', base: 'wingfoil', color: '#003e52' };
+  const kite = { id: 'kite', name: 'Kite', base: 'kite', color: '#ff7a1a' };
+  const surf = { id: 'surf', name: 'Surf', base: 'surf', color: '#000000' };
+  const rawIds = () => (readStoredSettings().activities as unknown as { id: string }[]).map((a) => a.id);
+  const rawFutur = () => (readStoredSettings().activities as unknown as { id: string }[]).find((a) => a.id === 'a-ski');
+
+  beforeEach(() => jsonStore.write(KEY, { activities: [wing, futur, kite, surf], thresholds: { 'a-ski': 7 } }));
+
+  it('ajouter « Ski » : l\'entrée reste à son rang et l\'activité neuve ne reprend pas son identifiant', () => {
+    const id = addStoredActivity('Ski', 'kite', '#e0218a');
+    expect(id).toBe('a-ski-2');
+    expect(rawFutur()).toEqual(futur);
+    const ids = rawIds();
+    expect(ids.indexOf('a-ski')).toBe(1);
+    expect(ids).toContain('a-ski-2');
+    // L'entrée inconnue garde ses réglages, la neuve n'en hérite pas.
+    expect(readStoredSettings().thresholds).toEqual({ 'a-ski': 7 });
+  });
+
+  it('renommer une activité connue', () => {
+    updateStoredActivity('kite', { name: 'Kite foil' });
+    expect(rawIds()).toEqual(['wingfoil', 'a-ski', 'kite', 'surf']);
+    expect(rawFutur()).toEqual(futur);
+    expect((readStoredSettings().activities as unknown as { name: string }[])[2].name).toBe('Kite foil');
+  });
+
+  it('supprimer une activité connue : elle part, l\'entrée inconnue reste', () => {
+    removeStoredActivity('kite');
+    expect(rawIds()).toEqual(['wingfoil', 'a-ski', 'surf']);
+    expect(rawFutur()).toEqual(futur);
+  });
+
+  it('cacher puis ré-afficher une activité, cacher puis ré-afficher une famille', () => {
+    setStoredActivityHidden('kite', true);
+    expect(rawIds()).toEqual(['wingfoil', 'a-ski', 'kite', 'surf']);
+    expect(rawFutur()).toEqual(futur);
+    setStoredActivityHidden('kite', false);
+    expect(rawIds()).toEqual(['wingfoil', 'a-ski', 'kite', 'surf']);
+    setStoredFamilyHidden('surf', true);
+    expect(readStoredSettings().hiddenFamilies).toEqual(['surf']);
+    expect(rawIds()).toEqual(['wingfoil', 'a-ski', 'kite', 'surf']);
+    setStoredFamilyHidden('surf', false);
+    expect(readStoredSettings().hiddenFamilies).toEqual([]);
+    expect(rawFutur()).toEqual(futur);
+  });
+
+  it('sans entrée inconnue, une activité neuve garde l\'identifiant tiré de son nom', () => {
+    jsonStore.write(KEY, { activities: [wing, kite, surf] });
+    expect(addStoredActivity('Ski', 'kite', '#e0218a')).toBe('a-ski');
   });
 });
 

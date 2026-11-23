@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   activitiesOfFamily, activityFamily, findActivity, isActivityShown, newActivityId, insertActivity,
-  readActivities, visibleActivities, visibleFamilies, withHidden, type Activity,
+  readActivities, storedActivityIds, visibleActivities, visibleFamilies, withHidden, type Activity,
 } from '../core/activities';
 import type { LogoId } from '../core/activityLogos';
 import { defaultActiveThresholdOf, getSportProfile, type RecordingProfile, type SportFamily } from '../core/sportProfiles';
@@ -23,7 +23,7 @@ import {
   moduleActivity, resetOverrides,
   resolveDistanceUnit, resolveFoil, resolveGearReminderCloses, resolveHeartRate, resolveHrOffset, resolveJumps, resolveLiveFields,
   resolveMarkGuide, resolveNotificationFields, resolvePumping, resolveRecordingProfile, resolveTurns, resolveSpeedRange, resolveSpeedUnit,
-  resolveTabChoices, resolveThresholdOverride, settingsView, withSetting, withVisibility, withoutOverrides,
+  resolveTabChoices, resolveThresholdOverride, settingsView, withActivities, withSetting, withVisibility, withoutOverrides,
   type SettingField, type SportSettingsView, type StoredSettings,
 } from '../settings/activitySettings';
 import { STORAGE_KEYS } from '../core/appIdentity';
@@ -272,6 +272,73 @@ export const effectiveSpeedUnit = (activity: Activity): SpeedUnit => resolveSpee
 export const effectiveDistanceUnit = (activity: Activity): DistanceUnit => resolveDistanceUnit(readStoredSettings(), activity);
 
 /**
+ * Ajoute une activité, rangée avec sa famille ; rend son identifiant, `null` si le nom est vide. L'identifiant ne
+ * reprend aucun de la liste rangée, celui d'une entrée d'un calcul inconnu comprise : la neuve n'hériterait pas de
+ * ses réglages.
+ */
+export const addStoredActivity = (name: string, base: SportType, color: string, icon?: LogoId): string | null => {
+  const trimmed = name.trim();
+  if (trimmed === '') return null;
+  let id = '';
+  updateStoredSettings((stored) => {
+    const activities = storedActivities(stored);
+    id = newActivityId(trimmed, activities, storedActivityIds(stored.activities));
+    const activity: Activity = { id, name: trimmed, base, color, ...(icon ? { icon } : {}) };
+    return withActivities(stored, insertActivity(activities, activity));
+  });
+  return id;
+};
+
+/** Renomme, recolore ou change l'icône d'une activité ; un nom vide est ignoré. */
+export const updateStoredActivity = (id: string, patch: { name?: string; color?: string; icon?: LogoId }): void => {
+  const name = patch.name?.trim();
+  updateStoredSettings((stored) => withActivities(stored, storedActivities(stored).map((a) =>
+    a.id === id
+      ? { ...a, ...(name ? { name } : {}), ...(patch.color ? { color: patch.color } : {}), ...(patch.icon ? { icon: patch.icon } : {}) }
+      : a
+  )));
+};
+
+/**
+ * Supprime une activité et ses réglages. Ses sessions restent, sous le nom
+ * de leur calcul (`sessionActivity`).
+ */
+export const removeStoredActivity = (id: string): void =>
+  updateStoredSettings((stored) => withActivities(withoutOverrides(stored, id), storedActivities(stored).filter((a) => a.id !== id)));
+
+/**
+ * Cache ou ré-affiche une activité ; rien n'est effacé.
+ * Ré-afficher une activité d'une famille cachée ré-affiche la famille.
+ * Cacher la dernière activité visible de la dernière famille visible est refusé.
+ */
+export const setStoredActivityHidden = (id: string, hidden: boolean): void =>
+  updateStoredSettings((stored) => {
+    const activities = storedActivities(stored);
+    const hiddenFamilies = hiddenFamiliesOf(stored);
+    const target = activities.find((a) => a.id === id);
+    if (!target) return null;
+    const nextActivities = activities.map((a) => (a.id === id ? withHidden(a, hidden) : a));
+    const family = activityFamily(target);
+    return withVisibility(stored, nextActivities, hidden ? hiddenFamilies : hiddenFamilies.filter((f) => f !== family));
+  });
+
+/**
+ * Cache ou ré-affiche une famille. Ré-afficher une famille dont toutes les
+ * activités sont cachées les ré-affiche toutes ; sinon chacune garde son
+ * choix. Cacher la dernière famille visible est refusé.
+ */
+export const setStoredFamilyHidden = (family: SportFamily, hidden: boolean): void =>
+  updateStoredSettings((stored) => {
+    const activities = storedActivities(stored);
+    const hiddenFamilies = hiddenFamiliesOf(stored);
+    if (hidden) return withVisibility(stored, activities, hiddenFamilies.includes(family) ? hiddenFamilies : [...hiddenFamilies, family]);
+    const own = activitiesOfFamily(activities, family);
+    const allHidden = own.length > 0 && own.every((a) => a.hidden);
+    const nextActivities = allHidden ? activities.map((a) => (activityFamily(a) === family ? withHidden(a, false) : a)) : activities;
+    return withVisibility(stored, nextActivities, hiddenFamilies.filter((f) => f !== family));
+  });
+
+/**
  * Accès à toutes les activités à la fois, pour la page Réglages : leurs
  * réglages, et la liste elle-même (ajouter, renommer, supprimer). Chaque
  * modification est écrite immédiatement ; les modules la lisent à leur
@@ -294,90 +361,6 @@ export const useAllSportSettings = () => {
 
   /** Remet tous les réglages d'une activité au défaut de son calcul ; le matériel enregistré reste. */
   const resetActivity = useCallback((id: string) => updateStoredSettings((stored) => resetOverrides(stored, id)), []);
-
-  /** Ajoute une activité, rangée avec sa famille ; rend son identifiant, `null` si le nom est vide. */
-  const addActivity = useCallback(
-    (name: string, base: SportType, color: string, icon?: LogoId): string | null => {
-      const trimmed = name.trim();
-      if (trimmed === '') return null;
-      let id = '';
-      updateStoredSettings((stored) => {
-        const activities = storedActivities(stored);
-        id = newActivityId(trimmed, activities);
-        const activity: Activity = { id, name: trimmed, base, color, ...(icon ? { icon } : {}) };
-        return { ...stored, activities: insertActivity(activities, activity) };
-      });
-      return id;
-    },
-    []
-  );
-
-  /** Renomme, recolore ou change l'icône d'une activité ; un nom vide est ignoré. */
-  const updateActivity = useCallback(
-    (id: string, patch: { name?: string; color?: string; icon?: LogoId }) => {
-      const name = patch.name?.trim();
-      updateStoredSettings((stored) => ({
-        ...stored,
-        activities: storedActivities(stored).map((a) =>
-          a.id === id
-            ? { ...a, ...(name ? { name } : {}), ...(patch.color ? { color: patch.color } : {}), ...(patch.icon ? { icon: patch.icon } : {}) }
-            : a
-        ),
-      }));
-    },
-    []
-  );
-
-  /**
-   * Supprime une activité et ses réglages. Ses sessions restent, sous le nom
-   * de leur calcul (`sessionActivity`).
-   */
-  const removeActivity = useCallback(
-    (id: string) =>
-      updateStoredSettings((stored) => ({
-        ...withoutOverrides(stored, id),
-        activities: storedActivities(stored).filter((a) => a.id !== id),
-      })),
-    []
-  );
-
-  /**
-   * Cache ou ré-affiche une activité ; rien n'est effacé.
-   * Ré-afficher une activité d'une famille cachée ré-affiche la famille.
-   * Cacher la dernière activité visible de la dernière famille visible est refusé.
-   */
-  const setActivityHidden = useCallback(
-    (id: string, hidden: boolean) =>
-      updateStoredSettings((stored) => {
-        const activities = storedActivities(stored);
-        const hiddenFamilies = hiddenFamiliesOf(stored);
-        const target = activities.find((a) => a.id === id);
-        if (!target) return null;
-        const nextActivities = activities.map((a) => (a.id === id ? withHidden(a, hidden) : a));
-        const family = activityFamily(target);
-        return withVisibility(stored, nextActivities, hidden ? hiddenFamilies : hiddenFamilies.filter((f) => f !== family));
-      }),
-    []
-  );
-
-  /**
-   * Cache ou ré-affiche une famille. Ré-afficher une famille dont toutes les
-   * activités sont cachées les ré-affiche toutes ; sinon chacune garde son
-   * choix. Cacher la dernière famille visible est refusé.
-   */
-  const setFamilyHidden = useCallback(
-    (family: SportFamily, hidden: boolean) =>
-      updateStoredSettings((stored) => {
-        const activities = storedActivities(stored);
-        const hiddenFamilies = hiddenFamiliesOf(stored);
-        if (hidden) return withVisibility(stored, activities, hiddenFamilies.includes(family) ? hiddenFamilies : [...hiddenFamilies, family]);
-        const own = activitiesOfFamily(activities, family);
-        const allHidden = own.length > 0 && own.every((a) => a.hidden);
-        const nextActivities = allHidden ? activities.map((a) => (activityFamily(a) === family ? withHidden(a, false) : a)) : activities;
-        return withVisibility(stored, nextActivities, hiddenFamilies.filter((f) => f !== family));
-      }),
-    []
-  );
 
   const longPressMs = isValidLongPress(stored.longPressMs) ? stored.longPressMs : DEFAULT_LONG_PRESS_MS;
   /** Durée de l'appui long, en millisecondes ; `null` revient au défaut. */
@@ -422,8 +405,9 @@ export const useAllSportSettings = () => {
   );
 
   return {
-    activities, view, setFor, resetActivity, addActivity, updateActivity, removeActivity, longPressMs, setLongPressMs,
-    stopHoldMs, setStopHoldMs, beepSound, setBeepSound, hiddenFamilies: hiddenFamiliesOf(stored), setActivityHidden, setFamilyHidden,
+    activities, view, setFor, resetActivity, addActivity: addStoredActivity, updateActivity: updateStoredActivity,
+    removeActivity: removeStoredActivity, longPressMs, setLongPressMs, stopHoldMs, setStopHoldMs, beepSound, setBeepSound,
+    hiddenFamilies: hiddenFamiliesOf(stored), setActivityHidden: setStoredActivityHidden, setFamilyHidden: setStoredFamilyHidden,
   };
 };
 

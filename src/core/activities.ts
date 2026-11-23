@@ -410,11 +410,54 @@ export const insertActivity = (activities: Activity[], activity: Activity): Acti
   return [...activities.slice(0, at), activity, ...activities.slice(at)];
 };
 
+/** Identifiant d'une activité rangée, `null` si elle n'en a pas. */
+const storedActivityId = (item: unknown): string | null =>
+  isObject(item) && typeof item.id === 'string' && item.id !== '' ? item.id : null;
+
+/**
+ * Identifiants de toute la liste rangée, entrées écartées à la lecture comprises (`readActivities` n'en rend que
+ * les valides) : ceux qu'une activité neuve ne doit pas reprendre. Une liste absente ou abîmée n'en réserve aucun.
+ */
+export const storedActivityIds = (raw: unknown): string[] =>
+  Array.isArray(raw) ? raw.map(storedActivityId).filter((id): id is string => id !== null) : [];
+
+/**
+ * Liste à écrire (`next`) avec, remises à leur place, les entrées de la liste précédente (`previous`, telle que
+ * rangée) posées sur un calcul que cette version ne connaît pas et absentes de `next`. Cette version ne les montre
+ * pas, donc ne peut pas les avoir retirées : `readActivities` les écarte, une réécriture de la liste les perdrait.
+ * Chacune revient juste après la voisine qui la précédait, en tête sans voisine. Une entrée absente d'un calcul
+ * connu reste retirée (l'utilisateur l'a supprimée). Rend `next` lui-même s'il n'y a rien à remettre.
+ */
+export const keepUnknownActivities = (next: readonly unknown[], previous: readonly unknown[]): readonly unknown[] => {
+  const list: unknown[] = [...next];
+  const ids = new Set(list.map(storedActivityId));
+  let anchor: string | null = null;
+  let restored = false;
+  for (const item of previous) {
+    const id = storedActivityId(item);
+    if (id === null) continue;
+    if (ids.has(id)) {
+      anchor = id;
+      continue;
+    }
+    // Activité d'un calcul connu, absente : retirée par l'utilisateur.
+    if (isSportType((item as Record<string, unknown>).base)) continue;
+    const at = anchor === null ? 0 : list.findIndex((a) => storedActivityId(a) === anchor) + 1;
+    list.splice(at, 0, item);
+    ids.add(id);
+    anchor = id;
+    restored = true;
+  }
+  return restored ? list : next;
+};
+
 /**
  * Identifiant d'une nouvelle activité, tiré de son nom et unique. Le préfixe
  * `a-` l'empêche de se confondre avec un calcul, donc avec une activité de base.
+ * `reserved` : identifiants à ne pas reprendre bien qu'absents de `existing`
+ * (`storedActivityIds`).
  */
-export const newActivityId = (name: string, existing: Activity[]): string => {
+export const newActivityId = (name: string, existing: Activity[], reserved: readonly string[] = []): string => {
   const slug =
     name
       .normalize('NFD')
@@ -423,7 +466,7 @@ export const newActivityId = (name: string, existing: Activity[]): string => {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .slice(0, 24) || 'activite';
-  const taken = new Set(existing.map((a) => a.id));
+  const taken = new Set([...existing.map((a) => a.id), ...reserved]);
   let id = `a-${slug}`;
   for (let n = 2; taken.has(id); n++) id = `a-${slug}-${n}`;
   return id;
