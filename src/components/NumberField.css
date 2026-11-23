@@ -2,6 +2,7 @@
 .number-field {
   display: flex;
   align-items: center;
+  flex-wrap: wrap; /* écran étroit et gros texte : l'unité passe à la ligne au lieu de sortir de l'écran */
   gap: 8px;
   margin-bottom: 0;
   font-size: var(--text-s);

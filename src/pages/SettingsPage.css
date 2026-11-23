@@ -189,6 +189,12 @@
   width: auto;
 }
 
+/* Une liste déroulante ne dépasse pas sa ligne : sur écran étroit et gros texte, elle rétrécit (texte coupé). */
+.settings-row > .ui-field,
+.settings-sports__pair > .ui-field {
+  max-width: 100%;
+}
+
 /* Sous-option d'un réglage coché (sauts) : en retrait sous lui. */
 .settings-row--sub {
   padding-left: var(--space-4);
